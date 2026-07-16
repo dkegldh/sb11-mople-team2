@@ -1,0 +1,21 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:mople-test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+
+jwt:
+  secret: test-secret-key-for-ci-pipeline-only-1234567890
+
+external-api:
+  tmdb:
+    base-url: http://localhost:0
+    api-key: test-key
+  sportsdb:
+    base-url: http://localhost:0
+    api-key: test-key

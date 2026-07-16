@@ -1,0 +1,25 @@
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+logging:
+  level:
+    com.codeit.mople: INFO
+
+jwt:
+  secret: ${JWT_SECRET}
+
+external-api:
+  tmdb:
+    base-url: https://api.themoviedb.org/3
+    api-key: ${TMDB_API_KEY}
+  sportsdb:
+    base-url: https://www.thesportsdb.com/api/v1/json
+    api-key: ${SPORTSDB_API_KEY}

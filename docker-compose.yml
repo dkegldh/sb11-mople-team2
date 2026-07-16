@@ -1,0 +1,22 @@
+services:
+  # 로컬 개발용 DB
+  postgres-dev:
+    image: postgres:16-alpine
+    container_name: mople-postgres-dev
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=pass
+      - POSTGRES_DB=monew_db
+
+  # 로컬 테스트용 DB
+  postgres-test:
+    image: postgres:16-alpine
+    container_name: mople-postgres-test
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=pass
+      - POSTGRES_DB=monew_test

@@ -1,0 +1,63 @@
+name: CI PipeLine
+
+on:
+  pull_request:
+    branches: [ "main", "develop" ]
+  push:
+    branches: [ "main", "develop" ]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: JDK 17 설정
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Gradle 설정 (캐시 포함)
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: gradlew 실행 권한 부여
+        run: chmod +x ./gradlew
+
+      - name: 빌드 및 테스트 (커버리지 게이트 포함)
+        run: ./gradlew build
+        env:
+          SPRING_PROFILES_ACTIVE: test
+
+      - name: 테스트 결과 요약
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: 테스트 결과
+          path: '**/build/test-results/test/*.xml'
+          reporter: java-junit
+          fail-on-error: false
+
+      - name: JaCoCo 커버리지 리포트 코멘트
+        if: github.event_name == 'pull_request'
+        uses: madrapps/jacoco-report@v1.7.1
+        with:
+          paths: '**/build/reports/jacoco/test/jacocoTestReport.xml'
+          token: ${{ secrets.GITHUB_TOKEN }}
+          min-coverage-overall: 80
+          min-coverage-changed-files: 80
+          title: 📊 커버리지 리포트
+
+      - name: 커버리지 리포트 아티팩트 리포트
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: '**/build/reports/jacoco/test/html'
+          retention-days: 7

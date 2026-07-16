@@ -1,0 +1,20 @@
+spring:
+  application:
+    name: mople
+  profiles:
+    active: dev
+
+server:
+  port: 8080
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+jwt:
+  access-token-expiration: 1800000     # 30분 (ms)
+  refresh-token-expiration: 604800000  # 7일 (ms)
+
+password-reset:
+  temporary-password: "temporary1!!"
+  expiration-minutes: 3

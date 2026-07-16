@@ -1,0 +1,25 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/mople
+    username: mople
+    password: mople1234
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+logging:
+  level:
+    com.codeit.mople: DEBUG
+
+jwt:
+  secret: ${JWT_SECRET:local-dev-secret-key-change-this-1234567890}
+
+external-api:
+  tmdb:
+    base-url: https://api.themoviedb.org/3
+    api-key: ${TMDB_API_KEY:}
+  sportsdb:
+    base-url: https://www.thesportsdb.com/api/v1/json
+    api-key: ${SPORTSDB_API_KEY:}
