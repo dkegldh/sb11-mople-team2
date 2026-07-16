@@ -6,9 +6,9 @@ services:
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=pass
-      - POSTGRES_DB=monew_db
+      - POSTGRES_USER=mople
+      - POSTGRES_PASSWORD=mople1234
+      - POSTGRES_DB=mople_db
 
   # 로컬 테스트용 DB
   postgres-test:
@@ -17,6 +17,6 @@ services:
     ports:
       - "5433:5432"
     environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=pass
-      - POSTGRES_DB=monew_test
+      - POSTGRES_USER=mople
+      - POSTGRES_PASSWORD=mople1234
+      - POSTGRES_DB=mople_db

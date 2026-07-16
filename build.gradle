@@ -20,7 +20,7 @@ repositories {
 }
 
 ext {
-    set('springCloudVersion', "2024.0.0")
+    set('springCloudVersion', "2025.0.1")
 }
 
 dependencies {
@@ -80,6 +80,7 @@ dependencyManagement {
 
 tasks.named('test') {
     useJUnitPlatform()
+    systemProperty 'spring.profiles.active', 'test'
     finalizedBy 'jacocoTestReport'
 }
 
