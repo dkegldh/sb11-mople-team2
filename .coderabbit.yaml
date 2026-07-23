@@ -1,0 +1,24 @@
+# .coderabbit.yaml
+language: "ko-KR" # 한국어
+
+reviews:
+  profile: "chill" # 리뷰 성향: 느슨함
+  request_changes_workflow: false
+  high_level_summary: true # PR 요약본 생성 켜기
+  poem: false
+
+  # 리뷰 지침 (Custom Instructions)
+  instructions: |
+    - Java와 Spring Boot 기반의 백엔드 코드 컨벤션을 엄격하게 지켜주세요.
+    - JPA, Hibernate 사용 시 발생할 수 있는 N+1 문제나 성능 저하 요인을 꼼꼼히 체크해 주세요.
+    - 예외 처리(Exception Handling)와 트랜잭션(@Transactional) 누락이 없는지 확인해 주세요.
+    - 불필요한 객체 생성이나 메모리 낭비가 있는지 확인해 주세요.
+
+  # AI가 굳이 읽고 리뷰할 필요가 없는 파일들 제외 (토큰 낭비 방지)
+  path_filters:
+    - "!src/main/resources/static/**" # 방금 추가한 프론트엔드 정적 파일들은 로직 리뷰 대상에서 제외
+    - "!*.md"
+    - "!*.json"
+
+chat:
+  auto_reply: true # 사용자가 @coderabbitai 를 태그하지 않아도 맥락에 따라 자동 답변
