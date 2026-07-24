@@ -1,0 +1,48 @@
+<configuration>
+  <property name="LOG_PATTERN"
+    value="%d{yy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%X{requestId:--} | %X{method:--} | %X{url:--}] - %msg%n"/>
+
+  <property name="LOG_PATH" value=".logs"/>
+
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>${LOG_PATTERN}</pattern>
+    </encoder>
+  </appender>
+
+  <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>${LOG_PATH}/application.log</file>
+    <encoder>
+      <pattern>${LOG_PATTERN}</pattern>
+    </encoder>
+    <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+      <fileNamePattern>${LOG_PATH}/application-%d{yyyy-MM-dd}.log</fileNamePattern>
+      <maxHistory>30</maxHistory>
+    </rollingPolicy>
+  </appender>
+
+  <!-- 로컬 개발: 콘솔 + 파일, 도메인 패키지는 DEBUG로 상세히 -->
+  <springProfile name="dev">
+    <root level="INFO">
+      <appender-ref ref="CONSOLE"/>
+      <appender-ref ref="FILE"/>
+    </root>
+    <logger name="com.codeit.mople" level="DEBUG"/>
+  </springProfile>
+
+  <!-- 테스트: 콘솔만, 노이즈 최소화 -->
+  <springProfile name="test">
+    <root level="WARN">
+      <appender-ref ref="CONSOLE"/>
+    </root>
+    <logger name="com.codeit.mople" level="INFO"/>
+  </springProfile>
+
+  <!-- 운영: 콘솔 + 파일 -->
+  <springProfile name="prod">
+    <root level="INFO">
+      <appender-ref ref="CONSOLE"/>
+      <appender-ref ref="FILE"/>
+    </root>
+  </springProfile>
+</configuration>
