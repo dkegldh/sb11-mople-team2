@@ -48,8 +48,8 @@ class AdminInitializerTest {
 
   @Test
   void 어드민_계정이_없으면_생성한다() throws Exception {
-    given(userRepository.existsByRole(Role.ADMIN)).willReturn(false);
     given(userRepository.existsByEmail("admin@mople.com")).willReturn(false);
+    given(userRepository.existsByRole(Role.ADMIN)).willReturn(false);
     given(passwordEncoder.encode(anyString())).willReturn("encoded-password");
 
     adminInitializer.run(applicationArguments);
@@ -68,7 +68,6 @@ class AdminInitializerTest {
 
   @Test
   void 어드민_이메일을_일반유저가_사용중이면_생성하지_않는다() throws Exception {
-    given(userRepository.existsByRole(Role.ADMIN)).willReturn(false);
     given(userRepository.existsByEmail("admin@mople.com")).willReturn(true);
 
     adminInitializer.run(applicationArguments);
@@ -78,8 +77,8 @@ class AdminInitializerTest {
 
   @Test
   void 동시_초기화로_이메일_유니크_제약_위반이_발생하면_조용히_넘어간다() throws Exception {
-    given(userRepository.existsByRole(Role.ADMIN)).willReturn(false);
     given(userRepository.existsByEmail("admin@mople.com")).willReturn(false);
+    given(userRepository.existsByRole(Role.ADMIN)).willReturn(false);
     given(passwordEncoder.encode(anyString())).willReturn("encoded-password");
 
     ConstraintViolationException cause =
