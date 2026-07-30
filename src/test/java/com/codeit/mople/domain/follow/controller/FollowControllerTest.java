@@ -13,12 +13,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.codeit.mople.domain.auth.security.CustomUserDetails;
 import com.codeit.mople.domain.follow.dto.FollowRequest;
 import com.codeit.mople.domain.follow.dto.FollowResponse;
 import com.codeit.mople.domain.follow.exception.FollowErrorCode;
 import com.codeit.mople.domain.follow.service.FollowService;
+import com.codeit.mople.domain.user.entity.Role;
 import com.codeit.mople.global.error.CustomException;
-import com.codeit.mople.global.security.MoplUserDetails;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,7 +44,7 @@ class FollowControllerTest {
   @MockitoBean
   FollowService followService;
 
-  MoplUserDetails principal;
+  CustomUserDetails principal;
   UUID followeeId;
   UUID followerId;
   UUID followId;
@@ -53,7 +54,7 @@ class FollowControllerTest {
     followeeId = UUID.randomUUID();
     followerId = UUID.randomUUID();
     followId = UUID.randomUUID();
-    principal = new MoplUserDetails(followerId);
+    principal = new CustomUserDetails(followerId, Role.USER);
   }
 
   @Nested

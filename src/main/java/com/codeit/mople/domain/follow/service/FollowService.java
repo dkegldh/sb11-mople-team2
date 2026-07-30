@@ -5,6 +5,7 @@ import com.codeit.mople.domain.follow.dto.FollowResponse;
 import com.codeit.mople.domain.follow.entity.Follow;
 import com.codeit.mople.domain.follow.event.FollowCreatedEvent;
 import com.codeit.mople.domain.follow.exception.FollowErrorCode;
+import com.codeit.mople.domain.follow.exception.FollowException;
 import com.codeit.mople.domain.follow.mapper.FollowMapper;
 import com.codeit.mople.domain.follow.repository.FollowRepository;
 import com.codeit.mople.domain.user.entity.User;
@@ -60,4 +61,34 @@ public class FollowService {
     return followMapper.toFollowResponse(saved);
   }
 
+  @Transactional
+  public void unFollow(UUID followId, UUID followerId) {
+
+    log.debug("팔로우 취소 시도: followId={}, followerId={}", followId, followerId);
+
+    // 해당 followId가 있는지 검증
+     Follow follow = followRepository.findById(followId)
+         .orElseThrow(() -> new CustomException(FollowErrorCode.FOLLOW_NOT_FOUND));
+
+     // 본인의 팔로우만 언팔 가능
+     if (!follow.getFollower().getId().equals(followerId)) {
+       throw new CustomException(FollowErrorCode.FOLLOW_NOT_OWNER);
+     }
+
+     // 해당 팔로우(row) 삭제
+     followRepository.delete(follow);
+     log.info("팔로우 취소 성공: followId={}, followerId={}", followId, followerId);
+  }
+
+  public FollowResponse getFollowByMe(UUID followeeId, UUID followerId) {
+    log.debug("팔로우 여부 조회: followeeId={}, followerId={}", followeeId, followerId);
+    Follow followByMe = followRepository.findByFolloweeIdAndFollowerId(followeeId, followerId)
+        .orElseThrow(() -> new FollowException(FollowErrorCode.FOLLOW_BY_ME_NOT_FOUND));
+    return followMapper.toFollowResponse(followByMe);
+  }
+
+  public long getFollowCount(UUID followeeId) {
+    log.debug("팔로우 수 조회: followeeId={}", followeeId);
+    return followRepository.countByFolloweeId(followeeId);
+  }
 }
