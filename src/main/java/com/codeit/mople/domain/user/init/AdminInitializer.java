@@ -27,11 +27,11 @@ public class AdminInitializer implements ApplicationRunner {
   @Override
   public void run(ApplicationArguments args) {
     log.debug("어드민 계정 초기화 시작");
-    if (userRepository.existsByRole(Role.ADMIN)) {
-      return;
-    }
     if (userRepository.existsByEmail(adminProperties.email())) {
       log.warn("어드민 계정이메일이 이미 사용중입니다. : {}", maskEmail(adminProperties.email()));
+      return;
+    }
+    if (userRepository.existsByRole(Role.ADMIN)) {
       return;
     }
     User admin = User.createAdmin(
