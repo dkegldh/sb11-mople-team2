@@ -44,3 +44,6 @@ application-local.yaml
 
 ### 로컬 문서 ###
 /docs/
+#임시 얼로드 폴더 제외
+/uploads/
+

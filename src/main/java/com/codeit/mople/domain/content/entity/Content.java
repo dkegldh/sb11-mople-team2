@@ -1,5 +1,6 @@
 package com.codeit.mople.domain.content.entity;
 
+
 import com.codeit.mople.global.entity.BaseTimeEntity;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
@@ -10,6 +11,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Table;
+import java.util.ArrayList;
 import java.util.List;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -54,7 +56,9 @@ public class Content extends BaseTimeEntity {
     this.title = title;
     this.description = description;
     this.thumbnailUrl = thumbnailUrl;
-    this.tags = tags;
+
+    //생성 시 복사본(new ArrayList)을 사용하여 불변 리스트 참조 방지
+    this.tags = tags != null ? new ArrayList<>(tags) : new ArrayList<>();
   }
 
   //새로운 리뷰가 작성되거나 삭제 될 때,
@@ -66,9 +70,22 @@ public class Content extends BaseTimeEntity {
 
   //관리자가 콘텐츠의 기본 정보를 수정할 때 사용하는 메서드
   public void updateContentInfo(String title, String description, String thumbnailUrl, List<String> tags) {
-    this.title = title;
-    this.description = description;
-    this.thumbnailUrl = thumbnailUrl;
-    this.tags = tags;
+    if (title != null) {
+      this.title = title;
+    }
+
+    if (description != null) {
+      this.description = description;
+    }
+
+    if (thumbnailUrl != null) {
+      this.thumbnailUrl = thumbnailUrl;
+    }
+    
+    //Hibernate 컬렉션 래퍼 유지를 위한 clear/addAll 적용
+    if (tags != null) {
+      this.tags.clear();
+      this.tags.addAll(tags);
+    }
   }
 }
