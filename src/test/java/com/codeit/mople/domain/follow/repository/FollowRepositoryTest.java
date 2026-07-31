@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.codeit.mople.domain.follow.entity.Follow;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.global.config.JpaAuditingConfig;
+import com.codeit.mople.global.config.QueryDslConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -17,7 +18,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 
 @DataJpaTest
-@Import(JpaAuditingConfig.class)
+@Import({JpaAuditingConfig.class, QueryDslConfig.class})
 @DisplayName("FollowRepository 테스트")
 class FollowRepositoryTest {
 

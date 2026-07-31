@@ -2,13 +2,17 @@ package com.codeit.mople.domain.user.service;
 
 import com.codeit.mople.domain.user.dto.request.ChangePasswordRequest;
 import com.codeit.mople.domain.user.dto.request.UserCreateRequest;
+import com.codeit.mople.domain.user.dto.request.UserSearchRequest;
+import com.codeit.mople.domain.user.dto.request.UserSortBy;
 import com.codeit.mople.domain.user.dto.request.UserUpdateRequest;
 import com.codeit.mople.domain.user.dto.response.UserDto;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.exception.UserErrorCode;
 import com.codeit.mople.domain.user.exception.UserException;
 import com.codeit.mople.domain.user.repository.UserRepository;
+import com.codeit.mople.global.dto.CursorResponse;
 import com.codeit.mople.global.storage.FileStorageService;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +44,19 @@ public class UserService {
   public UserDto getUser(UUID userId) {
     User user = findUserOrThrow(userId);
     return UserDto.from(user);
+  }
+
+  public CursorResponse<UserDto> getUsers(UserSearchRequest request) {
+    List<User> users = userRepository.searchUsers(request);
+
+    return CursorResponse.of(
+        users.stream().map(UserDto::from).toList(),
+        request.limitOrDefault(),
+        request.sortByOrDefault().name(),
+        request.sortDirectionOrDefault().name(),
+        dto -> cursorValueOf(dto, request.sortByOrDefault()),
+        UserDto::id
+    );
   }
 
   @Transactional
@@ -74,5 +91,15 @@ public class UserService {
     if(!targetUserId.equals(requesterId)) {
       throw new UserException(UserErrorCode.FORBIDDEN_ACCESS);
     }
+  }
+
+  private String cursorValueOf(UserDto dto, UserSortBy sortBy) {
+    return switch (sortBy) {
+      case name -> dto.name();
+      case email -> dto.email();
+      case createdAt -> dto.createdAt().toString();
+      case isLocked -> String.valueOf(dto.locked());
+      case role -> dto.role().name();
+    };
   }
 }
