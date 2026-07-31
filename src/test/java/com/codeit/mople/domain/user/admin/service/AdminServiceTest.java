@@ -14,11 +14,8 @@ import com.codeit.mople.domain.user.exception.UserErrorCode;
 import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.global.error.CustomException;
 import com.codeit.mople.global.event.UserForceLogoutEvent;
-import com.codeit.mople.domain.user.dto.response.UserDto;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.data.domain.Sort;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -69,34 +66,6 @@ class AdminServiceTest {
   @AfterEach
   void tearDown() {
     SecurityContextHolder.clearContext();
-  }
-
-  @Nested
-  @DisplayName("사용자 목록 조회")
-  class GetUserList {
-
-    @Test
-    @DisplayName("전체 사용자 목록을 가입일 오름차순으로 반환한다")
-    void 전체_사용자_목록을_가입일_오름차순으로_반환한다() {
-      // given
-      User user1 = User.createUser("user1@test.com", "encoded", "유저1");
-      User user2 = User.createAdmin("admin@test.com", "encoded", "어드민");
-      given(userRepository.findAll(Sort.by("createdAt").ascending()))
-          .willReturn(List.of(user1, user2));
-
-      // when
-      List<UserDto> result = adminService.getUserList();
-
-      // then
-      assertThat(result).hasSize(2);
-      assertThat(result.get(0).email()).isEqualTo("user1@test.com");
-      assertThat(result.get(0).name()).isEqualTo("유저1");
-      assertThat(result.get(0).role()).isEqualTo(Role.USER);
-      assertThat(result.get(0).locked()).isFalse();
-      assertThat(result.get(1).email()).isEqualTo("admin@test.com");
-      assertThat(result.get(1).name()).isEqualTo("어드민");
-      assertThat(result.get(1).role()).isEqualTo(Role.ADMIN);
-    }
   }
 
   @Nested

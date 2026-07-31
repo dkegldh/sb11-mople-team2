@@ -4,13 +4,10 @@ import com.codeit.mople.domain.user.admin.controller.api.AdminApi;
 import com.codeit.mople.domain.user.admin.dto.LockUpdateRequest;
 import com.codeit.mople.domain.user.admin.dto.RoleUpdateRequest;
 import com.codeit.mople.domain.user.admin.service.AdminService;
-import com.codeit.mople.domain.user.dto.response.UserDto;
 import com.codeit.mople.global.response.ApiResponse;
 import jakarta.validation.Valid;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -23,12 +20,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminController implements AdminApi {
 
   private final AdminService adminService;
-
-  @Override
-  @GetMapping
-  public ApiResponse<List<UserDto>> getUserList() {
-    return ApiResponse.success(adminService.getUserList());
-  }
 
   @Override
   @PatchMapping("/{userId}/role")
