@@ -195,7 +195,7 @@ class AdminControllerTest {
           .andDo(print())
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.success").value(false))
-          .andExpect(jsonPath("$.error.code").value("USER-006"));
+          .andExpect(jsonPath("$.error.code").value("USER-007"));
     }
   }
 
@@ -314,7 +314,7 @@ class AdminControllerTest {
           .andDo(print())
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.success").value(false))
-          .andExpect(jsonPath("$.error.code").value("USER-006"));
+          .andExpect(jsonPath("$.error.code").value("USER-007"));
     }
   }
 }
