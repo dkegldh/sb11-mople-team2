@@ -59,6 +59,7 @@ class AdminInitializerTest {
 
   @Test
   void 어드민_계정이_이미_있으면_생성하지_않는다() throws Exception {
+    given(userRepository.existsByEmail("admin@mople.com")).willReturn(false);
     given(userRepository.existsByRole(Role.ADMIN)).willReturn(true);
 
     adminInitializer.run(applicationArguments);

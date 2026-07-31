@@ -8,13 +8,19 @@ import static org.mockito.Mockito.when;
 
 import com.codeit.mople.domain.user.dto.request.ChangePasswordRequest;
 import com.codeit.mople.domain.user.dto.request.UserCreateRequest;
+import com.codeit.mople.domain.user.dto.request.UserSearchRequest;
+import com.codeit.mople.domain.user.dto.request.UserSortBy;
 import com.codeit.mople.domain.user.dto.request.UserUpdateRequest;
 import com.codeit.mople.domain.user.dto.response.UserDto;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.exception.UserErrorCode;
+import com.codeit.mople.domain.user.exception.UserException;
 import com.codeit.mople.domain.user.repository.UserRepository;
+import com.codeit.mople.global.dto.CursorResponse;
+import com.codeit.mople.global.dto.SortDirection;
 import com.codeit.mople.global.error.CustomException;
 import com.codeit.mople.global.storage.FileStorageService;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,14 +70,18 @@ public class UserServiceTest {
   }
 
   @Test
-  @DisplayName("이메일 중복 시 예외 발생")
+  @DisplayName("이메일 중복 시 예외 발생 및 중복된 이메일 정보 포함")
   void signUp_throwsException_whenEmailDuplicated() {
     UserCreateRequest request = new UserCreateRequest("dup@test.com", "rawPw123", "testUser");
     when(userRepository.existsByEmail(request.email())).thenReturn(true);
 
     assertThatThrownBy(() -> userService.signUp(request))
-        .isInstanceOf(CustomException.class)
-        .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.DUPLICATE_EMAIL);
+        .isInstanceOf(UserException.class)
+        .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.DUPLICATE_EMAIL)
+        .satisfies(e -> {
+          UserException ue = (UserException) e;
+          assertThat(ue.getDetails()).containsEntry("email", "dup@test.com");
+        });
   }
 
   @Test
@@ -92,8 +102,98 @@ public class UserServiceTest {
     when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> userService.getUser(userId))
-        .isInstanceOf(CustomException.class)
+        .isInstanceOf(UserException.class)
         .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.USER_NOT_FOUND);
+  }
+
+  @Test
+  @DisplayName("사용자 목록 조회 시 필터 조건 없이도 정상 동작함")
+  void getUsers_success_withoutFilters() {
+    UserSearchRequest request = new UserSearchRequest(
+        null, null, null, null, null, 10,
+        SortDirection.ASCENDING, UserSortBy.name
+    );
+    User user1 = User.createUser("user1@test.com", "encoded", "user1");
+    when(userRepository.searchUsers(request)).thenReturn(List.of(user1));
+
+    CursorResponse<UserDto> response = userService.getUsers(request);
+
+    assertThat(response.data()).hasSize(1);
+    verify(userRepository).searchUsers(request);
+  }
+
+  @Test
+  @DisplayName("사용자 목록 조회 시 hasNext와 nextCursor가 올바르게 설정됨")
+  void getUsers_returnsCorrectCursorResponse() {
+    UserSearchRequest request = new UserSearchRequest(
+        null, null, null, null, null, 2,
+        SortDirection.ASCENDING, UserSortBy.name
+    );
+
+    User user1 = User.createUser("a@test.com", "encoded", "aa");
+    User user2 = User.createUser("b@test.com", "encoded", "bb");
+    User user3 = User.createUser("c@test.com", "encoded", "cc");
+    when(userRepository.searchUsers(request)).thenReturn(List.of(user1, user2, user3));
+
+    CursorResponse<UserDto> response = userService.getUsers(request);
+
+    assertThat(response.data()).hasSize(2);
+    assertThat(response.hasNext()).isTrue();
+    assertThat(response.nextCursor()).isEqualTo("bb");
+    assertThat(response.sortBy()).isEqualTo("name");
+  }
+
+  @Test
+  @DisplayName("다음 페이지가 있으면 hasNext가 true이고 nextCursor/nextIdAfter가 채워짐")
+  void getUsers_returnsHasNextTrue_whenMoreItemsExist() {
+    UserSearchRequest request = new UserSearchRequest(
+        null, null, null, null, null, 2,
+        SortDirection.ASCENDING, UserSortBy.name
+    );
+    User user1 = User.createUser("user1@test.com", "encoded", "user1");
+    User user2 = User.createUser("user2@test.com", "encoded", "user2");
+    User user3 = User.createUser("user3@test.com", "encoded", "user3");
+    when(userRepository.searchUsers(request)).thenReturn(List.of(user1, user2, user3));
+
+    CursorResponse<UserDto> response = userService.getUsers(request);
+
+    assertThat(response.data()).hasSize(2);
+    assertThat(response.hasNext()).isTrue();
+    assertThat(response.nextCursor()).isEqualTo("user2");
+    assertThat(response.nextIdAfter()).isEqualTo(user2.getId());
+  }
+
+  @Test
+  @DisplayName("마지막 페이지면 hasNext가 false이고 nextCursor는 null임")
+  void getUsers_returnsHasNextFalse_whenLastPage() {
+    UserSearchRequest request = new UserSearchRequest(
+        null, null, null, null, null, 10,
+        SortDirection.ASCENDING, UserSortBy.name
+    );
+    User user1 = User.createUser("user1@test.com", "encoded", "user1");
+    when(userRepository.searchUsers(request)).thenReturn(List.of(user1));
+
+    CursorResponse<UserDto> response = userService.getUsers(request);
+
+    assertThat(response.hasNext()).isFalse();
+    assertThat(response.nextCursor()).isNull();
+    assertThat(response.nextIdAfter()).isNull();
+  }
+
+  @Test
+  @DisplayName("sortBy가 email이면 nextCursor에 email 값이 사용됨")
+  void getUsers_usesEmailAsCursor_whenSortByEmail() {
+    UserSearchRequest request = new UserSearchRequest(
+        null, null, null, null, null, 1,
+        SortDirection.ASCENDING, UserSortBy.email
+    );
+    User user1 = User.createUser("user1@test.com", "encoded", "user1");
+    User user2 = User.createUser("user2@test.com", "encoded", "user2");
+    when(userRepository.searchUsers(request)).thenReturn(List.of(user1, user2));
+
+    CursorResponse<UserDto> response = userService.getUsers(request);
+
+    assertThat(response.nextCursor()).isEqualTo("user1@test.com");
   }
 
   @Test
@@ -105,7 +205,7 @@ public class UserServiceTest {
     UserUpdateRequest request = new UserUpdateRequest("newName", null);
 
     assertThatThrownBy(() -> userService.updateProfile(userId, otherUserId, request))
-        .isInstanceOf(CustomException.class)
+        .isInstanceOf(UserException.class)
         .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.FORBIDDEN_ACCESS);
   }
 
@@ -177,7 +277,7 @@ public class UserServiceTest {
     ChangePasswordRequest request = new ChangePasswordRequest("newPw123");
 
     assertThatThrownBy(() -> userService.changePassword(userId, otherUserId, request))
-        .isInstanceOf(CustomException.class)
+        .isInstanceOf(UserException.class)
         .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.FORBIDDEN_ACCESS);
   }
 }

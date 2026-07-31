@@ -3,9 +3,11 @@ package com.codeit.mople.domain.user.controller;
 import com.codeit.mople.domain.auth.security.CustomUserDetails;
 import com.codeit.mople.domain.user.dto.request.ChangePasswordRequest;
 import com.codeit.mople.domain.user.dto.request.UserCreateRequest;
+import com.codeit.mople.domain.user.dto.request.UserSearchRequest;
 import com.codeit.mople.domain.user.dto.request.UserUpdateRequest;
 import com.codeit.mople.domain.user.dto.response.UserDto;
 import com.codeit.mople.domain.user.service.UserService;
+import com.codeit.mople.global.dto.CursorResponse;
 import com.codeit.mople.global.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -42,6 +44,11 @@ public class UserController {
   @GetMapping("/{userId}")
   public ApiResponse<UserDto> getUser(@PathVariable UUID userId) {
     return ApiResponse.success(userService.getUser(userId));
+  }
+
+  @GetMapping
+  public ApiResponse<CursorResponse<UserDto>> getUsers(UserSearchRequest request) {
+    return ApiResponse.success(userService.getUsers(request));
   }
 
   @PatchMapping(value = "/{userId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

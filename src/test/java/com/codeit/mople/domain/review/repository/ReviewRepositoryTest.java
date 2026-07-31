@@ -7,6 +7,7 @@ import com.codeit.mople.domain.content.entity.ContentType;
 import com.codeit.mople.domain.review.entity.Review;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.global.config.JpaAuditingConfig;
+import com.codeit.mople.global.config.QueryDslConfig;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -17,7 +18,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.context.annotation.Import;
 
-@Import(JpaAuditingConfig.class)
+@Import({JpaAuditingConfig.class, QueryDslConfig.class})
 @DataJpaTest
 public class ReviewRepositoryTest {
 

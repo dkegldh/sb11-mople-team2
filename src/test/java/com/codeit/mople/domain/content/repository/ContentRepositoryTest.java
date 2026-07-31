@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.codeit.mople.domain.content.entity.Content;
 import com.codeit.mople.domain.content.entity.ContentType;
 import com.codeit.mople.global.config.JpaAuditingConfig;
+import com.codeit.mople.global.config.QueryDslConfig;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -15,7 +16,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.context.annotation.Import;
 
 @DataJpaTest
-@Import(JpaAuditingConfig.class)
+@Import({JpaAuditingConfig.class, QueryDslConfig.class})
 public class ContentRepositoryTest {
 
   @Autowired

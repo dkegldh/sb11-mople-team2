@@ -9,9 +9,9 @@ import static org.mockito.Mockito.when;
 import com.codeit.mople.domain.auth.dto.request.SignInRequest;
 import com.codeit.mople.domain.auth.dto.response.TokenResponse;
 import com.codeit.mople.domain.auth.exception.AuthErrorCode;
+import com.codeit.mople.domain.auth.exception.AuthException;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.repository.UserRepository;
-import com.codeit.mople.global.error.CustomException;
 import com.codeit.mople.global.jwt.JwtProvider;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -96,7 +96,7 @@ public class AuthServiceTest {
     when(userRepository.findByEmail(request.email())).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> authService.signIn(request))
-        .isInstanceOf(CustomException.class)
+        .isInstanceOf(AuthException.class)
         .hasFieldOrPropertyWithValue("errorCode", AuthErrorCode.INVALID_CREDENTIALS);
   }
 
@@ -108,7 +108,7 @@ public class AuthServiceTest {
     when(passwordEncoder.matches(request.password(), user.getPassword())).thenReturn(false);
 
     assertThatThrownBy(() -> authService.signIn(request))
-        .isInstanceOf(CustomException.class)
+        .isInstanceOf(AuthException.class)
         .hasFieldOrPropertyWithValue("errorCode", AuthErrorCode.INVALID_CREDENTIALS);
   }
 
@@ -138,15 +138,29 @@ public class AuthServiceTest {
     when(passwordEncoder.matches(request.password(), lockedUser.getPassword())).thenReturn(true);
 
     assertThatThrownBy(() -> authService.signIn(request))
-        .isInstanceOf(CustomException.class)
+        .isInstanceOf(AuthException.class)
         .hasFieldOrPropertyWithValue("errorCode", AuthErrorCode.LOCKED_ACCOUNT);
+  }
+
+  @Test
+  @DisplayName("로그인 실패 시 details가 비어있다 (보안상 계정 존재 여부 노출 방지)")
+  void signIn_throwsException_withoutDetails() {
+    SignInRequest request = new SignInRequest("nobody@test.com", "rawPassword");
+    when(userRepository.findByEmail(request.email())).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> authService.signIn(request))
+        .isInstanceOf(AuthException.class)
+        .satisfies(e -> {
+          AuthException ae = (AuthException) e;
+          assertThat(ae.getDetails()).isEmpty();
+        });
   }
 
   private AuthErrorCode catchAuthErrorCode(SignInRequest request) {
     try {
       authService.signIn(request);
       throw new AssertionError("예외가 발생해야 합니다.");
-    } catch (CustomException e) {
+    } catch (AuthException e) {
       return (AuthErrorCode) e.getErrorCode();
     }
   }

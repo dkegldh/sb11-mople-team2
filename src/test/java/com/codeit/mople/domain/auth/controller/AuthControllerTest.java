@@ -72,6 +72,20 @@ public class AuthControllerTest {
   }
 
   @Test
+  @DisplayName("로그인 실패 응답에는 details가 포함되지 않는다")
+  void signIn_returnsUnauthorized_withoutDetails() throws Exception {
+    SignInRequest request = new SignInRequest("nobody@test.com", "rawPw123");
+
+    mockMvc.perform(post("/api/auth/sign-in")
+            .contentType("application/json")
+            .content(objectMapper.writeValueAsString(request)))
+        .andDo(print())
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.error.code").value("AUTH-001"))
+        .andExpect(jsonPath("$.error.details").doesNotExist());
+  }
+
+  @Test
   @DisplayName("비밀번호가 틀리면 401을 반환")
   void signIn_returnsUnauthorized_whenPasswordWrong() throws Exception {
     userRepository.save(User.createUser("test2@test.com", passwordEncoder.encode("correctPw"), "testUser"));
