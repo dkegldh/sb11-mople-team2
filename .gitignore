@@ -39,9 +39,6 @@ out/
 *.log
 .DS_Store
 
-### Local config ###
-application-local.yaml
-
 ### 로컬 문서 ###
 /docs/
 
