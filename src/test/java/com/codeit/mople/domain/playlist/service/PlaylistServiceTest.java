@@ -10,6 +10,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
+import com.codeit.mople.domain.content.entity.Content;
+import com.codeit.mople.domain.content.repository.ContentRepository;
 import com.codeit.mople.domain.playlist.dto.request.PlaylistCreateRequest;
 import com.codeit.mople.domain.playlist.dto.request.PlaylistUpdateRequest;
 import com.codeit.mople.domain.playlist.dto.response.PlaylistContentResponse;
@@ -17,8 +19,10 @@ import com.codeit.mople.domain.playlist.dto.response.PlaylistResponse;
 import com.codeit.mople.domain.playlist.entity.Playlist;
 import com.codeit.mople.domain.playlist.entity.PlaylistContent;
 import com.codeit.mople.domain.playlist.entity.PlaylistSubscription;
-import com.codeit.mople.domain.playlist.event.PlaylistSubscriptionCreateEvent;
+import com.codeit.mople.domain.playlist.event.PlaylistContentAddedEvent;
+import com.codeit.mople.domain.playlist.event.PlaylistSubscribedEvent;
 import com.codeit.mople.domain.playlist.exception.PlaylistErrorCode;
+import com.codeit.mople.domain.playlist.exception.PlaylistException;
 import com.codeit.mople.domain.playlist.exception.PlaylistForbiddenException;
 import com.codeit.mople.domain.playlist.exception.PlaylistNotFoundException;
 import com.codeit.mople.domain.playlist.mapper.PlaylistContentMapper;
@@ -51,13 +55,16 @@ public class PlaylistServiceTest {
   private PlaylistRepository playlistRepository;
 
   @Mock
+  private ContentRepository contentRepository;
+
+  @Mock
+  private UserRepository userRepository;
+
+  @Mock
   private PlaylistContentRepository playlistContentRepository;
 
   @Mock
   private PlaylistSubscriptionRepository playlistSubscriptionRepository;
-
-  @Mock
-  private UserRepository userRepository;
 
   @Mock
   private PlaylistMapper mapper;
@@ -508,7 +515,8 @@ public class PlaylistServiceTest {
 
       // then
       verify(playlistSubscriptionRepository).save(any(PlaylistSubscription.class));
-      verify(publisher).publishEvent(any(PlaylistSubscriptionCreateEvent.class));
+      verify(publisher).publishEvent(any(PlaylistSubscribedEvent.class));
+      verify(playlistRepository).increaseSubscriberCount(playlistId);
     }
 
     @Test
@@ -525,7 +533,7 @@ public class PlaylistServiceTest {
 
       assertThatThrownBy(() -> playlistService.subscribe(playlistId, subscriberId))
           .isInstanceOf(CustomException.class)
-          .hasFieldOrPropertyWithValue("errorCode", PlaylistErrorCode.PLAYLIST_DUPLICATE);
+          .hasFieldOrPropertyWithValue("errorCode", PlaylistErrorCode.SUBSCRIBE_DUPLICATE);
 
       verify(playlistSubscriptionRepository, never()).save(any());
       verify(publisher, never()).publishEvent(any());
@@ -533,7 +541,7 @@ public class PlaylistServiceTest {
 
     @Test
     @DisplayName("플래이리스트가 없으면 예외")
-    void subscribe_playlistNotfound() {
+    void subscribe_playlistNotFound() {
       UUID playlistId = UUID.randomUUID();
       UUID subscriberId = UUID.randomUUID();
 
@@ -541,7 +549,7 @@ public class PlaylistServiceTest {
 
       assertThatThrownBy(() -> playlistService.subscribe(playlistId, subscriberId))
           .isInstanceOf(CustomException.class)
-          .hasFieldOrPropertyWithValue("errorCode", PlaylistErrorCode.PLAYLIST_NOT_FOUND);
+          .hasFieldOrPropertyWithValue("errorCode", PlaylistErrorCode.SUBSCRIBE_NOT_FOUND);
 
       verify(playlistSubscriptionRepository, never()).save(any());
       verify(publisher, never()).publishEvent(any());
@@ -559,7 +567,7 @@ public class PlaylistServiceTest {
 
       assertThatThrownBy(() -> playlistService.subscribe(playlistId, subscriberId))
           .isInstanceOf(CustomException.class)
-          .hasFieldOrPropertyWithValue("errorCode", PlaylistErrorCode.PLAYLIST_NOT_FOUND);
+          .hasFieldOrPropertyWithValue("errorCode", PlaylistErrorCode.SUBSCRIBE_UNAUTHORIZED);
 
       verify(playlistSubscriptionRepository, never()).save(any());
       verify(publisher, never()).publishEvent(any());
@@ -576,13 +584,241 @@ public class PlaylistServiceTest {
 
       assertThatThrownBy(() -> playlistService.subscribe(playlistId, ownerId))
           .isInstanceOf(CustomException.class)
-          .hasFieldOrPropertyWithValue("errorCode", PlaylistErrorCode.PLAYLIST_DUPLICATE);
+          .hasFieldOrPropertyWithValue("errorCode", PlaylistErrorCode.SUBSCRIBE_NOT_ALLOWED);
 
       verify(userRepository, never()).findById(any());
       verify(playlistSubscriptionRepository, never()).save(any());
       verify(publisher, never()).publishEvent(any());
     }
 
+  }
+
+  @Nested
+  @DisplayName("플레이리스트 구독 취소")
+  class UnSubscribe {
+
+    @Test
+    @DisplayName("플레이리스트 구독 취소 성공")
+    void unSubscribe_success() {
+      UUID playlistId = UUID.randomUUID();
+      UUID subscriberId = UUID.randomUUID();
+
+      given(playlistSubscriptionRepository.deleteByPlaylistIdAndSubscriberId(playlistId, subscriberId)).willReturn(1);
+      given(playlistRepository.decreaseSubscriberCount(playlistId)).willReturn(1);
+
+      // when
+      playlistService.unSubscribe(playlistId, subscriberId);
+
+      // then
+      verify(playlistSubscriptionRepository).deleteByPlaylistIdAndSubscriberId(playlistId, subscriberId);
+      verify(playlistRepository).decreaseSubscriberCount(playlistId);
+    }
+
+    @Test
+    @DisplayName("구독하지 않은 플레이리스트면 예외")
+    void unSubscribe_notFound() {
+      UUID playlistId = UUID.randomUUID();
+      UUID subscriberId = UUID.randomUUID();
+
+      given(playlistSubscriptionRepository.deleteByPlaylistIdAndSubscriberId(playlistId, subscriberId)).willReturn(0);
+
+      assertThatThrownBy(() -> playlistService.unSubscribe(playlistId, subscriberId))
+          .isInstanceOf(PlaylistException.class)
+          .hasFieldOrPropertyWithValue("errorCode", PlaylistErrorCode.UNSUBSCRIBE_NOT_FOUND);
+
+      verify(playlistRepository, never()).decreaseSubscriberCount(any());
+    }
+  }
+
+  @Nested
+  @DisplayName("플레이리스트 콘텐츠 생성")
+  class addContent {
+
+    @Test
+    @DisplayName("플레이리스트 콘텐츠 추가 성공")
+    void addContent_success() {
+      UUID playlistId = UUID.randomUUID();
+      UUID contentId = UUID.randomUUID();
+
+      Playlist playlist = Playlist.create(owner, title, description);
+      Content content = mock(Content.class);
+
+      given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
+      given(contentRepository.findById(contentId)).willReturn(Optional.of(content));
+      given(owner.getId()).willReturn(ownerId);
+
+      // when
+      playlistService.addContent(playlistId, contentId, ownerId);
+
+      // then
+      verify(publisher).publishEvent(any(PlaylistContentAddedEvent.class));
+      verify(playlistContentRepository).save(any(PlaylistContent.class));
+    }
+
+    @Test
+    @DisplayName("플레이리스트가 없으면 예외")
+    void addContent_playlistNotFound() {
+      UUID playlistId = UUID.randomUUID();
+      UUID contentId = UUID.randomUUID();
+      given(playlistRepository.findById(playlistId)).willReturn(Optional.empty());
+
+      // when then
+      assertThatThrownBy(() -> playlistService.addContent(playlistId, contentId, ownerId))
+          .isInstanceOf(PlaylistException.class)
+          .hasFieldOrPropertyWithValue("errorCode", PlaylistErrorCode.PY_CONTENT_PLAY_NOT_FOUND);
+
+      verify(publisher, never()).publishEvent(any());
+      verify(playlistContentRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("컨텐츠가 없으면 예외")
+    void addContent_contentNotFound() {
+      UUID playlistId = UUID.randomUUID();
+      UUID contentId = UUID.randomUUID();
+      Playlist playlist = Playlist.create(owner, title, description);
+      given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
+      given(contentRepository.findById(contentId)).willReturn(Optional.empty());
+
+      // when then
+      assertThatThrownBy(() -> playlistService.addContent(playlistId, contentId, ownerId))
+          .isInstanceOf(PlaylistException.class)
+          .hasFieldOrPropertyWithValue("errorCode", PlaylistErrorCode.PY_CONTENT_CONTENT_NOT_FOUND);
+
+      verify(publisher, never()).publishEvent(any());
+      verify(playlistContentRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("이미 있는 컨텐츠면 예외")
+    void addContent_duplicate() {
+      UUID playlistId = UUID.randomUUID();
+      UUID contentId = UUID.randomUUID();
+      Playlist playlist = Playlist.create(owner, title, description);
+      Content content = mock(Content.class);
+
+      given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
+      given(contentRepository.findById(contentId)).willReturn(Optional.of(content));
+      given(owner.getId()).willReturn(ownerId);
+      given(playlistContentRepository.existsByPlaylistIdAndContentId(playlistId, contentId)).willReturn(true);
+
+      // when then
+      assertThatThrownBy(() -> playlistService.addContent(playlistId, contentId, ownerId))
+          .isInstanceOf(PlaylistException.class)
+          .hasFieldOrPropertyWithValue("errorCode", PlaylistErrorCode.PY_CONTENT_DUPLICATE);
+
+      verify(publisher, never()).publishEvent(any());
+      verify(playlistContentRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("플레이리스트 소유자가 아니면 예외")
+    void addContent_forbidden() {
+      UUID playlistId = UUID.randomUUID();
+      UUID contentId = UUID.randomUUID();
+      UUID noOwnerId = UUID.randomUUID();
+      Playlist playlist = mock(Playlist.class);
+      Content content = mock(Content.class);
+
+      given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
+      given(contentRepository.findById(contentId)).willReturn(Optional.of(content));
+      given(playlist.getId()).willReturn(playlistId);
+      given(playlist.getOwner()).willReturn(owner);
+      given(owner.getId()).willReturn(ownerId);
+
+      // when then
+      assertThatThrownBy(() -> playlistService.addContent(playlistId, contentId, noOwnerId))
+          .isInstanceOf(PlaylistException.class)
+          .hasFieldOrPropertyWithValue("errorCode", PlaylistErrorCode.PLAYLIST_FORBIDDEN);
+
+      verify(publisher, never()).publishEvent(any());
+      verify(playlistContentRepository, never()).existsByPlaylistIdAndContentId(any(), any());
+      verify(playlistContentRepository, never()).save(any());
+    }
+  }
+  @Nested
+  @DisplayName("플레이리스트 컨텐츠 삭제")
+  class removeContent {
+
+    @Test
+    @DisplayName("플레이리스트 컨텐츠 삭제 성공")
+    void removeContent_success() {
+      UUID playlistId = UUID.randomUUID();
+      UUID contentId = UUID.randomUUID();
+      Playlist playlist = Playlist.create(owner, title, description);
+      Content content = mock(Content.class);
+      PlaylistContent playlistContent = PlaylistContent.create(playlist, content);
+
+      given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
+      given(owner.getId()).willReturn(ownerId);
+      given(playlistContentRepository.findByPlaylistIdAndContentId(playlistId, contentId))
+          .willReturn(Optional.of(playlistContent));
+
+      // when
+      playlistService.removeContent(playlistId, contentId, ownerId);
+
+      // then
+      verify(publisher, never()).publishEvent(any());
+      verify(playlistContentRepository).delete(playlistContent);
+    }
+
+    @Test
+    @DisplayName("플레이리스트가 없으면 예외")
+    void removeContent_playlistNotFound() {
+      UUID playlistId = UUID.randomUUID();
+      UUID contentId = UUID.randomUUID();
+
+      given(playlistRepository.findById(playlistId)).willReturn(Optional.empty());
+
+      assertThatThrownBy(() -> playlistService.removeContent(playlistId, contentId, ownerId))
+          .isInstanceOf(PlaylistException.class)
+          .hasFieldOrPropertyWithValue("errorCode", PlaylistErrorCode.PY_CONTENT_PLAY_NOT_FOUND);
+
+      verify(playlistContentRepository, never()).findByPlaylistIdAndContentId(any(), any());
+      verify(playlistContentRepository, never()).delete(any());
+
+    }
+
+    @Test
+    @DisplayName("플레이리스트 소유자가 아니면 예외")
+    void removeContent_forbidden() {
+      UUID playlistId = UUID.randomUUID();
+      UUID contentId = UUID.randomUUID();
+      UUID noOwnerId = UUID.randomUUID();
+      Playlist playlist = mock(Playlist.class);
+
+      given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
+      given(playlist.getId()).willReturn(playlistId);
+      given(playlist.getOwner()).willReturn(owner);
+      given(owner.getId()).willReturn(ownerId);
+
+
+      assertThatThrownBy(() -> playlistService.removeContent(playlistId, contentId, noOwnerId))
+          .isInstanceOf(PlaylistException.class)
+          .hasFieldOrPropertyWithValue("errorCode", PlaylistErrorCode.PLAYLIST_FORBIDDEN);
+
+      verify(playlistContentRepository, never()).findByPlaylistIdAndContentId(any(), any());
+      verify(playlistContentRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("플레이리스트에 없는 컨텐츠면 예외")
+    void removeContent_notInPlaylist() {
+      UUID playlistId = UUID.randomUUID();
+      UUID contentId = UUID.randomUUID();
+      Playlist playlist = Playlist.create(owner, title, description);
+
+      given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
+      given(owner.getId()).willReturn(ownerId);
+      given(playlistContentRepository.findByPlaylistIdAndContentId(playlistId, contentId))
+          .willReturn(Optional.empty());
+
+      assertThatThrownBy(() -> playlistService.removeContent(playlistId, contentId, ownerId))
+          .isInstanceOf(PlaylistException.class)
+          .hasFieldOrPropertyWithValue("errorCode", PlaylistErrorCode.UN_PY_CONTENT_NOT_FOUND);
+
+      verify(playlistContentRepository, never()).delete(any());
+    }
   }
 
 }

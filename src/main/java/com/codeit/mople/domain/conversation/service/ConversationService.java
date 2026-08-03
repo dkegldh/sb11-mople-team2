@@ -1,5 +1,6 @@
 package com.codeit.mople.domain.conversation.service;
 
+import com.codeit.mople.domain.conversation.dto.request.ConversationCursorRequest;
 import com.codeit.mople.domain.conversation.dto.response.ConversationDto;
 import com.codeit.mople.domain.conversation.dto.response.CursorResponseConversationDto;
 import com.codeit.mople.domain.conversation.entity.Conversation;
@@ -10,6 +11,7 @@ import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.exception.UserErrorCode;
 import com.codeit.mople.domain.user.exception.UserException;
 import com.codeit.mople.domain.user.repository.UserRepository;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -91,26 +93,48 @@ public class ConversationService {
     return ConversationDto.from(conversation, requesterId);
   }
 
-  public CursorResponseConversationDto getMyConversations(UUID requesterId) {
-    log.debug("내 대화방 목록 조회 요청 - requesterId: {}", requesterId);
+  public CursorResponseConversationDto getMyConversations(UUID requesterId, ConversationCursorRequest request) {
+    log.debug("내 대화방 목록 조회 요청 - requesterId: {}, limit: {}, cursor: {}", requesterId, request.limit(), request.cursor());
 
-    User requester = userRepository.findById(requesterId)
+    userRepository.findById(requesterId)
         .orElseThrow(() -> new ConversationException(UserErrorCode.USER_NOT_FOUND, Map.of("userId", requesterId)));
 
-    List<Conversation> conversations = conversationRepository.findByUserAOrUserBOrderByCreatedAtDesc(requester);
+    Instant cursorTime = request.parseCursorToInstant();
 
-    List<ConversationDto> conversationDtos = conversations.stream()
+    List<Conversation> conversations = conversationRepository.findConversationByCursor(requesterId, request, cursorTime);
+
+    boolean hasNext = conversations.size() > request.limit();
+    List<Conversation> slicedConversations = hasNext ? conversations.subList(0, request.limit()) : conversations;
+
+    List<ConversationDto> conversationDtos = slicedConversations.stream()
         .map(c -> ConversationDto.from(c, requesterId))
         .toList();
 
+    String nextCursor = null;
+    UUID nextIdAfter = null;
+
+    if (hasNext && !slicedConversations.isEmpty()) {
+      Conversation lastItem = slicedConversations.get(slicedConversations.size() - 1);
+
+      // 대화방에 lastMessage가 없으면 대화방의 createdAt을 커서로 사용
+      Instant nextTime = (lastItem.getLastMessage() != null && lastItem.getLastMessage().getCreatedAt() != null)
+          ? lastItem.getLastMessage().getCreatedAt()
+          : lastItem.getCreatedAt();
+
+      if (nextTime != null) {
+        nextCursor = nextTime.toString();
+        nextIdAfter = lastItem.getId();
+      }
+    }
+
     return new CursorResponseConversationDto(
         conversationDtos,
-        null,
-        null,
-        false,
+        nextCursor,
+        nextIdAfter,
+        hasNext,
         conversationDtos.size(),
-        "createdAt",
-        "DESCENDING"
+        request.sortBy(),
+        request.sortDirection()
     );
   }
 

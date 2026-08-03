@@ -5,7 +5,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-import com.codeit.mople.domain.auth.dto.request.SignInRequest;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.global.jwt.JwtProvider;
@@ -47,11 +46,10 @@ public class AuthControllerTest {
   @DisplayName("로그인 성공 시 토큰을 발급")
   void signIn_success() throws Exception {
     userRepository.save(User.createUser("test@test.com", passwordEncoder.encode("rawPw123"), "testUser"));
-    SignInRequest request = new SignInRequest("test@test.com", "rawPw123");
 
     mockMvc.perform(post("/api/auth/sign-in")
-        .contentType("application/json")
-        .content(objectMapper.writeValueAsString(request)))
+        .param("username", "test@test.com")
+        .param("password", "rawPw123"))
         .andDo(print())
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
@@ -61,11 +59,9 @@ public class AuthControllerTest {
   @Test
   @DisplayName("존재하지 않는 이메일로 로그인하면 401을 반환")
   void signIn_returnsUnauthorized_whenEmailNotFound() throws Exception {
-    SignInRequest request = new SignInRequest("nobody@test.com", "rawPw123");
-
     mockMvc.perform(post("/api/auth/sign-in")
-        .contentType("application/json")
-        .content(objectMapper.writeValueAsString(request)))
+        .param("username", "nobody@test.com")
+        .param("password", "rawPw123"))
         .andDo(print())
         .andExpect(status().isUnauthorized())
         .andExpect(jsonPath("$.error.code").value("AUTH-001"));
@@ -74,11 +70,9 @@ public class AuthControllerTest {
   @Test
   @DisplayName("로그인 실패 응답에는 details가 포함되지 않는다")
   void signIn_returnsUnauthorized_withoutDetails() throws Exception {
-    SignInRequest request = new SignInRequest("nobody@test.com", "rawPw123");
-
     mockMvc.perform(post("/api/auth/sign-in")
-            .contentType("application/json")
-            .content(objectMapper.writeValueAsString(request)))
+            .param("username", "nobody@test.com")
+            .param("password", "rawPw123"))
         .andDo(print())
         .andExpect(status().isUnauthorized())
         .andExpect(jsonPath("$.error.code").value("AUTH-001"))
@@ -89,11 +83,10 @@ public class AuthControllerTest {
   @DisplayName("비밀번호가 틀리면 401을 반환")
   void signIn_returnsUnauthorized_whenPasswordWrong() throws Exception {
     userRepository.save(User.createUser("test2@test.com", passwordEncoder.encode("correctPw"), "testUser"));
-    SignInRequest request = new SignInRequest("test2@test.com", "wrongPw");
 
     mockMvc.perform(post("/api/auth/sign-in")
-        .contentType("application/json")
-        .content(objectMapper.writeValueAsString(request)))
+        .param("username", "test2@test.com")
+        .param("password", "wrongPw"))
         .andDo(print())
         .andExpect(status().isUnauthorized())
         .andExpect(jsonPath("$.error.code").value("AUTH-001"));
@@ -103,11 +96,10 @@ public class AuthControllerTest {
   @DisplayName("재로그인 시 이전 토큰으로는 인증이 필요한 API에 접근할 수 없음")
   void reSignIn_invalidatesOldToken() throws Exception {
     User user = userRepository.save(User.createUser("multi@test.com", passwordEncoder.encode("rawPw123"), "testUser"));
-    SignInRequest request = new SignInRequest("multi@test.com", "rawPw123");
 
     String firstResponse = mockMvc.perform(post("/api/auth/sign-in")
-        .contentType("application/json")
-        .content(objectMapper.writeValueAsString(request)))
+        .param("username", "multi@test.com")
+        .param("password", "rawPw123"))
         .andReturn().getResponse().getContentAsString();
 
     String oldToken = objectMapper.readTree(firstResponse).get("data").get("accessToken").asText();
@@ -119,8 +111,8 @@ public class AuthControllerTest {
             .andExpect(status().isOk());
 
     String secondResponse = mockMvc.perform(post("/api/auth/sign-in")
-                    .contentType("application/json")
-                    .content(objectMapper.writeValueAsString(request)))
+                    .param("username", "multi@test.com")
+                    .param("password", "rawPw123"))
             .andDo(print())
             .andExpect(status().isOk())
             .andReturn().getResponse().getContentAsString();
@@ -147,11 +139,9 @@ public class AuthControllerTest {
     user.lock();
     userRepository.save(user);
 
-    SignInRequest request = new SignInRequest("locked@test.com", "rawPw123");
-
     mockMvc.perform(post("/api/auth/sign-in")
-        .contentType("application/json")
-        .content(objectMapper.writeValueAsString(request)))
+        .param("username", "locked@test.com")
+        .param("password", "rawPw123"))
         .andDo(print())
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.error.code").value("AUTH-004"));

@@ -90,7 +90,24 @@ public interface PlaylistApi {
       ),
   })
   ResponseEntity<Void> createSubscribe(
-     @PathVariable UUID playlistId,
-     @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails principal
+      @PathVariable UUID playlistId,
+      @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails principal
+  );
+
+  ResponseEntity<Void> cancelSubscribe(
+      @PathVariable UUID playlistId,
+      @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails principal
+  );
+
+  ResponseEntity<Void> addContentPlaylist(
+      @PathVariable UUID playlistId,
+      @PathVariable UUID contentId,
+      @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails principal
+  );
+
+  ResponseEntity<Void> removeContentPlaylist(
+      @PathVariable UUID playlistId,
+      @PathVariable UUID contentId,
+      @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails principal
   );
 }

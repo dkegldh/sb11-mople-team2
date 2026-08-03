@@ -49,7 +49,7 @@ public class AuthServiceTest {
   @DisplayName("로그인 성공 시 토큰을 발급")
   void signIn_success() {
     SignInRequest request = new SignInRequest("test@test.com", "rawPassword");
-    when(userRepository.findByEmail(request.email())).thenReturn(Optional.of(user));
+    when(userRepository.findByEmail(request.username())).thenReturn(Optional.of(user));
     when(passwordEncoder.matches(request.password(), user.getPassword())).thenReturn(true);
     when(jwtProvider.createAccessToken(any(), anyLong())).thenReturn("issued-token");
 
@@ -62,7 +62,7 @@ public class AuthServiceTest {
   @DisplayName("로그인 성공 시 sessionVersion 1 증가")
   void signIn_success_increasesSessionVersion() {
     SignInRequest request = new SignInRequest("test@test.com", "rawPassword");
-    when(userRepository.findByEmail(request.email())).thenReturn(Optional.of(user));
+    when(userRepository.findByEmail(request.username())).thenReturn(Optional.of(user));
     when(passwordEncoder.matches(request.password(), user.getPassword())).thenReturn(true);
     when(jwtProvider.createAccessToken(any(), anyLong())).thenReturn("issued-token");
 
@@ -75,7 +75,7 @@ public class AuthServiceTest {
   @DisplayName("재로그인 시 sessionVersion이 증가하여 이전 토큰의 값과 달라짐")
   void signIn_twice_changesSessionVersionEachTime() {
     SignInRequest request = new SignInRequest("test@test.com", "rawPassword");
-    when(userRepository.findByEmail(request.email())).thenReturn(Optional.of(user));
+    when(userRepository.findByEmail(request.username())).thenReturn(Optional.of(user));
     when(passwordEncoder.matches(request.password(), user.getPassword())).thenReturn(true);
     when(jwtProvider.createAccessToken(any(), anyLong())).thenReturn("token");
 
@@ -93,7 +93,7 @@ public class AuthServiceTest {
   @DisplayName("존재하지 않는 이메일로 로그인 시 예외가 발생")
   void signIn_throwsException_whenEmailNotFound() {
     SignInRequest request = new SignInRequest("nobody@test.com", "rawPassword");
-    when(userRepository.findByEmail(request.email())).thenReturn(Optional.empty());
+    when(userRepository.findByEmail(request.username())).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> authService.signIn(request))
         .isInstanceOf(AuthException.class)
@@ -104,7 +104,7 @@ public class AuthServiceTest {
   @DisplayName("비밀번호가 일치하지 않으면 예외가 발생")
   void signIn_throwsException_whenPasswordMismatch() {
     SignInRequest request = new SignInRequest("test@test.com", "wrongPassword");
-    when(userRepository.findByEmail(request.email())).thenReturn(Optional.of(user));
+    when(userRepository.findByEmail(request.username())).thenReturn(Optional.of(user));
     when(passwordEncoder.matches(request.password(), user.getPassword())).thenReturn(false);
 
     assertThatThrownBy(() -> authService.signIn(request))
@@ -134,7 +134,7 @@ public class AuthServiceTest {
     lockedUser.lock();
 
     SignInRequest request = new SignInRequest("locked@test.com", "rawPw123");
-    when(userRepository.findByEmail(request.email())).thenReturn(Optional.of(lockedUser));
+    when(userRepository.findByEmail(request.username())).thenReturn(Optional.of(lockedUser));
     when(passwordEncoder.matches(request.password(), lockedUser.getPassword())).thenReturn(true);
 
     assertThatThrownBy(() -> authService.signIn(request))
@@ -146,7 +146,7 @@ public class AuthServiceTest {
   @DisplayName("로그인 실패 시 details가 비어있다 (보안상 계정 존재 여부 노출 방지)")
   void signIn_throwsException_withoutDetails() {
     SignInRequest request = new SignInRequest("nobody@test.com", "rawPassword");
-    when(userRepository.findByEmail(request.email())).thenReturn(Optional.empty());
+    when(userRepository.findByEmail(request.username())).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> authService.signIn(request))
         .isInstanceOf(AuthException.class)

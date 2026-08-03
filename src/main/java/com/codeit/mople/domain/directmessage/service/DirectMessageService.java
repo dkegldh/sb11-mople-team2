@@ -4,11 +4,14 @@ import com.codeit.mople.domain.conversation.entity.Conversation;
 import com.codeit.mople.domain.conversation.exception.ConversationErrorCode;
 import com.codeit.mople.domain.conversation.exception.ConversationException;
 import com.codeit.mople.domain.conversation.repository.ConversationRepository;
+import com.codeit.mople.domain.directmessage.dto.request.DirectMessageCursorRequest;
+import com.codeit.mople.domain.directmessage.dto.response.CursorResponseDirectMessageDto;
 import com.codeit.mople.domain.directmessage.dto.response.DirectMessageDto;
 import com.codeit.mople.domain.directmessage.entity.DirectMessage;
 import com.codeit.mople.domain.directmessage.exception.DirectMessageErrorCode;
 import com.codeit.mople.domain.directmessage.exception.DirectMessageException;
 import com.codeit.mople.domain.directmessage.repository.DirectMessageRepository;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -27,20 +30,50 @@ public class DirectMessageService {
   private final ConversationRepository conversationRepository;
 
   // 특정 대화방의 메시지 목록 조회
-  // TODO: 커서 페이지네이션 도입 예정
-  public List<DirectMessageDto> getDirectMessages(UUID conversationId, UUID requesterId) {
+  @Transactional
+  public CursorResponseDirectMessageDto getDirectMessages(UUID conversationId, UUID requesterId,
+      DirectMessageCursorRequest request) {
     log.debug("특정 DM 목록 조회 요청 - conversationId: {}, requesterId: {}", conversationId, requesterId);
     Conversation conversation = conversationRepository.findById(conversationId)
-        .orElseThrow(() -> new ConversationException(ConversationErrorCode.CONVERSATION_NOT_FOUND, Map.of("conversationId", conversationId)));
+        .orElseThrow(() -> new ConversationException(ConversationErrorCode.CONVERSATION_NOT_FOUND,
+            Map.of("conversationId", conversationId)));
 
     validateConversationParticipant(conversation, requesterId);
 
-    List<DirectMessage> messages = directMessageRepository.findByConversationIdOrderByCreatedAtDesc(conversationId);
+    // 채팅 방에 들어왔으므로 유저의 읽은 시각 업데이트
+    conversation.updateLastReadAt(requesterId, Instant.now());
 
-    log.info("특정 DM 목록 조회 완료 - conversationId: {}", conversationId);
-    return messages.stream()
+    Instant cursorTime = request.parseCursorToInstant();
+    List<DirectMessage> messages = directMessageRepository.findDirectMessageByCursor(conversationId,
+        request, cursorTime);
+
+    boolean hasNext = messages.size() > request.limit();
+    List<DirectMessage> slicedMessages = hasNext ? messages.subList(0, request.limit()) : messages;
+
+    List<DirectMessageDto> directMessageDtos = slicedMessages.stream()
         .map(DirectMessageDto::from)
         .toList();
+
+    String nextCursor = null;
+    UUID nextIdAfter = null;
+
+    if (hasNext && !slicedMessages.isEmpty()) {
+      DirectMessage lastItem = slicedMessages.get(slicedMessages.size() - 1);
+      nextCursor = lastItem.getCreatedAt().toString();
+      nextIdAfter = lastItem.getId();
+    }
+
+    log.info("특정 DM 목록 조회 완료 - conversationId: {}", conversationId);
+
+    return new CursorResponseDirectMessageDto(
+        directMessageDtos,
+        nextCursor,
+        nextIdAfter,
+        hasNext,
+        directMessageDtos.size(),
+        request.sortBy(),
+        request.sortDirection()
+    );
   }
 
   // 단건 메시지 읽음 처리
@@ -49,7 +82,9 @@ public class DirectMessageService {
     log.debug("단건 DM 읽음 처리 요청 - messageId: {}, requesterId: {}", directMessageId, requesterId);
 
     DirectMessage message = directMessageRepository.findById(directMessageId)
-        .orElseThrow(() -> new DirectMessageException(DirectMessageErrorCode.DIRECT_MESSAGE_NOT_FOUND, Map.of("directMessageId", directMessageId)));
+        .orElseThrow(
+            () -> new DirectMessageException(DirectMessageErrorCode.DIRECT_MESSAGE_NOT_FOUND,
+                Map.of("directMessageId", directMessageId)));
 
     if (!message.getConversation().getId().equals(conversationId)) {
       log.warn("대화방-DM 소속 불일치 - path conversationId: {}, actual conversationId: {}, messageId: {}",
@@ -61,27 +96,33 @@ public class DirectMessageService {
     }
 
     if (!message.getReceiver().getId().equals(requesterId)) {
-      log.warn("수신자가 아닌 유저의 접근, DM 읽음 처리 인가 실패 - messageId: {}, requesterId: {}", directMessageId, requesterId);
+      log.warn("수신자가 아닌 유저의 접근, DM 읽음 처리 인가 실패 - messageId: {}, requesterId: {}", directMessageId,
+          requesterId);
       throw new DirectMessageException(DirectMessageErrorCode.UNAUTHORIZED_RECEIVER,
           Map.of("actualReceiverId", message.getReceiver().getId(),
               "requesterId", requesterId,
               "directMessageId", directMessageId));
     }
 
-    if (message.isRead()) {
+    Conversation conversation = message.getConversation();
+    Instant myLastReadAt = conversation.getMyLastReadAt(requesterId);
+
+    if (myLastReadAt != null && !message.getCreatedAt().isAfter(myLastReadAt)) {
       log.debug("이미 읽은 메시지이므로 추가 작업 생략 - messageId: {}", directMessageId);
       return;
     }
 
-    message.markAsRead();
+    conversation.updateLastReadAt(requesterId, message.getCreatedAt());
+
     log.info("DM 읽음 처리 완료 - messageId: {}", directMessageId);
   }
 
   // 공통 인가 로직 분리
   private void validateConversationParticipant(Conversation conversation, UUID requesterId) {
     if (!conversation.getUserA().getId().equals(requesterId) &&
-    !conversation.getUserB().getId().equals(requesterId)) {
-      throw new ConversationException(ConversationErrorCode.ACCESS_DENIED, Map.of("conversationId", conversation.getId(), "requesterId", requesterId));
+        !conversation.getUserB().getId().equals(requesterId)) {
+      throw new ConversationException(ConversationErrorCode.ACCESS_DENIED,
+          Map.of("conversationId", conversation.getId(), "requesterId", requesterId));
     }
   }
 }

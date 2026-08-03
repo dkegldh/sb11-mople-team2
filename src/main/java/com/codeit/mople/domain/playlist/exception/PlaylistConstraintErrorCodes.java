@@ -10,6 +10,9 @@ public class PlaylistConstraintErrorCodes implements ConstraintErrorCodes {
 
   @Override
   public Map<String, ErrorCode> get() {
-    return Map.of("uk_playlist_subscriptions_playlist_subscriber", PlaylistErrorCode.PLAYLIST_DUPLICATE);
+    return Map.of(
+        "uk_playlist_subscriptions_playlist_subscriber", PlaylistErrorCode.SUBSCRIBE_DUPLICATE,
+        "uk_playlist_contents_playlist_content", PlaylistErrorCode.PY_CONTENT_DUPLICATE
+    );
   }
 }

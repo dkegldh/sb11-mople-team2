@@ -3,19 +3,23 @@ package com.codeit.mople.domain.conversation.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+import com.codeit.mople.domain.conversation.dto.request.ConversationCursorRequest;
 import com.codeit.mople.domain.conversation.dto.response.ConversationDto;
 import com.codeit.mople.domain.conversation.dto.response.CursorResponseConversationDto;
 import com.codeit.mople.domain.conversation.entity.Conversation;
 import com.codeit.mople.domain.conversation.exception.ConversationErrorCode;
 import com.codeit.mople.domain.conversation.exception.ConversationException;
 import com.codeit.mople.domain.conversation.repository.ConversationRepository;
+import com.codeit.mople.domain.directmessage.entity.DirectMessage;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.repository.UserRepository;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -209,24 +213,75 @@ public class ConversationServiceTest {
   class GetMyConversations {
 
     @Test
-    @DisplayName("성공: 본인이 속한 모든 대화 목록을 최신순으로 가져온다.")
+    @DisplayName("성공: 본인이 속한 모든 대화 목록을 최신순 커서 페이징으로 가져온다.")
     void success_get_my_conversations() {
       //given
       given(userA.getId()).willReturn(userAId);
       given(userB.getId()).willReturn(userBId);
 
       given(userRepository.findById(userAId)).willReturn(Optional.of(userA));
+
       Conversation conversation = Conversation.createConversation(userA, userB);
-      given(conversationRepository.findByUserAOrUserBOrderByCreatedAtDesc(userA))
+      DirectMessage mockMessage = mock(DirectMessage.class);
+      given(mockMessage.getConversation()).willReturn(conversation);
+      given(mockMessage.getCreatedAt()).willReturn(Instant.now());
+      given(mockMessage.getSender()).willReturn(userB);
+      given(mockMessage.getReceiver()).willReturn(userA);
+      conversation.updateLastMessage(mockMessage);
+
+      ConversationCursorRequest mockRequest = mock(ConversationCursorRequest.class);
+      given(mockRequest.limit()).willReturn(20);
+      given(mockRequest.sortBy()).willReturn("createdAt");
+      given(mockRequest.sortDirection()).willReturn("DESCENDING");
+      given(mockRequest.parseCursorToInstant()).willReturn(null);
+
+      given(conversationRepository.findConversationByCursor(eq(userAId), eq(mockRequest), any()))
           .willReturn(List.of(conversation));
 
       //when
-      CursorResponseConversationDto result = conversationService.getMyConversations(userAId);
+      CursorResponseConversationDto result = conversationService.getMyConversations(userAId, mockRequest);
 
       //then
       assertThat(result).isNotNull();
       assertThat(result.data()).hasSize(1);
       assertThat(result.sortDirection()).isEqualTo("DESCENDING");
+    }
+
+    @Test
+    @DisplayName("성공: 마지막 메시지가 없는 빈 대화방이 마지막 항목일 conversation.createdAt을 nextCursor로 사용한다.")
+    void success_get_my_conversations_with_empty_conversation_fallback() {
+      //given
+      given(userA.getId()).willReturn(userAId);
+      given(userB.getId()).willReturn(userBId);
+      given(userRepository.findById(userAId)).willReturn(Optional.of(userA));
+
+      Conversation emptyConversation = Conversation.createConversation(userA, userB);
+      UUID conversationId = UUID.randomUUID();
+      Instant roomCreatedAt = Instant.now().minusSeconds(60);
+
+      ReflectionTestUtils.setField(emptyConversation, "id", conversationId);
+      ReflectionTestUtils.setField(emptyConversation, "createdAt", roomCreatedAt);
+
+      ConversationCursorRequest mockRequest = mock(ConversationCursorRequest.class);
+      given(mockRequest.limit()).willReturn(1);
+      given(mockRequest.sortBy()).willReturn("createdAt");
+      given(mockRequest.sortDirection()).willReturn("DESCENDING");
+      given(mockRequest.parseCursorToInstant()).willReturn(null);
+
+      Conversation dummyConversation = Conversation.createConversation(userA, userB);
+      given(conversationRepository.findConversationByCursor(eq(userAId), eq(mockRequest), any()))
+          .willReturn(List.of(emptyConversation, dummyConversation));
+
+      //when
+      CursorResponseConversationDto result = conversationService.getMyConversations(userAId, mockRequest);
+
+      //then
+      assertThat(result).isNotNull();
+      assertThat(result.hasNext()).isTrue();
+      assertThat(result.data()).hasSize(1);
+
+      assertThat(result.nextCursor()).isEqualTo(roomCreatedAt.toString());
+      assertThat(result.nextIdAfter()).isEqualTo(conversationId);
     }
   }
 }

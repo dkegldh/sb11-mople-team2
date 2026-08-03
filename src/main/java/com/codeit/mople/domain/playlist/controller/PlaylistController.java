@@ -83,4 +83,36 @@ public class PlaylistController implements PlaylistApi {
     return ResponseEntity.noContent().build();
   }
 
+  @Override
+  @DeleteMapping("/{playlistId}/subscription")
+  public ResponseEntity<Void> cancelSubscribe(
+      @PathVariable UUID playlistId,
+      @AuthenticationPrincipal CustomUserDetails principal
+  ) {
+    playlistService.unSubscribe(playlistId, principal.getUserId());
+    return ResponseEntity.noContent().build();
+  }
+
+  @Override
+  @PostMapping("/{playlistId}/contents/{contentId}")
+  public ResponseEntity<Void> addContentPlaylist(
+      @PathVariable UUID playlistId,
+      @PathVariable UUID contentId,
+      @AuthenticationPrincipal CustomUserDetails principal
+  ) {
+    playlistService.addContent(playlistId, contentId, principal.getUserId());
+    return ResponseEntity.noContent().build();
+  }
+
+  @Override
+  @DeleteMapping("/{playlistId}/contents/{contentId}")
+  public ResponseEntity<Void> removeContentPlaylist(
+      @PathVariable UUID playlistId,
+      @PathVariable UUID contentId,
+      @AuthenticationPrincipal CustomUserDetails principal
+  ) {
+    playlistService.removeContent(playlistId, contentId, principal.getUserId());
+    return ResponseEntity.noContent().build();
+  }
+
 }

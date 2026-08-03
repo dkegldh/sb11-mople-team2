@@ -3,6 +3,8 @@ package com.codeit.mople.domain.directmessage.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -11,7 +13,8 @@ import com.codeit.mople.domain.conversation.entity.Conversation;
 import com.codeit.mople.domain.conversation.exception.ConversationErrorCode;
 import com.codeit.mople.domain.conversation.exception.ConversationException;
 import com.codeit.mople.domain.conversation.repository.ConversationRepository;
-import com.codeit.mople.domain.directmessage.dto.response.DirectMessageDto;
+import com.codeit.mople.domain.directmessage.dto.request.DirectMessageCursorRequest;
+import com.codeit.mople.domain.directmessage.dto.response.CursorResponseDirectMessageDto;
 import com.codeit.mople.domain.directmessage.entity.DirectMessage;
 import com.codeit.mople.domain.directmessage.exception.DirectMessageErrorCode;
 import com.codeit.mople.domain.directmessage.exception.DirectMessageException;
@@ -81,8 +84,16 @@ public class DirectMessageServiceTest {
       given(conversation.getUserA()).willReturn(userA);
       given(userA.getId()).willReturn(userAId);
 
-      given(directMessageRepository.findByConversationIdOrderByCreatedAtDesc(conversationId))
+      // 커서 페이징 관련 리퀘스트 목 세팅 동기화
+      DirectMessageCursorRequest mockRequest = mock(DirectMessageCursorRequest.class);
+      given(mockRequest.limit()).willReturn(20);
+      given(mockRequest.sortBy()).willReturn("createdAt");
+      given(mockRequest.sortDirection()).willReturn("DESCENDING");
+      given(mockRequest.parseCursorToInstant()).willReturn(null);
+
+      given(directMessageRepository.findDirectMessageByCursor(eq(conversationId), eq(mockRequest), any()))
           .willReturn(List.of(message));
+
       given(message.getId()).willReturn(messageId);
       given(message.getConversation()).willReturn(conversation);
       given(message.getSender()).willReturn(userA);
@@ -93,22 +104,23 @@ public class DirectMessageServiceTest {
       given(userB.getId()).willReturn(userBId);
 
       //when
-      List<DirectMessageDto> result = directMessageService.getDirectMessages(conversationId, userAId);
+      CursorResponseDirectMessageDto result = directMessageService.getDirectMessages(conversationId, userAId, mockRequest);
 
       //then
-      assertThat(result).hasSize(1);
-      assertThat(result.get(0).content()).isEqualTo("안녕하세요!");
-      verify(directMessageRepository).findByConversationIdOrderByCreatedAtDesc(conversationId);
+      assertThat(result.data()).hasSize(1);
+      assertThat(result.data().get(0).content()).isEqualTo("안녕하세요!");
+      verify(conversation).updateLastReadAt(eq(userAId), any(Instant.now().getClass()));
     }
 
     @Test
     @DisplayName("실패: 존재하지 않는 대화방을 조회하면 예외가 발생한다.")
     void fail_get_direct_messages_not_found() {
       //given
+      DirectMessageCursorRequest mockRequest = mock(DirectMessageCursorRequest.class);
       given(conversationRepository.findById(conversationId)).willReturn(Optional.empty());
 
       //when & then
-      assertThatThrownBy(() -> directMessageService.getDirectMessages(conversationId, userAId))
+      assertThatThrownBy(() -> directMessageService.getDirectMessages(conversationId, userAId, mockRequest))
           .isInstanceOf(ConversationException.class)
           .hasMessageContaining(ConversationErrorCode.CONVERSATION_NOT_FOUND.getMessage());
     }
@@ -117,6 +129,7 @@ public class DirectMessageServiceTest {
     @DisplayName("실패: 대화방 참여자가 아닌 제 3자가 조회를 시도하면 예외가 발생한다.")
     void fail_get_direct_messages_access_denied() {
       //given
+      DirectMessageCursorRequest mockRequest = mock(DirectMessageCursorRequest.class);
       given(conversation.getId()).willReturn(conversationId);
       given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
       given(conversation.getUserA()).willReturn(userA);
@@ -125,7 +138,7 @@ public class DirectMessageServiceTest {
       given(userB.getId()).willReturn(userBId);
 
       //when & then
-      assertThatThrownBy(() -> directMessageService.getDirectMessages(conversationId, strangerId))
+      assertThatThrownBy(() -> directMessageService.getDirectMessages(conversationId, strangerId, mockRequest))
           .isInstanceOf(ConversationException.class)
           .hasMessageContaining(ConversationErrorCode.ACCESS_DENIED.getMessage());
     }
@@ -136,20 +149,24 @@ public class DirectMessageServiceTest {
   class ReadMessage {
 
     @Test
-    @DisplayName("성공: 올바른 수신자가 메시지를 읽음 처리한다.")
+    @DisplayName("성공: 올바른 수신자가 메시지 수신 시 대화방 내 본인의 읽음 상태가 갱신된다.")
     void success_read_message() {
       //given
+      Instant messageTime = Instant.now().minusSeconds(10);
       given(directMessageRepository.findById(messageId)).willReturn(Optional.of(message));
       given(message.getConversation()).willReturn(conversation);
       given(conversation.getId()).willReturn(conversationId);
       given(message.getReceiver()).willReturn(userB);
       given(userB.getId()).willReturn(userBId);
+      given(message.getCreatedAt()).willReturn(messageTime);
+
+      given(conversation.getMyLastReadAt(userBId)).willReturn(null);
 
       //when
       directMessageService.readMessage(conversationId, messageId, userBId);
 
       //then
-      verify(message).markAsRead();
+      verify(conversation).updateLastReadAt(userBId, messageTime);
     }
 
     @Test

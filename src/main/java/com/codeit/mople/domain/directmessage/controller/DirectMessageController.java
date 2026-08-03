@@ -1,8 +1,9 @@
 package com.codeit.mople.domain.directmessage.controller;
 
-import com.codeit.mople.domain.directmessage.dto.response.DirectMessageDto;
+import com.codeit.mople.domain.directmessage.dto.request.DirectMessageCursorRequest;
+import com.codeit.mople.domain.directmessage.dto.response.CursorResponseDirectMessageDto;
 import com.codeit.mople.domain.directmessage.service.DirectMessageService;
-import java.util.List;
+import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -23,10 +24,11 @@ public class DirectMessageController {
   private final DirectMessageService directMessageService;
 
   @GetMapping
-  public ResponseEntity<List<DirectMessageDto>> getDirectMessages(
-      @PathVariable UUID conversationId
+  public ResponseEntity<CursorResponseDirectMessageDto> getDirectMessages(
+      @PathVariable UUID conversationId,
+      @Valid DirectMessageCursorRequest request
   ) {
-    List<DirectMessageDto> response = directMessageService.getDirectMessages(conversationId, TEMP_REQUESTER_ID);
+    CursorResponseDirectMessageDto response = directMessageService.getDirectMessages(conversationId, TEMP_REQUESTER_ID, request);
     return ResponseEntity.ok(response);
   }
 

@@ -1,6 +1,7 @@
 package com.codeit.mople.domain.conversation.controller;
 
 import com.codeit.mople.domain.conversation.dto.request.ConversationCreateRequest;
+import com.codeit.mople.domain.conversation.dto.request.ConversationCursorRequest;
 import com.codeit.mople.domain.conversation.dto.response.ConversationDto;
 import com.codeit.mople.domain.conversation.dto.response.CursorResponseConversationDto;
 import com.codeit.mople.domain.conversation.service.ConversationService;
@@ -36,8 +37,10 @@ public class ConversationController {
   }
 
   @GetMapping
-  public ResponseEntity<CursorResponseConversationDto> findConversations() {
-    CursorResponseConversationDto response = conversationService.getMyConversations(TEMP_REQUESTER_ID);
+  public ResponseEntity<CursorResponseConversationDto> findConversations(
+      @Valid ConversationCursorRequest request
+  ) {
+    CursorResponseConversationDto response = conversationService.getMyConversations(TEMP_REQUESTER_ID,request);
     return ResponseEntity.ok(response);
   }
 

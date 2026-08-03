@@ -73,5 +73,4 @@ public class Playlist extends BaseTimeEntity {
       this.description = description;
     }
   }
-
 }

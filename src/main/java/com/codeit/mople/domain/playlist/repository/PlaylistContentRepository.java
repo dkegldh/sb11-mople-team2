@@ -2,6 +2,7 @@ package com.codeit.mople.domain.playlist.repository;
 
 import com.codeit.mople.domain.playlist.entity.PlaylistContent;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -26,4 +27,8 @@ public interface PlaylistContentRepository extends JpaRepository<PlaylistContent
   @Modifying(clearAutomatically = true)
   @Query("delete from PlaylistContent pc where pc.playlist.id = :playlistId")
   void deleteAllByPlaylistId(@Param("playlistId") UUID playlistId);
+
+  boolean existsByPlaylistIdAndContentId(UUID playlistId, UUID contentId);
+
+  Optional<PlaylistContent> findByPlaylistIdAndContentId(UUID playlistId, UUID contentId);
 }

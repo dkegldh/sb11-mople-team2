@@ -22,7 +22,7 @@ public class AuthService {
 
   @Transactional
   public TokenResponse signIn(SignInRequest request) {
-    User user = userRepository.findByEmail(request.email())
+    User user = userRepository.findByEmail(request.username())
         .orElseThrow(() -> new AuthException(AuthErrorCode.INVALID_CREDENTIALS));
 
     if(!passwordEncoder.matches(request.password(), user.getPassword())) {

@@ -2,9 +2,9 @@ package com.codeit.mople.domain.playlist.event;
 
 import java.util.UUID;
 
-public record PlaylistSubscriptionCreateEvent(
+public record PlaylistContentAddedEvent(
     UUID playlistId,
-    UUID subscriberId
+    UUID contentId
 ) {
 
 }
