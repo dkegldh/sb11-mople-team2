@@ -28,6 +28,8 @@ public interface AdminApi {
           content = @Content(schema = @Schema(implementation = ApiResponse.class))),
       @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "사용자 없음",
           content = @Content(schema = @Schema(implementation = ApiResponse.class))),
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "서버 오류",
+          content = @Content(schema = @Schema(implementation = ApiResponse.class))),
   })
   ApiResponse<Void> changeRole(
       @PathVariable UUID userId,
@@ -44,6 +46,8 @@ public interface AdminApi {
       @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "권한 없음",
           content = @Content(schema = @Schema(implementation = ApiResponse.class))),
       @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "사용자 없음",
+          content = @Content(schema = @Schema(implementation = ApiResponse.class))),
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "서버 오류",
           content = @Content(schema = @Schema(implementation = ApiResponse.class))),
   })
   ApiResponse<Void> changeLocked(

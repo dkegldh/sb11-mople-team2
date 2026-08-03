@@ -5,7 +5,7 @@ import com.codeit.mople.domain.user.entity.Role;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.exception.UserErrorCode;
 import com.codeit.mople.domain.user.repository.UserRepository;
-import com.codeit.mople.global.error.CustomException;
+import com.codeit.mople.domain.user.exception.UserException;
 import com.codeit.mople.global.event.UserForceLogoutEvent;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -31,7 +31,7 @@ public class AdminService {
     log.debug("권한 변경 시작 - userId: {}, role: {}", userId, roleStr);
     Role role = Role.valueOf(roleStr.toUpperCase());
     User user = userRepository.findById(userId)
-        .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+        .orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
     Role previousRole = user.getRole();
     user.changeRole(role);
     if (previousRole != role) {
@@ -46,7 +46,7 @@ public class AdminService {
     validateNotSelf(userId);
     log.debug("계정 잠금 변경 시작 - userId: {}, locked: {}", userId, locked);
     User user = userRepository.findById(userId)
-        .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+        .orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
     boolean previousLocked = user.isLocked();
     if (locked) {
       user.lock();
@@ -64,7 +64,7 @@ public class AdminService {
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
     CustomUserDetails principal = (CustomUserDetails) auth.getPrincipal();
     if (targetUserId.equals(principal.getUserId())) {
-      throw new CustomException(UserErrorCode.CANNOT_MODIFY_SELF);
+      throw new UserException(UserErrorCode.CANNOT_MODIFY_SELF);
     }
   }
 }
