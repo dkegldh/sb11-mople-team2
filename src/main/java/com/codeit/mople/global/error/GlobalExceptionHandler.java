@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.BeanInstantiationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -27,6 +28,16 @@ public class GlobalExceptionHandler {
     return ResponseEntity
         .status(errorCode.getStatus())
         .body(ApiResponse.error(errorCode.getCode(), errorCode.getMessage(), e.getDetails()));
+  }
+
+  // Record 생성자에서 던진 CustomException이 BeanInstantiationException으로 감싸진 경우
+  @ExceptionHandler(BeanInstantiationException.class)
+  public ResponseEntity<ApiResponse<Void>> handleBeanInstantiationException(
+      BeanInstantiationException e) {
+    if (e.getCause() instanceof CustomException customException) {
+      return handleCustomException(customException);
+    }
+    return handleException(e);
   }
 
   // @Valid 검증 실패 (요청 body)
