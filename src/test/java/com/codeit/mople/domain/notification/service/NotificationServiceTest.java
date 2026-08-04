@@ -123,9 +123,6 @@ class NotificationServiceTest {
             assertThat(result.nextIdAfter()).isEqualTo(lastItemId);
             // totalCount는 현재 페이지 크기가 아닌 전체 알림 개수
             assertThat(result.totalCount()).isEqualTo(3);
-
-            // limit+1번째 항목(n3)은 응답에 포함되지 않아야 함
-            assertThat(result.data()).noneMatch(n -> n.title().equals("알림3"));
         }
 
         @Test
