@@ -157,6 +157,7 @@ class NotificationServiceTest {
 
             given(notificationRepository.findNotificationByCursor(eq(receiverId), isNull(), isNull(), eq(20)))
                 .willReturn(List.of());
+            given(notificationRepository.countByReceiver_Id(receiverId)).willReturn(0L);
 
             // when
             CursorResponseNotificationDto result = notificationService.getNotifications(receiverId, request);
