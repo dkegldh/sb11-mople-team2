@@ -4,6 +4,7 @@ import com.codeit.mople.domain.notification.exception.NotificationException;
 import com.codeit.mople.global.error.CommonErrorCode;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import java.time.Instant;
 import java.util.Map;
@@ -13,6 +14,7 @@ public record NotificationCursorRequest(
     String cursor,
     UUID idAfter,
 
+    @NotNull(message = "limit는 필수입니다.")
     @Min(value = 1, message = "페이지 크기는 최소 1 이상이어야 합니다.")
     @Max(value = 100, message = "페이지 크기는 최대 100을 초과할 수 없습니다.")
     Integer limit,
@@ -25,9 +27,6 @@ public record NotificationCursorRequest(
 ) {
 
     public NotificationCursorRequest {
-        if (limit == null) {
-            limit = 20;
-        }
         if (sortDirection == null || sortDirection.isBlank()) {
             sortDirection = "DESCENDING";
         }
