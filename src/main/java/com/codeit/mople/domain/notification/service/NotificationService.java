@@ -28,7 +28,7 @@ public class NotificationService {
 
         Instant cursorTime = request.parseCursorToInstant();
         List<Notification> notifications = notificationRepository.findNotificationByCursor(
-            receiverId, request, cursorTime);
+            receiverId, cursorTime, request.idAfter(), request.limit());
 
         boolean hasNext = notifications.size() > request.limit();
         List<Notification> sliced = hasNext ? notifications.subList(0, request.limit()) : notifications;
@@ -53,6 +53,7 @@ public class NotificationService {
             nextIdAfter = lastItem.getId();
         }
 
+        long totalCount = notificationRepository.countByReceiver_Id(receiverId);
         log.info("알림 목록 조회 완료 - receiverId: {}", receiverId);
 
         return new CursorResponseNotificationDto(
@@ -60,7 +61,7 @@ public class NotificationService {
             nextCursor,
             nextIdAfter,
             hasNext,
-            data.size(),
+            totalCount,
             request.sortBy(),
             request.sortDirection()
         );
