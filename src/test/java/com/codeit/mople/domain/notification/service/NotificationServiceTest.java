@@ -1,6 +1,7 @@
 package com.codeit.mople.domain.notification.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -8,6 +9,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 
 import com.codeit.mople.domain.notification.dto.request.NotificationCursorRequest;
+import com.codeit.mople.domain.notification.exception.NotificationException;
 import com.codeit.mople.domain.notification.dto.response.CursorResponseNotificationDto;
 import com.codeit.mople.domain.notification.entity.Notification;
 import com.codeit.mople.domain.notification.entity.NotificationLevel;
@@ -104,7 +106,7 @@ class NotificationServiceTest {
 
             Notification n1 = mockNotification(UUID.randomUUID(), "알림1", "내용1", NotificationLevel.INFO, Instant.now());
             Notification n2 = mockNotification(lastItemId, "알림2", "내용2", NotificationLevel.INFO, lastItemTime);
-            Notification n3 = mock(Notification.class); // limit+1번째 - 스텁 없음, from()은 호출되지 않음
+            Notification n3 = mock(Notification.class); // limit+1번째 — 슬라이싱으로 제외되어 필드 접근 없음
 
             given(notificationRepository.findNotificationByCursor(eq(receiverId), eq(request), isNull()))
                 .willReturn(List.of(n1, n2, n3));
@@ -177,15 +179,27 @@ class NotificationServiceTest {
                 cursorStr, idAfter, 20, "DESCENDING", "createdAt");
 
             given(notificationRepository.findNotificationByCursor(
-                eq(receiverId), eq(request), any(Instant.class)))
+                eq(receiverId), eq(request), eq(Instant.parse(cursorStr))))
                 .willReturn(List.of());
 
             // when
             CursorResponseNotificationDto result = notificationService.getNotifications(receiverId, request);
 
-            // then - cursor가 있을 때 Repository에 null이 아닌 Instant 값이 전달됨
+            // then - cursor 문자열이 정확한 Instant 값으로 변환되어 Repository에 전달됨
             assertThat(result.data()).isEmpty();
             assertThat(result.hasNext()).isFalse();
+        }
+
+        @Test
+        @DisplayName("실패: cursor 형식이 잘못되면 NotificationException이 발생한다.")
+        void fail_throws_exception_when_cursor_format_is_invalid() {
+            // given
+            NotificationCursorRequest request = new NotificationCursorRequest(
+                "invalid-date", UUID.randomUUID(), 20, "DESCENDING", "createdAt");
+
+            // when & then — parseCursorToInstant()에서 예외 발생, Repository는 호출되지 않음
+            assertThatThrownBy(() -> notificationService.getNotifications(receiverId, request))
+                .isInstanceOf(NotificationException.class);
         }
 
         @Test
