@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import jakarta.persistence.PersistenceException;
 
-import com.codeit.mople.domain.notification.dto.request.NotificationCursorRequest;
 import com.codeit.mople.domain.notification.entity.Notification;
 import com.codeit.mople.domain.notification.entity.NotificationType;
 import com.codeit.mople.domain.user.entity.User;
@@ -161,15 +160,6 @@ class NotificationRepositoryTest {
   @DisplayName("커서 기반 알림 조회 [findNotificationByCursor]")
   class FindNotificationByCursor {
 
-    private NotificationCursorRequest firstPageRequest() {
-      return new NotificationCursorRequest(null, null, 20, "DESCENDING", "createdAt");
-    }
-
-    private NotificationCursorRequest 커서_요청(Notification last) {
-      return new NotificationCursorRequest(
-          last.getCreatedAt().toString(), last.getId(), 20, "DESCENDING", "createdAt");
-    }
-
     @Test
     @DisplayName("cursor 없이 조회하면 receiver의 알림만 최신순으로 반환된다.")
     void 첫_페이지_receiver_알림만_최신순_반환() {
@@ -179,8 +169,7 @@ class NotificationRepositoryTest {
       알림_저장(otherUser, "타유저 알림", NotificationType.NEW_FOLLOWER);
 
       List<Notification> result =
-          notificationRepository.findNotificationByCursor(
-              receiver.getId(), firstPageRequest(), null);
+          notificationRepository.findNotificationByCursor(receiver.getId(), null, null, 20);
 
       // receiver 알림 3개만 반환 (otherUser 알림 제외)
       assertThat(result).hasSize(3);
@@ -194,8 +183,7 @@ class NotificationRepositoryTest {
     @DisplayName("알림이 없으면 빈 리스트를 반환한다.")
     void 알림_없으면_빈_리스트() {
       List<Notification> result =
-          notificationRepository.findNotificationByCursor(
-              receiver.getId(), firstPageRequest(), null);
+          notificationRepository.findNotificationByCursor(receiver.getId(), null, null, 20);
 
       assertThat(result).isEmpty();
     }
@@ -206,11 +194,9 @@ class NotificationRepositoryTest {
       for (int i = 0; i < 5; i++) {
         알림_저장(receiver, "알림" + i, NotificationType.NEW_FOLLOWER);
       }
-      NotificationCursorRequest request =
-          new NotificationCursorRequest(null, null, 3, "DESCENDING", "createdAt");
 
       List<Notification> result =
-          notificationRepository.findNotificationByCursor(receiver.getId(), request, null);
+          notificationRepository.findNotificationByCursor(receiver.getId(), null, null, 3);
 
       // limit=3이므로 limit+1=4개까지만 반환 (Service에서 hasNext 판별용)
       assertThat(result).hasSize(4);
@@ -221,11 +207,9 @@ class NotificationRepositoryTest {
     void 알림이_limit_이하이면_전체_반환() {
       알림_저장(receiver, "알림1", NotificationType.NEW_FOLLOWER);
       알림_저장(receiver, "알림2", NotificationType.PLAYLIST_SUBSCRIBE);
-      NotificationCursorRequest request =
-          new NotificationCursorRequest(null, null, 5, "DESCENDING", "createdAt");
 
       List<Notification> result =
-          notificationRepository.findNotificationByCursor(receiver.getId(), request, null);
+          notificationRepository.findNotificationByCursor(receiver.getId(), null, null, 5);
 
       assertThat(result).hasSize(2);
     }
@@ -236,11 +220,9 @@ class NotificationRepositoryTest {
       for (int i = 0; i < 3; i++) {
         알림_저장(receiver, "알림" + i, NotificationType.NEW_FOLLOWER);
       }
-      NotificationCursorRequest request =
-          new NotificationCursorRequest(null, null, 3, "DESCENDING", "createdAt");
 
       List<Notification> result =
-          notificationRepository.findNotificationByCursor(receiver.getId(), request, null);
+          notificationRepository.findNotificationByCursor(receiver.getId(), null, null, 3);
 
       // 데이터 수 == limit 이면 limit+1 쿼리 결과도 3개 → hasNext=false 판별 기준
       assertThat(result).hasSize(3);
@@ -253,11 +235,9 @@ class NotificationRepositoryTest {
       Thread.sleep(10); // 타임스탬프 차이 보장
       Notification newer = 알림_저장(receiver, "최신 알림", NotificationType.NEW_FOLLOWER);
 
-      // newer의 createdAt을 cursor로 사용 → older만 반환되어야 함
-      NotificationCursorRequest req = 커서_요청(newer);
       List<Notification> result =
           notificationRepository.findNotificationByCursor(
-              receiver.getId(), req, req.parseCursorToInstant());
+              receiver.getId(), newer.getCreatedAt(), newer.getId(), 20);
 
       assertThat(result).hasSize(1);
       assertThat(result.get(0).getId()).isEqualTo(older.getId());
@@ -276,11 +256,9 @@ class NotificationRepositoryTest {
       알림_저장(receiver, "최신 알림1", NotificationType.DIRECT_MESSAGE);
       알림_저장(receiver, "최신 알림2", NotificationType.ROLE_CHANGE);
 
-      // middle의 createdAt을 cursor로 사용 → oldest만 반환되어야 함
-      NotificationCursorRequest req = 커서_요청(middle);
       List<Notification> result =
           notificationRepository.findNotificationByCursor(
-              receiver.getId(), req, req.parseCursorToInstant());
+              receiver.getId(), middle.getCreatedAt(), middle.getId(), 20);
 
       assertThat(result).hasSize(1);
       assertThat(result.get(0).getId()).isEqualTo(oldest.getId());
@@ -316,15 +294,49 @@ class NotificationRepositoryTest {
       entityManager.clear();
 
       // largeId를 cursor로 사용 → createdAt이 같으므로 id < largeId인 smallId 알림만 반환
-      NotificationCursorRequest req =
-          new NotificationCursorRequest(
-              fixedTime.toString(), largeId, 20, "DESCENDING", "createdAt");
       List<Notification> result =
           notificationRepository.findNotificationByCursor(
-              receiver.getId(), req, req.parseCursorToInstant());
+              receiver.getId(), fixedTime, largeId, 20);
 
       assertThat(result).hasSize(1);
       assertThat(result.get(0).getId()).isEqualTo(smallId);
+    }
+  }
+
+  @Nested
+  @DisplayName("수신자별 알림 총 개수 조회 [countByReceiver_Id]")
+  class CountByReceiverId {
+
+    @Test
+    @DisplayName("알림이 없으면 0을 반환한다.")
+    void 알림_없으면_0() {
+      long count = notificationRepository.countByReceiver_Id(receiver.getId());
+
+      assertThat(count).isZero();
+    }
+
+    @Test
+    @DisplayName("receiver의 알림 개수를 정확히 반환한다.")
+    void receiver_알림_개수_정확히_반환() {
+      알림_저장(receiver, "알림1", NotificationType.NEW_FOLLOWER);
+      알림_저장(receiver, "알림2", NotificationType.PLAYLIST_SUBSCRIBE);
+      알림_저장(receiver, "알림3", NotificationType.DIRECT_MESSAGE);
+
+      long count = notificationRepository.countByReceiver_Id(receiver.getId());
+
+      assertThat(count).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("다른 receiver의 알림은 개수에 포함되지 않는다.")
+    void 다른_receiver_알림은_개수에_미포함() {
+      알림_저장(receiver, "내 알림", NotificationType.NEW_FOLLOWER);
+      알림_저장(otherUser, "타유저 알림1", NotificationType.NEW_FOLLOWER);
+      알림_저장(otherUser, "타유저 알림2", NotificationType.NEW_FOLLOWER);
+
+      long count = notificationRepository.countByReceiver_Id(receiver.getId());
+
+      assertThat(count).isEqualTo(1);
     }
   }
 }

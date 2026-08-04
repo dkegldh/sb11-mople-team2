@@ -12,7 +12,7 @@ import com.codeit.mople.domain.notification.dto.request.NotificationCursorReques
 import com.codeit.mople.domain.notification.exception.NotificationException;
 import com.codeit.mople.domain.notification.dto.response.CursorResponseNotificationDto;
 import com.codeit.mople.domain.notification.entity.Notification;
-import com.codeit.mople.domain.notification.entity.NotificationLevel;
+import com.codeit.mople.domain.notification.NotificationLevel;
 import com.codeit.mople.domain.notification.repository.NotificationRepository;
 import com.codeit.mople.domain.user.entity.User;
 import java.time.Instant;
@@ -63,8 +63,9 @@ class NotificationServiceTest {
             Notification n1 = mockNotification(id1, "팔로우 알림", "홍길동님이 팔로우했습니다.", NotificationLevel.INFO, createdAt1);
             Notification n2 = mockNotification(id2, "역할 변경", "역할이 변경됐습니다.", NotificationLevel.WARNING, createdAt2);
 
-            given(notificationRepository.findNotificationByCursor(eq(receiverId), eq(request), isNull()))
+            given(notificationRepository.findNotificationByCursor(eq(receiverId), isNull(), isNull(), eq(20)))
                 .willReturn(List.of(n1, n2));
+            given(notificationRepository.countByReceiver_Id(receiverId)).willReturn(2L);
 
             // when
             CursorResponseNotificationDto result = notificationService.getNotifications(receiverId, request);
@@ -108,8 +109,9 @@ class NotificationServiceTest {
             Notification n2 = mockNotification(lastItemId, "알림2", "내용2", NotificationLevel.INFO, lastItemTime);
             Notification n3 = mock(Notification.class); // limit+1번째 — 슬라이싱으로 제외되어 필드 접근 없음
 
-            given(notificationRepository.findNotificationByCursor(eq(receiverId), eq(request), isNull()))
+            given(notificationRepository.findNotificationByCursor(eq(receiverId), isNull(), isNull(), eq(2)))
                 .willReturn(List.of(n1, n2, n3));
+            given(notificationRepository.countByReceiver_Id(receiverId)).willReturn(3L);
 
             // when
             CursorResponseNotificationDto result = notificationService.getNotifications(receiverId, request);
@@ -119,7 +121,8 @@ class NotificationServiceTest {
             assertThat(result.hasNext()).isTrue();
             assertThat(result.nextCursor()).isEqualTo(lastItemTime.toString());
             assertThat(result.nextIdAfter()).isEqualTo(lastItemId);
-            assertThat(result.totalCount()).isEqualTo(2);
+            // totalCount는 현재 페이지 크기가 아닌 전체 알림 개수
+            assertThat(result.totalCount()).isEqualTo(3);
 
             // limit+1번째 항목(n3)은 응답에 포함되지 않아야 함
             assertThat(result.data()).noneMatch(n -> n.title().equals("알림3"));
@@ -135,7 +138,7 @@ class NotificationServiceTest {
             Notification n1 = mockNotification(UUID.randomUUID(), "알림1", "내용", NotificationLevel.INFO, Instant.now());
             Notification n2 = mockNotification(UUID.randomUUID(), "알림2", "내용", NotificationLevel.INFO, Instant.now());
 
-            given(notificationRepository.findNotificationByCursor(eq(receiverId), eq(request), isNull()))
+            given(notificationRepository.findNotificationByCursor(eq(receiverId), isNull(), isNull(), eq(2)))
                 .willReturn(List.of(n1, n2));
 
             // when
@@ -155,7 +158,7 @@ class NotificationServiceTest {
             NotificationCursorRequest request = new NotificationCursorRequest(
                 null, null, 20, "DESCENDING", "createdAt");
 
-            given(notificationRepository.findNotificationByCursor(eq(receiverId), eq(request), isNull()))
+            given(notificationRepository.findNotificationByCursor(eq(receiverId), isNull(), isNull(), eq(20)))
                 .willReturn(List.of());
 
             // when
@@ -179,7 +182,7 @@ class NotificationServiceTest {
                 cursorStr, idAfter, 20, "DESCENDING", "createdAt");
 
             given(notificationRepository.findNotificationByCursor(
-                eq(receiverId), eq(request), eq(Instant.parse(cursorStr))))
+                eq(receiverId), eq(Instant.parse(cursorStr)), eq(idAfter), eq(20)))
                 .willReturn(List.of());
 
             // when
@@ -213,8 +216,9 @@ class NotificationServiceTest {
             Instant createdAt = Instant.parse("2025-08-01T09:00:00Z");
             Notification n1 = mockNotification(notifId, "단건 알림", "내용", NotificationLevel.INFO, createdAt);
 
-            given(notificationRepository.findNotificationByCursor(eq(receiverId), eq(request), isNull()))
+            given(notificationRepository.findNotificationByCursor(eq(receiverId), isNull(), isNull(), eq(20)))
                 .willReturn(List.of(n1));
+            given(notificationRepository.countByReceiver_Id(receiverId)).willReturn(1L);
 
             // when
             CursorResponseNotificationDto result = notificationService.getNotifications(receiverId, request);
