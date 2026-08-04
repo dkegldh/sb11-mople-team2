@@ -14,7 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.codeit.mople.domain.auth.security.CustomUserDetails;
 import com.codeit.mople.domain.notification.dto.response.CursorResponseNotificationDto;
 import com.codeit.mople.domain.notification.dto.response.NotificationResponse;
-import com.codeit.mople.domain.notification.entity.NotificationLevel;
+import com.codeit.mople.domain.notification.NotificationLevel;
 import com.codeit.mople.domain.notification.service.NotificationService;
 import com.codeit.mople.domain.user.entity.Role;
 import java.time.Instant;
