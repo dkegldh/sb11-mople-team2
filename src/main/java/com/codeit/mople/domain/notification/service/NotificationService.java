@@ -34,7 +34,14 @@ public class NotificationService {
         List<Notification> sliced = hasNext ? notifications.subList(0, request.limit()) : notifications;
 
         List<NotificationResponse> data = sliced.stream()
-            .map(NotificationResponse::from)
+            .map(n -> new NotificationResponse(
+                n.getId(),
+                n.getCreatedAt(),
+                n.getReceiver().getId(),
+                n.getTitle(),
+                n.getContent(),
+                n.getLevel()
+            ))
             .toList();
 
         String nextCursor = null;
