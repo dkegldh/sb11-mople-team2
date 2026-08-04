@@ -140,6 +140,39 @@ public class NotificationIntegrationTest {
         }
 
         @Test
+        @DisplayName("성공: 다른 receiver의 알림은 조회되지 않는다.")
+        void success_notifications_are_isolated_by_receiver() throws Exception {
+            UUID otherReceiverId = UUID.randomUUID();
+            entityManager.createNativeQuery(
+                "INSERT INTO users (id, email, password, name, role, locked, session_version, created_at) " +
+                "VALUES (:id, 'other@test.com', 'password', '타유저', 'USER', false, 0, CURRENT_TIMESTAMP)"
+            ).setParameter("id", otherReceiverId).executeUpdate();
+
+            알림_생성("내 알림", NotificationType.NEW_FOLLOWER);
+
+            String otherSql =
+                "INSERT INTO notifications (id, receiver_id, title, content, level, notification_type, created_at) " +
+                "VALUES (RANDOM_UUID(), :receiverId, :title, '내용', 'INFO', 'NEW_FOLLOWER', CURRENT_TIMESTAMP)";
+            entityManager.createNativeQuery(otherSql)
+                .setParameter("receiverId", otherReceiverId)
+                .setParameter("title", "타유저 알림1")
+                .executeUpdate();
+            entityManager.createNativeQuery(otherSql)
+                .setParameter("receiverId", otherReceiverId)
+                .setParameter("title", "타유저 알림2")
+                .executeUpdate();
+
+            mockMvc.perform(get("/api/notifications")
+                    .param("limit", "20")
+                    .with(user(principal)))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].title").value("내 알림"))
+                .andExpect(jsonPath("$.totalCount").value(1));
+        }
+
+        @Test
         @DisplayName("성공: 각 알림의 응답 필드가 올바르게 반환된다.")
         void success_notification_fields_are_correct() throws Exception {
             알림_생성("팔로우 알림", NotificationType.NEW_FOLLOWER);
@@ -200,34 +233,55 @@ public class NotificationIntegrationTest {
         }
 
         @Test
-        @DisplayName("성공: 마지막 페이지에서 cursor로 조회하면 빈 data와 hasNext=false가 반환된다.")
-        void success_empty_when_no_more_data() throws Exception {
+        @DisplayName("성공: 3페이지에 걸친 연속 cursor 페이지네이션이 올바르게 동작한다.")
+        void success_three_page_cursor_pagination() throws Exception {
             알림_생성("알림1", NotificationType.NEW_FOLLOWER);
+            알림_생성("알림2", NotificationType.PLAYLIST_SUBSCRIBE);
+            알림_생성("알림3", NotificationType.DIRECT_MESSAGE);
 
-            // 첫 페이지 조회
-            MvcResult firstResult = mockMvc.perform(get("/api/notifications")
+            // 1페이지: limit=1 → 알림3 반환, hasNext=true
+            MvcResult page1 = mockMvc.perform(get("/api/notifications")
                     .param("limit", "1")
                     .with(user(principal)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.hasNext").value(false))
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].title").value("알림3"))
+                .andExpect(jsonPath("$.hasNext").value(true))
                 .andReturn();
 
-            String body = firstResult.getResponse().getContentAsString();
-            String firstCreatedAt = objectMapper.readTree(body)
-                .get("data").get(0).get("createdAt").asText();
-            String firstId = objectMapper.readTree(body)
-                .get("data").get(0).get("id").asText();
+            String body1 = page1.getResponse().getContentAsString();
+            String cursor1 = objectMapper.readTree(body1).get("nextCursor").asText();
+            String idAfter1 = objectMapper.readTree(body1).get("nextIdAfter").asText();
 
-            // 해당 알림을 cursor로 사용해 다음 페이지 요청 → 빈 결과
+            // 2페이지: 알림2 반환, hasNext=true
+            MvcResult page2 = mockMvc.perform(get("/api/notifications")
+                    .param("limit", "1")
+                    .param("cursor", cursor1)
+                    .param("idAfter", idAfter1)
+                    .with(user(principal)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].title").value("알림2"))
+                .andExpect(jsonPath("$.hasNext").value(true))
+                .andReturn();
+
+            String body2 = page2.getResponse().getContentAsString();
+            String cursor2 = objectMapper.readTree(body2).get("nextCursor").asText();
+            String idAfter2 = objectMapper.readTree(body2).get("nextIdAfter").asText();
+
+            // 3페이지: 알림1 반환, hasNext=false, nextCursor 없음
             mockMvc.perform(get("/api/notifications")
-                    .param("limit", "20")
-                    .param("cursor", firstCreatedAt)
-                    .param("idAfter", firstId)
+                    .param("limit", "1")
+                    .param("cursor", cursor2)
+                    .param("idAfter", idAfter2)
                     .with(user(principal)))
                 .andDo(print())
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").isEmpty())
-                .andExpect(jsonPath("$.hasNext").value(false));
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].title").value("알림1"))
+                .andExpect(jsonPath("$.hasNext").value(false))
+                .andExpect(jsonPath("$.nextCursor").doesNotExist())
+                .andExpect(jsonPath("$.nextIdAfter").doesNotExist());
         }
     }
 }
