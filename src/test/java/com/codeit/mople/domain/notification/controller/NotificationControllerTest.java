@@ -1,0 +1,232 @@
+package com.codeit.mople.domain.notification.controller;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.codeit.mople.domain.auth.security.CustomUserDetails;
+import com.codeit.mople.domain.notification.dto.response.CursorResponseNotificationDto;
+import com.codeit.mople.domain.notification.dto.response.NotificationResponse;
+import com.codeit.mople.domain.notification.entity.NotificationLevel;
+import com.codeit.mople.domain.notification.service.NotificationService;
+import com.codeit.mople.domain.user.entity.Role;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+@WebMvcTest(NotificationController.class)
+@DisplayName("NotificationController 테스트")
+class NotificationControllerTest {
+
+    @Autowired
+    MockMvc mockMvc;
+
+    @MockitoBean
+    NotificationService notificationService;
+
+    CustomUserDetails principal;
+
+    @BeforeEach
+    void setUp() {
+        principal = new CustomUserDetails(UUID.randomUUID(), Role.USER);
+    }
+
+    @Nested
+    @DisplayName("GET /api/notifications - 알림 목록 커서 조회")
+    class GetNotifications {
+
+        @Test
+        @DisplayName("성공: 유효한 파라미터로 요청하면 200과 알림 목록이 반환된다.")
+        void success_200_with_notification_list() throws Exception {
+            // given
+            UUID notifId = UUID.randomUUID();
+            Instant createdAt = Instant.parse("2025-08-01T10:00:00Z");
+            NotificationResponse notifResponse = new NotificationResponse(
+                notifId, createdAt, principal.getUserId(), "팔로우 알림", "홍길동님이 팔로우했습니다.", NotificationLevel.INFO);
+
+            CursorResponseNotificationDto response = new CursorResponseNotificationDto(
+                List.of(notifResponse), null, null, false, 1, "createdAt", "DESCENDING");
+
+            given(notificationService.getNotifications(any(), any())).willReturn(response);
+
+            // when & then
+            mockMvc.perform(get("/api/notifications")
+                    .param("limit", "20")
+                    .param("sortDirection", "DESCENDING")
+                    .param("sortBy", "createdAt")
+                    .with(user(principal)))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data[0].id").value(notifId.toString()))
+                .andExpect(jsonPath("$.data[0].title").value("팔로우 알림"))
+                .andExpect(jsonPath("$.data[0].content").value("홍길동님이 팔로우했습니다."))
+                .andExpect(jsonPath("$.data[0].level").value("INFO"))
+                .andExpect(jsonPath("$.hasNext").value(false))
+                .andExpect(jsonPath("$.nextCursor").doesNotExist())
+                .andExpect(jsonPath("$.nextIdAfter").doesNotExist())
+                .andExpect(jsonPath("$.totalCount").value(1))
+                .andExpect(jsonPath("$.sortBy").value("createdAt"))
+                .andExpect(jsonPath("$.sortDirection").value("DESCENDING"));
+        }
+
+        @Test
+        @DisplayName("성공: 알림이 없으면 200과 빈 data 목록이 반환된다.")
+        void success_200_with_empty_list() throws Exception {
+            // given
+            CursorResponseNotificationDto response = new CursorResponseNotificationDto(
+                List.of(), null, null, false, 0, "createdAt", "DESCENDING");
+
+            given(notificationService.getNotifications(any(), any())).willReturn(response);
+
+            // when & then
+            mockMvc.perform(get("/api/notifications")
+                    .param("limit", "20")
+                    .with(user(principal)))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data").isEmpty())
+                .andExpect(jsonPath("$.hasNext").value(false))
+                .andExpect(jsonPath("$.totalCount").value(0));
+        }
+
+        @Test
+        @DisplayName("성공: 다음 페이지가 있으면 200과 nextCursor, nextIdAfter가 반환된다.")
+        void success_200_with_next_cursor() throws Exception {
+            // given
+            String nextCursor = "2025-08-01T09:00:00Z";
+            UUID nextIdAfter = UUID.randomUUID();
+            CursorResponseNotificationDto response = new CursorResponseNotificationDto(
+                List.of(), nextCursor, nextIdAfter, true, 20, "createdAt", "DESCENDING");
+
+            given(notificationService.getNotifications(any(), any())).willReturn(response);
+
+            // when & then
+            mockMvc.perform(get("/api/notifications")
+                    .param("limit", "20")
+                    .with(user(principal)))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hasNext").value(true))
+                .andExpect(jsonPath("$.nextCursor").value(nextCursor))
+                .andExpect(jsonPath("$.nextIdAfter").value(nextIdAfter.toString()));
+        }
+
+        @Test
+        @DisplayName("실패: limit이 없으면 400을 반환한다.")
+        void fail_400_when_limit_is_missing() throws Exception {
+            // when & then
+            mockMvc.perform(get("/api/notifications")
+                    .with(user(principal)))
+                .andDo(print())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("COMMON-001"));
+
+            verifyNoInteractions(notificationService);
+        }
+
+        @Test
+        @DisplayName("실패: limit이 0이면 400을 반환한다.")
+        void fail_400_when_limit_is_zero() throws Exception {
+            // when & then
+            mockMvc.perform(get("/api/notifications")
+                    .param("limit", "0")
+                    .with(user(principal)))
+                .andDo(print())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("COMMON-001"));
+
+            verifyNoInteractions(notificationService);
+        }
+
+        @Test
+        @DisplayName("실패: limit이 101이면 400을 반환한다.")
+        void fail_400_when_limit_exceeds_max() throws Exception {
+            // when & then
+            mockMvc.perform(get("/api/notifications")
+                    .param("limit", "101")
+                    .with(user(principal)))
+                .andDo(print())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("COMMON-001"));
+
+            verifyNoInteractions(notificationService);
+        }
+
+        @Test
+        @DisplayName("실패: sortDirection이 ASCENDING이면 400을 반환한다.")
+        void fail_400_when_sort_direction_is_ascending() throws Exception {
+            // when & then
+            mockMvc.perform(get("/api/notifications")
+                    .param("limit", "20")
+                    .param("sortDirection", "ASCENDING")
+                    .with(user(principal)))
+                .andDo(print())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("COMMON-001"));
+
+            verifyNoInteractions(notificationService);
+        }
+
+        @Test
+        @DisplayName("실패: sortBy가 createdAt이 아니면 400을 반환한다.")
+        void fail_400_when_sort_by_is_invalid() throws Exception {
+            // when & then
+            mockMvc.perform(get("/api/notifications")
+                    .param("limit", "20")
+                    .param("sortBy", "updatedAt")
+                    .with(user(principal)))
+                .andDo(print())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("COMMON-001"));
+
+            verifyNoInteractions(notificationService);
+        }
+
+        @Test
+        @DisplayName("실패: cursor만 있고 idAfter가 없으면 400을 반환한다.")
+        void fail_400_when_cursor_without_id_after() throws Exception {
+            // when & then
+            mockMvc.perform(get("/api/notifications")
+                    .param("limit", "20")
+                    .param("cursor", "2025-08-01T10:00:00Z")
+                    .with(user(principal)))
+                .andDo(print())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("COMMON-001"));
+
+            verifyNoInteractions(notificationService);
+        }
+
+        @Test
+        @DisplayName("실패: 인증 없이 요청하면 401을 반환한다.")
+        void fail_401_when_unauthenticated() throws Exception {
+            // when & then
+            mockMvc.perform(get("/api/notifications")
+                    .param("limit", "20"))
+                .andDo(print())
+                .andExpect(status().isUnauthorized());
+
+            verifyNoInteractions(notificationService);
+        }
+    }
+}
