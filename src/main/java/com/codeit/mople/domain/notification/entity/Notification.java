@@ -1,5 +1,6 @@
 package com.codeit.mople.domain.notification.entity;
 
+import com.codeit.mople.domain.notification.NotificationLevel;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.global.entity.BaseEntity;
 import jakarta.persistence.Column;
