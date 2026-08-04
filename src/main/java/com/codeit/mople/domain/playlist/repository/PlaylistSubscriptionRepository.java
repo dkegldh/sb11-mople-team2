@@ -1,6 +1,7 @@
 package com.codeit.mople.domain.playlist.repository;
 
 import com.codeit.mople.domain.playlist.entity.PlaylistSubscription;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -17,6 +18,19 @@ public interface PlaylistSubscriptionRepository extends JpaRepository<PlaylistSu
       DELETE FROM PlaylistSubscription ps
              WHERE ps.playlist.id = :playlistId AND ps.subscriber.id = :subscriberId
       """)
-  int deleteByPlaylistIdAndSubscriberId(@Param("playlistId") UUID playlistId,@Param("subscriberId") UUID subscriberId);
+  int deleteByPlaylistIdAndSubscriberId(
+      @Param("playlistId") UUID playlistId,
+      @Param("subscriberId") UUID subscriberId
+  );
+
+  @Query("""
+      select ps.playlist.id
+      from PlaylistSubscription ps
+      where ps.subscriber.id = :subscriberId
+      and ps.playlist.id in :playlistIds
+      """)
+  List<UUID> findPlaylistIdsBySubscriberIdAndPlaylistIdIn(
+      @Param("subscriberId") UUID subscriberId,
+      @Param("playlistIds") List<UUID> playlistIds);
 
 }

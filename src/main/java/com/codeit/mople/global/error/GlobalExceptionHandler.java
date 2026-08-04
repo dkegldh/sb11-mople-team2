@@ -10,6 +10,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeanInstantiationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -62,6 +64,16 @@ public class GlobalExceptionHandler {
     return ResponseEntity
         .status(CommonErrorCode.INVALID_INPUT.getStatus())
         .body(ApiResponse.error(CommonErrorCode.INVALID_INPUT.getCode(), e.getMessage()));
+  }
+
+  // 인가(권한) 검증 실패 시 403 Forbidden 반환
+  @ExceptionHandler({AuthorizationDeniedException.class, AccessDeniedException.class})
+  public ResponseEntity<ApiResponse<Void>> handleAccessDeniedException(Exception e) {
+    log.warn("[AccessDenied] Message: {}", e.getMessage());
+    CommonErrorCode errorCode = CommonErrorCode.FORBIDDEN;
+    return ResponseEntity
+        .status(errorCode.getStatus())
+        .body(ApiResponse.error(errorCode.getCode(), errorCode.getMessage()));
   }
 
   // 예상 못 한 모든 예외

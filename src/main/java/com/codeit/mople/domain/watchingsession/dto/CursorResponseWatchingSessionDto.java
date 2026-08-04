@@ -1,10 +1,10 @@
-package com.codeit.mople.domain.content.dto;
+package com.codeit.mople.domain.watchingsession.dto;
 
 import java.util.List;
 import java.util.UUID;
 
-public record ContentPageResponse(
-    List<ContentResponse> data,
+public record CursorResponseWatchingSessionDto(
+    List<WatchingSessionResponse> data,
     String nextCursor,
     UUID nextIdAfter,
     boolean hasNext,

@@ -6,6 +6,7 @@ import com.codeit.mople.domain.conversation.dto.response.CursorResponseConversat
 import com.codeit.mople.domain.conversation.entity.Conversation;
 import com.codeit.mople.domain.conversation.exception.ConversationErrorCode;
 import com.codeit.mople.domain.conversation.exception.ConversationException;
+import com.codeit.mople.domain.conversation.mapper.ConversationMapper;
 import com.codeit.mople.domain.conversation.repository.ConversationRepository;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.exception.UserErrorCode;
@@ -29,6 +30,7 @@ public class ConversationService {
 
   private final UserRepository userRepository;
   private final ConversationRepository conversationRepository;
+  private final ConversationMapper conversationMapper;
 
   @Transactional
   public ConversationDto findOrCreateConversation(UUID requesterId, UUID targetUserId) {
@@ -61,7 +63,7 @@ public class ConversationService {
     }
 
     log.info("대화방 생성 완료 - conversationId: {}", conversation.getId());
-    return ConversationDto.from(conversation, requesterId);
+    return conversationMapper.toDto(conversation, requesterId);
   }
 
   public ConversationDto getConversation(UUID conversationId, UUID requesterId) {
@@ -72,7 +74,7 @@ public class ConversationService {
 
     validateParticipant(conversation, requesterId);
 
-    return ConversationDto.from(conversation, requesterId);
+    return conversationMapper.toDto(conversation, requesterId);
   }
 
   public ConversationDto getConversationWithUser(UUID requesterId, UUID targetUserId) {
@@ -90,7 +92,7 @@ public class ConversationService {
     Conversation conversation = conversationRepository.findByUserAAndUserB(userA, userB)
         .orElseThrow(() -> new ConversationException(ConversationErrorCode.CONVERSATION_NOT_FOUND, Map.of("userAId", userAId, "userBId", userBId)));
 
-    return ConversationDto.from(conversation, requesterId);
+    return conversationMapper.toDto(conversation, requesterId);
   }
 
   public CursorResponseConversationDto getMyConversations(UUID requesterId, ConversationCursorRequest request) {
@@ -107,7 +109,7 @@ public class ConversationService {
     List<Conversation> slicedConversations = hasNext ? conversations.subList(0, request.limit()) : conversations;
 
     List<ConversationDto> conversationDtos = slicedConversations.stream()
-        .map(c -> ConversationDto.from(c, requesterId))
+        .map(c -> conversationMapper.toDto(c, requesterId))
         .toList();
 
     String nextCursor = null;

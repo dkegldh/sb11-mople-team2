@@ -1,5 +1,7 @@
 package com.codeit.mople.domain.user.service;
 
+import com.codeit.mople.domain.auth.exception.AuthErrorCode;
+import com.codeit.mople.domain.auth.exception.AuthException;
 import com.codeit.mople.domain.user.dto.request.ChangePasswordRequest;
 import com.codeit.mople.domain.user.dto.request.UserCreateRequest;
 import com.codeit.mople.domain.user.dto.request.UserSearchRequest;
@@ -12,6 +14,8 @@ import com.codeit.mople.domain.user.exception.UserException;
 import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.global.dto.CursorResponse;
 import com.codeit.mople.global.storage.FileStorageService;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -80,6 +84,9 @@ public class UserService {
     validateOwner(targetUserId, requesterId);
     User user = findUserOrThrow(targetUserId);
     user.changePassword(passwordEncoder.encode(request.password()));
+    user.destroyTemporaryPassword();
+    user.clearRefreshToken();
+    user.increaseSessionVersion();
   }
 
   private User findUserOrThrow(UUID userId) {

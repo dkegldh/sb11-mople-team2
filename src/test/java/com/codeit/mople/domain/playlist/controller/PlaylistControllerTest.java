@@ -17,11 +17,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.codeit.mople.domain.auth.security.CustomUserDetails;
 import com.codeit.mople.domain.playlist.dto.request.PlaylistCreateRequest;
+import com.codeit.mople.domain.playlist.dto.request.PlaylistQueryCondition;
+import com.codeit.mople.domain.playlist.dto.request.PlaylistQueryCondition.PlaylistSortBy;
+import com.codeit.mople.domain.playlist.dto.request.PlaylistQueryCondition.SortDirection;
 import com.codeit.mople.domain.playlist.dto.request.PlaylistUpdateRequest;
+import com.codeit.mople.domain.playlist.dto.response.PlaylistCursorResponse;
 import com.codeit.mople.domain.playlist.dto.response.PlaylistResponse;
 import com.codeit.mople.domain.playlist.exception.PlaylistErrorCode;
-import com.codeit.mople.domain.playlist.exception.PlaylistForbiddenException;
-import com.codeit.mople.domain.playlist.exception.PlaylistNotFoundException;
+import com.codeit.mople.domain.playlist.exception.PlaylistException;
 import com.codeit.mople.domain.playlist.service.PlaylistService;
 import com.codeit.mople.domain.user.entity.Role;
 import com.codeit.mople.domain.user.entity.User;
@@ -29,6 +32,7 @@ import com.codeit.mople.global.dto.UserSummary;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -102,7 +106,7 @@ public class PlaylistControllerTest {
           List.of()
       );
 
-      given(playlistService.create(eq(ownerId), any(PlaylistCreateRequest.class)))
+      given(playlistService.create(any(PlaylistCreateRequest.class), eq(ownerId)))
           .willReturn(response);
 
       // when & then
@@ -126,7 +130,7 @@ public class PlaylistControllerTest {
           );
 
       // 행위 중심(PlaylistService.create() 메서드가 호출되었는지 검증)
-      verify(playlistService).create(eq(ownerId), any(PlaylistCreateRequest.class));
+      verify(playlistService).create(any(PlaylistCreateRequest.class), eq(ownerId));
     }
 
     @Test
@@ -200,7 +204,7 @@ public class PlaylistControllerTest {
           List.of()
       );
 
-      given(playlistService.find(playlistId))
+      given(playlistService.find(playlistId, userDetails.getUserId()))
           .willReturn(response);
 
       // when & then
@@ -210,7 +214,7 @@ public class PlaylistControllerTest {
           )
           .andExpect(status().isOk());
 
-      verify(playlistService).find(playlistId);
+      verify(playlistService).find(playlistId, userDetails.getUserId());
     }
 
     @Test
@@ -219,8 +223,11 @@ public class PlaylistControllerTest {
       // given
       UUID notExistPlaylistId = UUID.randomUUID();
 
-      given(playlistService.find(notExistPlaylistId))
-          .willThrow(new PlaylistNotFoundException(notExistPlaylistId));
+      given(playlistService.find(notExistPlaylistId, userDetails.getUserId()))
+          .willThrow(new PlaylistException(
+              PlaylistErrorCode.PLAYLIST_NOT_FOUND,
+              Map.of("playlistId", notExistPlaylistId)
+          ));
 
       // BeforeEach에서 userDetails 초기화
 
@@ -231,7 +238,182 @@ public class PlaylistControllerTest {
           )
           .andExpect(status().isNotFound());
 
-      verify(playlistService).find(notExistPlaylistId);
+      verify(playlistService).find(notExistPlaylistId, userDetails.getUserId());
+    }
+
+  }
+
+  @Nested
+  @DisplayName("플레이리스트 목록 조회")
+  class FindAll {
+
+    @Test
+    @DisplayName("플레이리스트 목록 조회 성공")
+    void findAll_success() throws Exception {
+      // given
+
+      // BeforeEach에서 userDetails 초기화
+
+      PlaylistCursorResponse response = new PlaylistCursorResponse(
+          List.of(),
+          null,
+          null,
+          false,
+          0L,
+          PlaylistSortBy.UPDATED_AT,
+          SortDirection.ASCENDING
+      );
+
+      given(playlistService.findAll(any(PlaylistQueryCondition.class), eq(userDetails.getUserId())))
+          .willReturn(response);
+
+      // when & then
+      mockMvc.perform(get("/api/playlists")
+              .param("limit", "10")
+              .param("sortDirection", "ASCENDING")
+              .param("sortBy", "UPDATED_AT")
+              .with(user(userDetails))
+              .with(csrf())
+          )
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data").isArray())
+          .andExpect(jsonPath("$.hasNext").value(false))
+          .andExpect(jsonPath("$.totalCount").value(0));
+
+      verify(playlistService).findAll(
+          any(PlaylistQueryCondition.class),
+          eq(userDetails.getUserId())
+      );
+    }
+
+    @Test
+    @DisplayName("플레이리스트 목록 조회 실패 - limit 누락(400 에러)")
+    void findAll_fail_withoutLimit() throws Exception {
+      // given
+
+      // BeforeEach에서 userDetails 초기화
+
+      // when & then
+      mockMvc.perform(get("/api/playlists")
+              .param("sortDirection", "ASCENDING")
+              .param("sortBy", "UPDATED_AT")
+              .with(user(userDetails))
+              .with(csrf()))
+          .andExpect(status().isBadRequest());
+
+      verifyNoInteractions(playlistService);
+    }
+
+    @Test
+    @DisplayName("플레이리스트 목록 조회 실패 - 정렬 조건 누락(400 에러)")
+    void findAll_fail_withoutSortBy() throws Exception {
+      // given
+
+      // BeforeEach에서 userDetails 초기화
+
+      // when & then
+      mockMvc.perform(get("/api/playlists")
+              .param("limit", "10")
+              .param("sortDirection", "ASCENDING")
+              .with(user(userDetails))
+              .with(csrf()))
+          .andExpect(status().isBadRequest());
+
+      verifyNoInteractions(playlistService);
+    }
+
+    @Test
+    @DisplayName("플레이리스트 목록 조회 실패 - 정렬 방향 누락(400 에러)")
+    void findAll_fail_withoutSortDirection() throws Exception {
+      // given
+
+      // BeforeEach에서 userDetails 초기화
+
+      // when & then
+      mockMvc.perform(get("/api/playlists")
+              .param("limit", "10")
+              .param("sortBy", "UPDATED_AT")
+              .with(user(userDetails))
+              .with(csrf()))
+          .andExpect(status().isBadRequest());
+
+      verifyNoInteractions(playlistService);
+    }
+
+    @Test
+    @DisplayName("플레이리스트 목록 조회 실패 - limit 값 1 미만(400 에러)")
+    void findAll_fail_limitLessThanMin() throws Exception {
+      // given
+
+      // BeforeEach에서 userDetails 초기화
+
+      // when & then
+      mockMvc.perform(get("/api/playlists")
+              .param("limit", "0")
+              .param("sortDirection", "ASCENDING")
+              .param("sortBy", "UPDATED_AT")
+              .with(user(userDetails))
+              .with(csrf()))
+          .andExpect(status().isBadRequest());
+
+      verifyNoInteractions(playlistService);
+    }
+
+    @Test
+    @DisplayName("플레이리스트 목록 조회 실패 - limit 값 100 초과(400 에러)")
+    void findAll_fail_limitGreaterThanMax() throws Exception {
+      // given
+
+      // BeforeEach에서 userDetails 초기화
+
+      // when & then
+      mockMvc.perform(get("/api/playlists")
+              .param("limit", "1000")
+              .param("sortDirection", "ASCENDING")
+              .param("sortBy", "UPDATED_AT")
+              .with(user(userDetails))
+              .with(csrf()))
+          .andExpect(status().isBadRequest());
+
+      verifyNoInteractions(playlistService);
+    }
+
+    @Test
+    @DisplayName("플레이리스트 목록 조회 실패 - 잘못된 정렬 조건(400 에러)")
+    void findAll_fail_invalidSortBy() throws Exception {
+      // given
+
+      // BeforeEach에서 userDetails 초기화
+
+      // when & then
+      mockMvc.perform(get("/api/playlists")
+              .param("limit", "10")
+              .param("sortDirection", "ASCENDING")
+              .param("sortBy", "ANY")
+              .with(user(userDetails))
+              .with(csrf()))
+          .andExpect(status().isBadRequest());
+
+      verifyNoInteractions(playlistService);
+    }
+
+    @Test
+    @DisplayName("플레이리스트 목록 조회 실패 - 잘못된 정렬 방향(400 에러)")
+    void findAll_fail_invalidSortDirection() throws Exception {
+      // given
+
+      // BeforeEach에서 userDetails 초기화
+
+      // when & then
+      mockMvc.perform(get("/api/playlists")
+              .param("limit", "10")
+              .param("sortDirection", "ANY")
+              .param("sortBy", "UPDATED_AT")
+              .with(user(userDetails))
+              .with(csrf()))
+          .andExpect(status().isBadRequest());
+
+      verifyNoInteractions(playlistService);
     }
 
   }
@@ -290,7 +472,10 @@ public class PlaylistControllerTest {
       // BeforeEach에서 playlistId, updateRequest, userDetails 초기화
 
       given(playlistService.update(eq(playlistId), any(PlaylistUpdateRequest.class), eq(ownerId)))
-          .willThrow(new PlaylistForbiddenException(playlistId));
+          .willThrow(new PlaylistException(
+              PlaylistErrorCode.PLAYLIST_FORBIDDEN,
+              Map.of("playlistId", playlistId)
+          ));
 
       // when & then
       mockMvc.perform(patch("/api/playlists/{playlistId}", playlistId)
@@ -334,7 +519,10 @@ public class PlaylistControllerTest {
 
       // BeforeEach에서 playlistId, ownerId, userDetails 초기화
 
-      doThrow(new PlaylistForbiddenException(playlistId))
+      doThrow(new PlaylistException(
+          PlaylistErrorCode.PLAYLIST_FORBIDDEN,
+          Map.of("playlistId", playlistId)
+      ))
           .when(playlistService).delete(eq(playlistId), eq(ownerId));
 
       // when & then

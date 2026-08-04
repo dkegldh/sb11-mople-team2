@@ -1,29 +1,26 @@
 package com.codeit.mople.domain.content.service;
 
 import com.codeit.mople.domain.content.dto.ContentCreateRequest;
-import com.codeit.mople.domain.content.dto.ContentPageResponse;
 import com.codeit.mople.domain.content.dto.ContentResponse;
 import com.codeit.mople.domain.content.dto.ContentUpdateRequest;
+import com.codeit.mople.domain.content.dto.CursorResponseContentDto;
 import com.codeit.mople.domain.content.entity.Content;
 import com.codeit.mople.domain.content.entity.ContentType;
 import com.codeit.mople.domain.content.exception.ContentErrorCode;
 import com.codeit.mople.domain.content.exception.ContentException;
-import com.codeit.mople.domain.content.mapper.ContentMapper;
+import com.codeit.mople.domain.content.repository.ContentQueryRepository;
 import com.codeit.mople.domain.content.repository.ContentRepository;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.domain.Sort.Direction;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -34,7 +31,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class ContentService{
 
   private final ContentRepository contentRepository;
-  private final ContentMapper contentMapper;
+  private final ContentQueryRepository contentQueryRepository;
 
   //허용할 이미지 MIME 타입 및 확장자 정의
   private static final List<String> ALLOWED_MIME_TYPES = List.of(
@@ -46,9 +43,8 @@ public class ContentService{
 
   //콘텐츠 생성
   @Transactional
-  public ContentResponse createContent(UUID adminId, ContentCreateRequest request,
-      MultipartFile thumbnail) {
-    log.debug("콘텐트 생성 시작 - adminId: {}, type: {}, title: {}", adminId, request.type(), request.title());
+  public ContentResponse createContent(ContentCreateRequest request, MultipartFile thumbnail) {
+    log.debug("콘텐트 생성 시작 - type: {}, title: {}", request.type(), request.title());
 
     //ContentType 변환 방어 로직
     ContentType contentType;
@@ -66,59 +62,86 @@ public class ContentService{
     }
 
     //Request DTO 데이터를 바탕으로 매퍼를 통해 Content 엔티티 생성
-    Content content = contentMapper.toEntity(request, contentType, uploadedThumbnailUrl);
+    Content content = new Content(contentType, request.title(), request.description(), uploadedThumbnailUrl, request.tags());
 
     //DB에 엔티티 저장
     Content savedContent = contentRepository.save(content);
 
     log.info("콘텐츠 생성 완료 - contentId: {}, title: {}", savedContent.getId(), savedContent.getTitle());
 
-    //저장된 엔티티 데이터를 ContentResponse 구조로 변환하여 반환
-    return contentMapper.toDto(savedContent);
+    return new ContentResponse(
+        savedContent.getId(),
+        savedContent.getType().name(),
+        savedContent.getTitle(),
+        savedContent.getDescription(),
+        savedContent.getThumbnailUrl(),
+        savedContent.getTags(),
+        savedContent.getAverageRating(),
+        savedContent.getReviewCount(),
+        savedContent.getWatcherCount()
+    );
   }
 
   //콘텐츠 목록 조회
   @Transactional(readOnly = true)
-  public ContentPageResponse getContents(int page, int limit, String sortDirection, String sortBy) {
-    log.debug("콘텐츠 목록 조회 시작 - page: {}, limit: {}, sortBy: {}, sortDirection: {}", page, limit, sortBy, sortDirection);
+  public CursorResponseContentDto getContents(UUID cursorId, Instant cursorCreatedAt, int limit) {
+    log.debug("콘텐츠 목록 조회 시작 - cursorId: {}, cursorCreatedAt: {}, limit: {}", cursorId, cursorCreatedAt, limit);
 
-    //Limit 검증 로직
-    if (page < 0 || limit <= 0 || limit > 100) {
-      log.warn("콘텐츠 목록 조회 실패(잘못된 페이징 조건) - page: {}, limit: {}", page, limit);
+    if (limit <= 0 || limit > 100) {
+      log.warn("콘텐츠 목록 조회 실패(잘못된 페이징 조건) - limit: {}", limit);
+      throw new ContentException(ContentErrorCode.INVALID_PAGE_REQUEST, Map.of("limit", limit));
+    }
+
+    //커서 피라미터가 둘 중 하나만 드어온 경우 예외 처리
+    if ((cursorId == null) != (cursorCreatedAt == null)) {
+      log.warn("콘텐츠 목록 조회 실패(불완전한 커서 조건) - cursorId: {}, cursorCreatedAt: {}", cursorId, cursorCreatedAt);
       throw new ContentException(ContentErrorCode.INVALID_PAGE_REQUEST,
-          Map.of("page", page, "limit", limit));
+          Map.of("cursorId", String.valueOf(cursorId), "cursorCreatedAt", String.valueOf(cursorCreatedAt)));
     }
 
-    //허용된 정렬 필드가 아닐 경우 기본값(createdAt) 처리
-    List<String> allowedSortFields = List.of("createdAt", "updatedAt", "title",
-        "averageRating", "watcherCount", "reviewCount");
-    if (!allowedSortFields.contains(sortBy)) {
-      log.debug("허용되지 않은 정렬 필드 기본값(createdAt) 처리 - 원래 전달된 sortBy: {}", sortBy);
-      sortBy = "createdAt";
+    //데이터 조회 및 카운트
+    List<Content> contents = contentQueryRepository.findContentByCursor(cursorId, cursorCreatedAt, limit);
+    long totalCount = contentQueryRepository.countAllContents();
+
+    //hasNext 판단 및 리스트 자르기
+    boolean hasNext = contents.size() > limit;
+    List<Content> pageContents = hasNext ? contents.subList(0, limit) : contents;
+
+    List<ContentResponse> contentResponses = pageContents.stream()
+        .map(content -> new ContentResponse(
+            content.getId(),
+            content.getType().name(),
+            content.getTitle(),
+            content.getDescription(),
+            content.getThumbnailUrl(),
+            content.getTags(),
+            content.getAverageRating(),
+            content.getReviewCount(),
+            content.getWatcherCount()
+        )).toList();
+
+    //커서 값 추출
+    String nextCursor = null;
+    UUID nextIdAfter = null;
+
+    if (hasNext && !pageContents.isEmpty()) {
+      Content lastItem = pageContents.get(pageContents.size() - 1);
+      nextCursor = lastItem.getCreatedAt() != null ? lastItem.getCreatedAt().toString() : null;
+      nextIdAfter = lastItem.getId();
     }
-
-    //정렬 방향 설정(ASCENDING(오름차순) 또는 DESCENDING(내림차순))
-    String normalizedSortDirection =
-        "DESCENDING".equalsIgnoreCase(sortDirection) ? "DESCENDING" : "ASCENDING";
-    Sort.Direction direction = normalizedSortDirection.equals("DESCENDING")
-        ? Direction.DESC
-        : Direction.ASC;
-
-    //PageRequest 객체 생성(첫 페이지(0) 부터 limit 개수만큼 조회)
-    PageRequest pageRequest = PageRequest.of(page, limit, Sort.by(direction, sortBy));
-
-    //DB 조회
-    Page<Content> contentPage = contentRepository.findAll(pageRequest);
-
-    //Content 엔티티 리스트를 ContentResponse DTO 리스트로 변환
-    List<ContentResponse> contentResponses = contentPage.getContent().stream()
-        .map(contentMapper::toDto).toList();
 
     log.debug("콘텐츠 목록 조회 완료 - 조회된 데이터 개수: {}", contentResponses.size());
 
-    //ContentPageResponse에 맞춰 매퍼를 통해 페이징 응답 객체 생성 및 반환
-    return contentMapper.toPageResponse(
-        contentResponses, contentPage, sortBy, normalizedSortDirection);
+    //응답 조립 후 반환
+    return new CursorResponseContentDto(
+        contentResponses,
+        nextCursor,
+        nextIdAfter,
+        hasNext,
+        totalCount,
+        "createdAt",
+        "DESCENDING"
+    );
   }
 
   //콘텐츠 단건 조회
@@ -135,15 +158,23 @@ public class ContentService{
 
     log.debug("콘텐츠 단건 조회 완료 - contentId: {}", content.getId());
 
-    //조회된 엔티티를 매퍼를 통해 DTO로 변환하여 반환
-    return contentMapper.toDto(content);
+    return new ContentResponse(
+        content.getId(),
+        content.getType().name(),
+        content.getTitle(),
+        content.getDescription(),
+        content.getThumbnailUrl(),
+        content.getTags(),
+        content.getAverageRating(),
+        content.getReviewCount(),
+        content.getWatcherCount()
+    );
   }
 
   //콘텐츠 수정
   @Transactional
-  public ContentResponse updateContent(UUID adminId, UUID contentId, ContentUpdateRequest request,
-      MultipartFile thumbnail) {
-    log.debug("콘텐츠 수정 시작 - adminId: {}, contentId: {}, updateTitle: {}", adminId, contentId, request.title());
+  public ContentResponse updateContent(UUID contentId, ContentUpdateRequest request, MultipartFile thumbnail) {
+    log.debug("콘텐츠 수정 시작 - contentId: {}, updateTitle: {}", contentId, request.title());
 
     //수정할 콘텐츠 조회(없으면 404 예외 발생)
     Content content = contentRepository.findById(contentId)
@@ -167,14 +198,23 @@ public class ContentService{
 
     log.info("콘텐츠 수정 완료 - contentId: {}", content.getId());
 
-    //수정된 엔티티를 DTO로 변환하여 반환
-    return contentMapper.toDto(content);
+    return new ContentResponse(
+        content.getId(),
+        content.getType().name(),
+        content.getTitle(),
+        content.getDescription(),
+        content.getThumbnailUrl(),
+        content.getTags(),
+        content.getAverageRating(),
+        content.getReviewCount(),
+        content.getWatcherCount()
+    );
   }
 
   //콘텐츠 삭제
   @Transactional
-  public void deleteContent(UUID adminId, UUID contentId) {
-    log.debug("콘텐츠 삭제 시작 - adminId: {}, contentId: {}", adminId, contentId);
+  public void deleteContent(UUID contentId) {
+    log.debug("콘텐츠 삭제 시작 - contentId: {}", contentId);
 
     //삭제할 콘텐츠 조회
     Content content = contentRepository.findById(contentId)

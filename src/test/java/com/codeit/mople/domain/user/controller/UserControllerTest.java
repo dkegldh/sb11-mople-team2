@@ -64,8 +64,7 @@ public class UserControllerTest {
             .content(objectMapper.writeValueAsString(request)))
         .andDo(print())
         .andExpect(status().isCreated())
-        .andExpect(jsonPath("$.success").value(true))
-        .andExpect(jsonPath("$.data.email").value("test@test.com"));
+        .andExpect(jsonPath("$.email").value("test@test.com"));
 
     User savedUser = userRepository.findByEmail("test@test.com")
         .orElseThrow(() -> new AssertionError("가입된 사용자를 찾을 수 없습니다."));
@@ -112,7 +111,7 @@ public class UserControllerTest {
             .header("Authorization", "Bearer " + token))
         .andDo(print())
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.email").value("get@test.com"));
+        .andExpect(jsonPath("$.email").value("get@test.com"));
   }
 
   @Test
@@ -146,9 +145,9 @@ public class UserControllerTest {
         .header("Authorization", "Bearer " + adminToken))
         .andDo(print())
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.data").isArray())
-        .andExpect(jsonPath("$.data.data.length()").value(3))
-        .andExpect(jsonPath("$.data.hasNext").value(false));
+        .andExpect(jsonPath("$.data").isArray())
+        .andExpect(jsonPath("$.data.length()").value(3))
+        .andExpect(jsonPath("$.hasNext").value(false));
   }
 
   @Test
@@ -177,7 +176,7 @@ public class UserControllerTest {
         .with(csrf()))
         .andDo(print())
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.name").value("newName"));
+        .andExpect(jsonPath("$.name").value("newName"));
   }
 
   @Test
@@ -195,8 +194,8 @@ public class UserControllerTest {
         .with(csrf()))
         .andDo(print())
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.name").value("newName"))
-        .andExpect(jsonPath("$.data.profileImageUrl").isNotEmpty());
+        .andExpect(jsonPath("$.name").value("newName"))
+        .andExpect(jsonPath("$.profileImageUrl").isNotEmpty());
   }
 
   @Test

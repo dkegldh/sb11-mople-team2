@@ -31,10 +31,12 @@ public class PlaylistContentRepositoryTest {
   
   private User author;
   private Playlist playlist;
+  private Playlist otherPlaylist;
   private Content content1;
   private Content content2;
   private PlaylistContent playlistContent1;
   private PlaylistContent playlistContent2;
+  private PlaylistContent otherPlaylistContent;
 
   @BeforeEach
   void setUp() {
@@ -46,8 +48,14 @@ public class PlaylistContentRepositoryTest {
 
     playlist = Playlist.create(
         author,
-        "테스트 플레이리스트",
-        "설명"
+        "새로운 플레이리스트 (1)",
+        "새로운 플레이리스트입니다."
+    );
+
+    otherPlaylist = Playlist.create(
+        author,
+        "새로운 플레이리스트 (2)",
+        "새로운 플레이리스트입니다."
     );
 
     content1 = new Content(
@@ -75,6 +83,11 @@ public class PlaylistContentRepositoryTest {
         PlaylistContent.create(
             playlist,
             content2
+        );
+    otherPlaylistContent =
+        PlaylistContent.create(
+            otherPlaylist,
+            content1
         );
   }
 
@@ -147,6 +160,66 @@ public class PlaylistContentRepositoryTest {
 
       assertThat(result).isEmpty();
     }
+
+  }
+
+  @Nested
+  @DisplayName("여러 플레이리스트의 콘텐츠 조회")
+  class FindAllByPlaylistIdInOrderByCreatedAtAsc {
+
+    @Test
+    @DisplayName("플레이리스트 ID 목록에 해당하는 콘텐츠를 추가 순서대로 조회 성공")
+    void findAllByPlaylistIdInOrderByCreatedAtAsc_success() {
+      // given
+      entityManager.persist(author);
+
+      entityManager.persist(playlist);
+      entityManager.persist(otherPlaylist);
+
+      entityManager.persist(content1);
+      entityManager.persist(content2);
+
+      // playlist
+      entityManager.persist(playlistContent2);
+      entityManager.flush();
+
+      entityManager.persist(playlistContent1);
+      entityManager.flush();
+
+      // otherPlaylist
+      entityManager.persist(otherPlaylistContent);
+      entityManager.flush();
+
+      // when
+      List<PlaylistContent> result =
+          playlistContentRepository.findAllByPlaylistIdInOrderByCreatedAtAsc(
+              List.of(
+                  playlist.getId(),
+                  otherPlaylist.getId()
+              )
+          );
+
+      // then
+      assertThat(result).hasSize(3);
+
+      // createdAt 기준 정렬 확인
+      assertThat(result.get(0).getContent().getId())
+          .isEqualTo(content2.getId());
+
+      assertThat(result.get(1).getContent().getId())
+          .isEqualTo(content1.getId());
+
+      assertThat(result.get(2).getPlaylist().getId())
+          .isEqualTo(otherPlaylist.getId());
+
+      // fetch join 확인
+      assertThat(result.get(0).getPlaylist().getId())
+          .isEqualTo(playlist.getId());
+
+      assertThat(result.get(0).getContent())
+          .isNotNull();
+    }
+
   }
 
 }

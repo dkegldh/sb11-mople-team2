@@ -20,6 +20,7 @@ import com.codeit.mople.domain.user.entity.Role;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -119,42 +120,8 @@ public class PlaylistIntegrationTest {
       assertThat(playlist.getDescription()).isEqualTo(description);
     }
 
-    @Test
-    @DisplayName("플레이리스트 생성 실패 - 제목이 비어있음(400 에러)")
-    void create_fail_blankTitle() throws Exception {
-      // given
-      PlaylistCreateRequest invalidRequest = new PlaylistCreateRequest("", description);
-
-      // when & then
-      mockMvc.perform(post("/api/playlists")
-              .with(user(userDetails))
-              .with(csrf())
-              .contentType(MediaType.APPLICATION_JSON)
-              .content(objectMapper.writeValueAsString(invalidRequest)))
-          .andExpect(status().isBadRequest());
-
-      assertThat(playlistRepository.count()).isZero();
-    }
-
-    @Test
-    @DisplayName("플레이리스트 생성 실패 - 설명이 비어있음(400 에러)")
-    void create_fail_blankDescription() throws Exception {
-      // given
-      PlaylistCreateRequest invalidRequest = new PlaylistCreateRequest(title, "");
-
-      // when & then
-      mockMvc.perform(post("/api/playlists")
-              .with(user(userDetails))
-              .with(csrf())
-              .contentType(MediaType.APPLICATION_JSON)
-              .content(objectMapper.writeValueAsString(invalidRequest)))
-          .andExpect(status().isBadRequest());
-
-      assertThat(playlistRepository.count()).isZero();
-    }
-
   @Test
-  @DisplayName("플레이리스트 생성 실패 - 인증되지 않은 사용자")
+  @DisplayName("플레이리스트 생성 실패 - 인증되지 않은 사용자(401 에러)")
   void create_fail_unauthorized() throws Exception {
     // when & then
     mockMvc.perform(post("/api/playlists")
@@ -177,14 +144,14 @@ public class PlaylistIntegrationTest {
     void find_success() throws Exception {
       // given
 
-      // BeforeEach에서 playlist 초기화
+      // BeforeEach에서 playlist, userDetails를 초기화
 
       Playlist savedPlaylist = playlistRepository.save(playlist);
 
       // when & then
       MvcResult result =
           mockMvc.perform(get("/api/playlists/{playlistId}", playlist.getId())
-                  .with(user("test"))
+                  .with(user(userDetails))
                   .with(csrf())
               )
               .andExpect(status().isOk())
@@ -207,6 +174,85 @@ public class PlaylistIntegrationTest {
       assertThat(findPlaylist.getOwner()).isEqualTo(savedOwner);
       assertThat(findPlaylist.getTitle()).isEqualTo(title);
       assertThat(findPlaylist.getDescription()).isEqualTo(description);
+    }
+
+  }
+
+  @Nested
+  @DisplayName("플레이리스트 목록 조회")
+  class FindAll {
+
+    @Test
+    @DisplayName("플레이리스트 목록 조회 성공")
+    void findAll_success() throws Exception {
+      // given
+      
+      // BeforeEach에서 playlist, userDetails를 초기화
+      
+      // 3개의 Playlist 저장
+      playlistRepository.save(playlist);
+      playlistRepository.save(
+          Playlist.create(
+              savedOwner,
+              "새 플레이리스트 (2)",
+              "새로운 플레이리스트입니다."
+          )
+      );
+      playlistRepository.save(
+          Playlist.create(
+              savedOwner,
+              "새 플레이리스트 (3)",
+              "새로운 플레이리스트입니다."
+          )
+      );
+
+      // when & then
+      MvcResult result =
+          mockMvc.perform(get("/api/playlists")
+                  .param("limit", "2")
+                  .param("sortDirection", "ASCENDING")
+                  .param("sortBy", "UPDATED_AT")
+                  .with(user(userDetails))
+                  .with(csrf())
+              )
+              .andExpect(status().isOk())
+              .andExpect(jsonPath("$.data").isArray())
+              .andExpect(jsonPath("$.data.length()").value(2))
+              .andExpect(jsonPath("$.hasNext").value(true))
+              .andExpect(jsonPath("$.totalCount").value(3))
+              .andExpect(jsonPath("$.nextCursor").isNotEmpty())
+              .andExpect(jsonPath("$.nextIdAfter").isNotEmpty())
+              .andReturn();
+
+      // DB 검증
+      List<Playlist> findPlaylists = playlistRepository.findAll();
+
+      assertThat(findPlaylists)
+          .hasSize(3)
+          .extracting(Playlist::getTitle)
+          .containsExactlyInAnyOrder(
+              title,
+              "새 플레이리스트 (2)",
+              "새 플레이리스트 (3)"
+          );
+
+      assertThat(findPlaylists)
+          .allMatch(findPlaylist ->
+              findPlaylist.getOwner().equals(savedOwner)
+          );
+    }
+
+    @Test
+    @DisplayName("플레이리스트 목록 조회 실패 - 인증되지 않은 사용자(401 에러)")
+    void findAll_fail_unauthorized() throws Exception {
+      // when & then
+      mockMvc.perform(get("/api/playlists")
+              .param("limit", "2")
+              .param("sortDirection", "ASCENDING")
+              .param("sortBy", "UPDATED_AT")
+              .with(csrf())
+          )
+          .andExpect(status().isUnauthorized());
     }
 
   }

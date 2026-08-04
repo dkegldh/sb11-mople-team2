@@ -3,7 +3,9 @@ package com.codeit.mople.domain.playlist.controller;
 import com.codeit.mople.domain.auth.security.CustomUserDetails;
 import com.codeit.mople.domain.playlist.controller.api.PlaylistApi;
 import com.codeit.mople.domain.playlist.dto.request.PlaylistCreateRequest;
+import com.codeit.mople.domain.playlist.dto.request.PlaylistQueryCondition;
 import com.codeit.mople.domain.playlist.dto.request.PlaylistUpdateRequest;
+import com.codeit.mople.domain.playlist.dto.response.PlaylistCursorResponse;
 import com.codeit.mople.domain.playlist.dto.response.PlaylistResponse;
 import com.codeit.mople.domain.playlist.service.PlaylistService;
 import jakarta.validation.Valid;
@@ -14,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -31,26 +34,40 @@ public class PlaylistController implements PlaylistApi {
   @Override
   @PostMapping
   public ResponseEntity<PlaylistResponse> create(
-      @AuthenticationPrincipal(errorOnInvalidType = true) CustomUserDetails userDetails,
-      @Valid @RequestBody PlaylistCreateRequest request
+      @Valid @RequestBody PlaylistCreateRequest request,
+      @AuthenticationPrincipal(errorOnInvalidType = true) CustomUserDetails userDetails
   ) {
 
-    PlaylistResponse response = playlistService.create(userDetails.getUserId(), request);
+    PlaylistResponse response = playlistService.create(request, userDetails.getUserId());
 
     return ResponseEntity
         .created(URI.create("/api/playlists/" + response.id()))
         .body(response);
   }
 
+  @Override
   @GetMapping("/{playlistId}")
   public ResponseEntity<PlaylistResponse> find(
-      @PathVariable UUID playlistId
+      @PathVariable UUID playlistId,
+      @AuthenticationPrincipal(errorOnInvalidType = true) CustomUserDetails userDetails
   ) {
-    PlaylistResponse response = playlistService.find(playlistId);
+    PlaylistResponse response = playlistService.find(playlistId, userDetails.getUserId());
 
     return ResponseEntity.ok(response);
   }
 
+  @Override
+  @GetMapping
+  public ResponseEntity<PlaylistCursorResponse> findAll(
+      @Valid @ModelAttribute PlaylistQueryCondition condition,
+      @AuthenticationPrincipal(errorOnInvalidType = true) CustomUserDetails userDetails
+  ) {
+    PlaylistCursorResponse response = playlistService.findAll(condition, userDetails.getUserId());
+
+    return ResponseEntity.ok(response);
+  }
+
+  @Override
   @PatchMapping("/{playlistId}")
   public ResponseEntity<PlaylistResponse> update(
       @PathVariable UUID playlistId,
@@ -63,6 +80,7 @@ public class PlaylistController implements PlaylistApi {
     return ResponseEntity.ok(response);
   }
 
+  @Override
   @DeleteMapping("/{playlistId}")
   public ResponseEntity<Void> delete(
       @PathVariable UUID playlistId,

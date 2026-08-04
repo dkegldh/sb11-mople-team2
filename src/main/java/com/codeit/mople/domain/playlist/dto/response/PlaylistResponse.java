@@ -1,5 +1,6 @@
 package com.codeit.mople.domain.playlist.dto.response;
 
+import com.codeit.mople.domain.playlist.entity.Playlist;
 import com.codeit.mople.global.dto.UserSummary;
 import java.time.Instant;
 import java.util.List;
@@ -15,5 +16,24 @@ public record PlaylistResponse(
     boolean subscribedByMe,
     List<PlaylistContentResponse> contents
 ) {
+
+  public static PlaylistResponse from(
+      Playlist playlist,
+      UserSummary owner,
+      boolean subscribedByMe,
+      List<PlaylistContentResponse> contents
+  ) {
+
+    return new PlaylistResponse(
+        playlist.getId(),
+        owner,
+        playlist.getTitle(),
+        playlist.getDescription(),
+        playlist.getUpdatedAt(),
+        playlist.getSubscriberCount(),
+        subscribedByMe,
+        contents
+    );
+  }
 
 }

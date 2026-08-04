@@ -15,7 +15,6 @@ import com.codeit.mople.domain.follow.dto.FollowResponse;
 import com.codeit.mople.domain.follow.entity.Follow;
 import com.codeit.mople.domain.follow.event.FollowCreatedEvent;
 import com.codeit.mople.domain.follow.exception.FollowErrorCode;
-import com.codeit.mople.domain.follow.mapper.FollowMapper;
 import com.codeit.mople.domain.follow.repository.FollowRepository;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.repository.UserRepository;
@@ -44,8 +43,6 @@ class FollowServiceTest {
   FollowRepository followRepository;
   @Mock
   UserRepository userRepository;
-  @Mock
-  FollowMapper followMapper;
   @Mock
   ApplicationEventPublisher publisher;
 
@@ -81,7 +78,9 @@ class FollowServiceTest {
       given(userRepository.findById(followeeId)).willReturn(Optional.of(followee));
       given(userRepository.findById(followerId)).willReturn(Optional.of(follower));
       given(followRepository.save(any(Follow.class))).willReturn(saved);
-      given(followMapper.toFollowResponse(saved)).willReturn(expected);
+      given(followee.getId()).willReturn(followeeId);
+      given(follower.getId()).willReturn(followerId);
+
 
       // when
       FollowResponse actual = followService.follow(request, followerId);
@@ -125,7 +124,7 @@ class FollowServiceTest {
       assertThatExceptionOfType(CustomException.class)
           .isThrownBy(() -> followService.follow(request, followerId))
           .extracting(CustomException::getErrorCode)
-          .isEqualTo(FollowErrorCode.FOLLOWEE_NOT_FOUND);
+          .isEqualTo(FollowErrorCode.FOLLOW_FOLLOWEE_NOT_FOUND);
 
       verify(followRepository, never()).save(any(Follow.class));
       verify(publisher, never()).publishEvent(any(FollowCreatedEvent.class));
@@ -145,7 +144,7 @@ class FollowServiceTest {
       assertThatExceptionOfType(CustomException.class)
           .isThrownBy(() -> followService.follow(request, followerId))
           .extracting(CustomException::getErrorCode)
-          .isEqualTo(FollowErrorCode.FOLLOWER_NOT_FOUND);
+          .isEqualTo(FollowErrorCode.FOLLOW_FOLLOWER_NOT_FOUND);
 
       verify(followRepository, never()).save(any(Follow.class));
       verify(publisher, never()).publishEvent(any(FollowCreatedEvent.class));
@@ -198,7 +197,7 @@ class FollowServiceTest {
     assertThatExceptionOfType(CustomException.class)
         .isThrownBy(() -> followService.unFollow(followId, followerId))
         .extracting(CustomException::getErrorCode)
-        .isEqualTo(FollowErrorCode.FOLLOW_NOT_FOUND);
+        .isEqualTo(FollowErrorCode.UNFOLLOW_NOT_FOUND);
 
     verify(followRepository, never()).delete(any(Follow.class));
   }
@@ -221,7 +220,7 @@ class FollowServiceTest {
     assertThatExceptionOfType(CustomException.class)
         .isThrownBy(() -> followService.unFollow(followId, followerId))
         .extracting(CustomException::getErrorCode)
-        .isEqualTo(FollowErrorCode.FOLLOW_NOT_OWNER);
+        .isEqualTo(FollowErrorCode.UNFOLLOW_NOT_OWNER);
 
     verify(followRepository, never()).delete(any(Follow.class));
   }
@@ -235,7 +234,8 @@ class FollowServiceTest {
     FollowResponse expected = new FollowResponse(saved.getId(), followeeId, followerId);
 
     given(followRepository.findByFolloweeIdAndFollowerId(followeeId, followerId)).willReturn(Optional.of(saved));
-    given(followMapper.toFollowResponse(saved)).willReturn(expected);
+    given(followee.getId()).willReturn(followeeId);
+    given(follower.getId()).willReturn(followerId);
 
     // when
     FollowResponse actual = followService.getFollowByMe(followeeId, followerId);

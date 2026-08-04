@@ -8,6 +8,7 @@ import org.springframework.boot.autoconfigure.security.servlet.PathRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
@@ -15,13 +16,13 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 
 @Configuration
+@EnableMethodSecurity
 public class SecurityConfig {
 
   @Bean
   public SecurityFilterChain filterChain(HttpSecurity http, JwtProvider jwtProvider,
       UserRepository userRepository) throws Exception {
     http
-        //JWT 기반의 Stateless API이므로 CSRF 보호 비활성화
         .csrf(csrf -> csrf
             .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()) // 쿠키명 기본값 XSRF-TOKEN, 헤더명 X-XSRF-TOKEN
             .ignoringRequestMatchers("/api/auth/**", "/api/users") // (POST, 회원가입)는 "아직 로그인하기 전" 상태에서 호출되는 API라서, CSRF 검증에서 예외 처리
@@ -39,9 +40,6 @@ public class SecurityConfig {
             .requestMatchers(HttpMethod.GET, "/api/users").hasRole("ADMIN")
             .requestMatchers(HttpMethod.PATCH, "/api/users/*/role").hasRole("ADMIN")
             .requestMatchers(HttpMethod.PATCH, "/api/users/*/locked").hasRole("ADMIN")
-            .requestMatchers(HttpMethod.POST, "/api/contents/**").hasRole("ADMIN")
-            .requestMatchers(HttpMethod.PATCH, "/api/contents/**").hasRole("ADMIN")
-            .requestMatchers(HttpMethod.DELETE, "/api/contents/**").hasRole("ADMIN")
             .anyRequest().authenticated()
         )
         .addFilterBefore(

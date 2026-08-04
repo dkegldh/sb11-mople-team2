@@ -15,10 +15,12 @@ import com.codeit.mople.domain.conversation.dto.response.CursorResponseConversat
 import com.codeit.mople.domain.conversation.entity.Conversation;
 import com.codeit.mople.domain.conversation.exception.ConversationErrorCode;
 import com.codeit.mople.domain.conversation.exception.ConversationException;
+import com.codeit.mople.domain.conversation.mapper.ConversationMapper;
 import com.codeit.mople.domain.conversation.repository.ConversationRepository;
 import com.codeit.mople.domain.directmessage.entity.DirectMessage;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.repository.UserRepository;
+import com.codeit.mople.global.dto.UserSummary;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -41,6 +43,9 @@ public class ConversationServiceTest {
 
   @Mock
   private ConversationRepository conversationRepository;
+
+  @Mock
+  private ConversationMapper conversationMapper;
 
   @InjectMocks
   private ConversationService conversationService;
@@ -67,15 +72,18 @@ public class ConversationServiceTest {
     @DisplayName("성공: 기존 대화방이 없으면 사용자 정렬 순서 보장하여 새로 생성한다.")
     void success_create_new_conversation() {
       //given
-      given(userA.getId()).willReturn(userAId);
-
       given(userRepository.findById(userAId)).willReturn(Optional.of(userA));
       given(userRepository.findById(userBId)).willReturn(Optional.of(userB));
       given(conversationRepository.findByUserAAndUserB(userA, userB)).willReturn(Optional.empty());
 
       Conversation newConversation = Conversation.createConversation(userA, userB);
-      ReflectionTestUtils.setField(newConversation, "id", UUID.randomUUID());
+      UUID newConversationId = UUID.randomUUID();
+      ReflectionTestUtils.setField(newConversation, "id", newConversationId);
       given(conversationRepository.saveAndFlush(any(Conversation.class))).willReturn(newConversation);
+
+      UserSummary dummySummary = new UserSummary(userAId, "dummyName", "dummyUrl");
+      ConversationDto dummyDto = new ConversationDto(newConversationId, dummySummary, null, false);
+      given(conversationMapper.toDto(newConversation, userBId)).willReturn(dummyDto);
 
       //when - userB가 userA에게 요청
       ConversationDto result = conversationService.findOrCreateConversation(userBId, userAId);
@@ -83,22 +91,24 @@ public class ConversationServiceTest {
       //then
       assertThat(result).isNotNull();
       assertThat(result.with().userId()).isEqualTo(userAId);
+      assertThat(result.id()).isEqualTo(newConversationId);
       verify(conversationRepository, times(1)).saveAndFlush(any(Conversation.class));
+      verify(conversationMapper, times(1)).toDto(newConversation, userBId);
     }
 
     @Test
     @DisplayName("성공: 기존 대화방이 존재하면 생성하지 않고 기존 방을 반환한다.")
     void success_return_existing_conversation(){
       //given
-      given(userA.getId()).willReturn(userAId);
-      given(userB.getId()).willReturn(userBId);
-
       given(userRepository.findById(userAId)).willReturn(Optional.of(userA));
       given(userRepository.findById(userBId)).willReturn(Optional.of(userB));
 
       Conversation existingConversation = Conversation.createConversation(userA, userB);
       ReflectionTestUtils.setField(existingConversation, "id", UUID.randomUUID());
       given(conversationRepository.findByUserAAndUserB(userA, userB)).willReturn(Optional.of(existingConversation));
+
+      ConversationDto dummyDto = new ConversationDto(existingConversation.getId(), null, null, false);
+      given(conversationMapper.toDto(existingConversation, userAId)).willReturn(dummyDto);
 
       //when
       ConversationDto result = conversationService.findOrCreateConversation(userAId, userBId);
@@ -126,9 +136,6 @@ public class ConversationServiceTest {
     @DisplayName("성공: 지정한 상대방과의 대화방이 존재하면 정상 반환한다.")
     void success_get_conversation_with_user() {
       //given
-      given(userA.getId()).willReturn(userAId);
-      given(userB.getId()).willReturn(userBId);
-
       given(userRepository.findById(userAId)).willReturn(Optional.of(userA));
       given(userRepository.findById(userBId)).willReturn(Optional.of(userB));
 
@@ -137,6 +144,9 @@ public class ConversationServiceTest {
       ReflectionTestUtils.setField(conversation, "id", conversationId);
 
       given(conversationRepository.findByUserAAndUserB(userA, userB)).willReturn(Optional.of(conversation));
+
+      ConversationDto dummyDto = new ConversationDto(conversationId, null, null, false);
+      given(conversationMapper.toDto(any(Conversation.class), eq(userAId))).willReturn(dummyDto);
 
       //when
       ConversationDto result = conversationService.getConversationWithUser(userAId, userBId);
@@ -170,13 +180,15 @@ public class ConversationServiceTest {
     void success_get_conversation_participant() {
       //given
       given(userA.getId()).willReturn(userAId);
-      given(userB.getId()).willReturn(userBId);
 
       Conversation conversation = Conversation.createConversation(userA, userB);
       UUID conversationId = UUID.randomUUID();
       ReflectionTestUtils.setField(conversation, "id", conversationId);
 
       given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
+
+      ConversationDto dummyDto = new ConversationDto(conversationId, null, null, false);
+      given(conversationMapper.toDto(any(Conversation.class), eq(userAId))).willReturn(dummyDto);
 
       //when
       ConversationDto result = conversationService.getConversation(conversationId, userAId);
@@ -216,17 +228,10 @@ public class ConversationServiceTest {
     @DisplayName("성공: 본인이 속한 모든 대화 목록을 최신순 커서 페이징으로 가져온다.")
     void success_get_my_conversations() {
       //given
-      given(userA.getId()).willReturn(userAId);
-      given(userB.getId()).willReturn(userBId);
-
       given(userRepository.findById(userAId)).willReturn(Optional.of(userA));
 
       Conversation conversation = Conversation.createConversation(userA, userB);
       DirectMessage mockMessage = mock(DirectMessage.class);
-      given(mockMessage.getConversation()).willReturn(conversation);
-      given(mockMessage.getCreatedAt()).willReturn(Instant.now());
-      given(mockMessage.getSender()).willReturn(userB);
-      given(mockMessage.getReceiver()).willReturn(userA);
       conversation.updateLastMessage(mockMessage);
 
       ConversationCursorRequest mockRequest = mock(ConversationCursorRequest.class);
@@ -237,6 +242,9 @@ public class ConversationServiceTest {
 
       given(conversationRepository.findConversationByCursor(eq(userAId), eq(mockRequest), any()))
           .willReturn(List.of(conversation));
+
+      ConversationDto dummyDto = new ConversationDto(UUID.randomUUID(), null, null, false);
+      given(conversationMapper.toDto(any(Conversation.class), eq(userAId))).willReturn(dummyDto);
 
       //when
       CursorResponseConversationDto result = conversationService.getMyConversations(userAId, mockRequest);
@@ -251,8 +259,6 @@ public class ConversationServiceTest {
     @DisplayName("성공: 마지막 메시지가 없는 빈 대화방이 마지막 항목일 conversation.createdAt을 nextCursor로 사용한다.")
     void success_get_my_conversations_with_empty_conversation_fallback() {
       //given
-      given(userA.getId()).willReturn(userAId);
-      given(userB.getId()).willReturn(userBId);
       given(userRepository.findById(userAId)).willReturn(Optional.of(userA));
 
       Conversation emptyConversation = Conversation.createConversation(userA, userB);
@@ -271,6 +277,9 @@ public class ConversationServiceTest {
       Conversation dummyConversation = Conversation.createConversation(userA, userB);
       given(conversationRepository.findConversationByCursor(eq(userAId), eq(mockRequest), any()))
           .willReturn(List.of(emptyConversation, dummyConversation));
+
+      ConversationDto dummyDto = new ConversationDto(UUID.randomUUID(), null, null, false);
+      given(conversationMapper.toDto(any(Conversation.class), eq(userAId))).willReturn(dummyDto);
 
       //when
       CursorResponseConversationDto result = conversationService.getMyConversations(userAId, mockRequest);

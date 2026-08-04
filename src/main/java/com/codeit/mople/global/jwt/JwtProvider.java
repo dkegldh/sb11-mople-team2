@@ -14,13 +14,16 @@ public class JwtProvider {
 
   private final SecretKey secretKey;
   private final long accessTokenExpiration;
+  private final long refreshTokenExpiration;
 
   public JwtProvider(
       @Value("${jwt.secret}") String secret,
-      @Value("${jwt.access-token-expiration}") long accessTokenExpiration
+      @Value("${jwt.access-token-expiration}") long accessTokenExpiration,
+      @Value("${jwt.refresh-token-expiration}") long refreshTokenExpiration
   ) {
     this.secretKey = Keys.hmacShaKeyFor(secret.getBytes());
     this.accessTokenExpiration = accessTokenExpiration;
+    this.refreshTokenExpiration = refreshTokenExpiration;
   }
 
   public String createAccessToken(UUID userId, long sessionVersion) {
@@ -30,6 +33,19 @@ public class JwtProvider {
     return Jwts.builder()
         .subject(userId.toString())
         .claim("sessionVersion", sessionVersion)
+        .issuedAt(now)
+        .expiration(expiry)
+        .signWith(secretKey)
+        .compact();
+  }
+
+  public String createRefreshToken(UUID userId) {
+    Date now = new Date();
+    Date expiry = new Date(now.getTime() + refreshTokenExpiration);
+
+    return Jwts.builder()
+        .id(UUID.randomUUID().toString())
+        .subject(userId.toString())
         .issuedAt(now)
         .expiration(expiry)
         .signWith(secretKey)
@@ -50,5 +66,9 @@ public class JwtProvider {
 
   public long getSessionVersion(String token) {
     return parseClaims(token).get("sessionVersion", Long.class);
+  }
+
+  public long getRefreshTokenExpiration() {
+    return refreshTokenExpiration;
   }
 }

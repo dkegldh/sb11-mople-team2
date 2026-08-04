@@ -20,6 +20,8 @@ import com.codeit.mople.global.dto.CursorResponse;
 import com.codeit.mople.global.dto.SortDirection;
 import com.codeit.mople.global.error.CustomException;
 import com.codeit.mople.global.storage.FileStorageService;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -255,9 +257,11 @@ public class UserServiceTest {
   }
 
   @Test
-  @DisplayName("비밀번호 변경 성공")
+  @DisplayName("비밀번호 변경 성공 시 기존 Refresh Token이 무효화되고 sessionVersion이 증가함")
   void changePassword_success() {
     UUID userId = UUID.randomUUID();
+    user.updateRefreshToken("old-refresh-token", Instant.now().plus(7, ChronoUnit.DAYS));
+    long beforeSessionVersion = user.getSessionVersion();
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(passwordEncoder.encode("newPw123")).thenReturn("encodedNewPw");
 
@@ -266,6 +270,8 @@ public class UserServiceTest {
     userService.changePassword(userId, userId, request);
 
     assertThat(user.getPassword()).isEqualTo("encodedNewPw");
+    assertThat(user.isRefreshTokenValid("old-refresh-token", Instant.now())).isFalse();
+    assertThat(user.getSessionVersion()).isEqualTo(beforeSessionVersion + 1);
   }
 
   @Test
