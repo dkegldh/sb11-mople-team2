@@ -115,70 +115,6 @@ class NotificationRepositoryTest {
     }
 
     @Nested
-    @DisplayName("수신자별 알림 조회 [findByReceiverIdOrderByCreatedAtDesc]")
-    class FindByReceiverIdOrderByCreatedAtDesc {
-
-        @Test
-        @DisplayName("receiver의 알림만 조회된다")
-        void receiver_알림만_조회됨() {
-            알림_저장(receiver, "팔로우 알림", NotificationType.NEW_FOLLOWER);
-            알림_저장(otherUser, "다른 유저 알림", NotificationType.PLAYLIST_SUBSCRIBE);
-
-            List<Notification> result = notificationRepository.findByReceiverIdOrderByCreatedAtDesc(receiver.getId());
-
-            assertThat(result).hasSize(1);
-            assertThat(result.get(0).getReceiver().getId()).isEqualTo(receiver.getId());
-        }
-
-        @Test
-        @DisplayName("알림이 없으면 빈 리스트를 반환한다")
-        void 알림_없으면_빈_리스트() {
-            List<Notification> result = notificationRepository.findByReceiverIdOrderByCreatedAtDesc(receiver.getId());
-
-            assertThat(result).isEmpty();
-        }
-
-        @Test
-        @DisplayName("모든 알림 종류가 저장되고 조회된다")
-        void 모든_알림_종류_조회됨() {
-            알림_저장(receiver, "팔로우 알림", NotificationType.NEW_FOLLOWER);
-            알림_저장(receiver, "권한 변경 알림", NotificationType.ROLE_CHANGE);
-            알림_저장(receiver, "플레이리스트 구독 알림", NotificationType.PLAYLIST_SUBSCRIBE);
-            알림_저장(receiver, "콘텐츠 추가 알림", NotificationType.PLAYLIST_CONTENT_ADDED);
-            알림_저장(receiver, "팔로위 활동 알림", NotificationType.FOLLOWEE_ACTIVITY);
-            알림_저장(receiver, "DM 알림", NotificationType.DIRECT_MESSAGE);
-
-            List<Notification> result = notificationRepository.findByReceiverIdOrderByCreatedAtDesc(receiver.getId());
-
-            assertThat(result).hasSize(6);
-            assertThat(result)
-                .extracting(Notification::getNotificationType)
-                .containsExactlyInAnyOrder(
-                    NotificationType.NEW_FOLLOWER,
-                    NotificationType.ROLE_CHANGE,
-                    NotificationType.PLAYLIST_SUBSCRIBE,
-                    NotificationType.PLAYLIST_CONTENT_ADDED,
-                    NotificationType.FOLLOWEE_ACTIVITY,
-                    NotificationType.DIRECT_MESSAGE
-                );
-        }
-
-        @Test
-        @DisplayName("알림이 최신순으로 정렬되어 조회된다")
-        void 최신순_정렬_확인() {
-            알림_저장(receiver, "첫 번째 알림", NotificationType.NEW_FOLLOWER);
-            알림_저장(receiver, "두 번째 알림", NotificationType.PLAYLIST_SUBSCRIBE);
-
-            List<Notification> result = notificationRepository.findByReceiverIdOrderByCreatedAtDesc(receiver.getId());
-
-            assertThat(result).hasSize(2);
-            assertThat(result).isSortedAccordingTo(
-                Comparator.comparing(Notification::getCreatedAt).reversed()
-            );
-        }
-    }
-
-    @Nested
     @DisplayName("알림 삭제 [deleteById]")
     class DeleteById {
 
@@ -191,7 +127,8 @@ class NotificationRepositoryTest {
             entityManager.flush();
             entityManager.clear();
 
-            List<Notification> result = notificationRepository.findByReceiverIdOrderByCreatedAtDesc(receiver.getId());
+            List<Notification> result = notificationRepository.findNotificationByCursor(
+                receiver.getId(), new NotificationCursorRequest(null, null, 20, "DESCENDING", "createdAt"), null);
             assertThat(result).isEmpty();
         }
 
@@ -205,7 +142,8 @@ class NotificationRepositoryTest {
             entityManager.flush();
             entityManager.clear();
 
-            List<Notification> otherResult = notificationRepository.findByReceiverIdOrderByCreatedAtDesc(otherUser.getId());
+            List<Notification> otherResult = notificationRepository.findNotificationByCursor(
+                otherUser.getId(), new NotificationCursorRequest(null, null, 20, "DESCENDING", "createdAt"), null);
             assertThat(otherResult).hasSize(1);
         }
     }
