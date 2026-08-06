@@ -1,0 +1,68 @@
+{
+    "genres": [
+        {
+            "id": 10759,
+            "name": "Action & Adventure"
+        },
+        {
+            "id": 16,
+            "name": "\uc560\ub2c8\uba54\uc774\uc158"
+        },
+        {
+            "id": 35,
+            "name": "\ucf54\ubbf8\ub514"
+        },
+        {
+            "id": 80,
+            "name": "\ubc94\uc8c4"
+        },
+        {
+            "id": 99,
+            "name": "\ub2e4\ud050\uba58\ud130\ub9ac"
+        },
+        {
+            "id": 18,
+            "name": "\ub4dc\ub77c\ub9c8"
+        },
+        {
+            "id": 10751,
+            "name": "\uac00\uc871"
+        },
+        {
+            "id": 10762,
+            "name": "Kids"
+        },
+        {
+            "id": 9648,
+            "name": "\ubbf8\uc2a4\ud130\ub9ac"
+        },
+        {
+            "id": 10763,
+            "name": "News"
+        },
+        {
+            "id": 10764,
+            "name": "Reality"
+        },
+        {
+            "id": 10765,
+            "name": "Sci-Fi & Fantasy"
+        },
+        {
+            "id": 10766,
+            "name": "Soap"
+        },
+        {
+            "id": 10767,
+            "name": "Talk"
+        },
+        {
+            "id": 10768,
+            "name": "War & Politics"
+        },
+        {
+            "id": 37,
+            "name": "\uc11c\ubd80"
+        }
+    ]
+}

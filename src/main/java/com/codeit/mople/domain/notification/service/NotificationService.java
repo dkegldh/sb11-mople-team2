@@ -5,6 +5,8 @@ import com.codeit.mople.domain.notification.dto.response.CursorResponseNotificat
 import com.codeit.mople.domain.notification.dto.response.NotificationResponse;
 import com.codeit.mople.domain.notification.entity.Notification;
 import com.codeit.mople.domain.notification.entity.NotificationType;
+import com.codeit.mople.domain.notification.exception.NotificationErrorCode;
+import com.codeit.mople.domain.notification.exception.NotificationException;
 import com.codeit.mople.domain.notification.repository.NotificationRepository;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.exception.UserErrorCode;
@@ -89,5 +91,17 @@ public class NotificationService {
     @Recover
     public void recoverCreateNotification(Exception e, UUID receiverId, String title, String content, NotificationType type) {
         log.error("알림 생성 최종 실패 (3회 재시도 소진) - receiverId: {}, type: {}", receiverId, type, e);
+    }
+
+    @Transactional
+    public void deleteNotification(UUID notificationId, UUID receiverId) {
+        log.debug("알림 삭제 요청 - notificationId: {}, receiverId: {}", notificationId, receiverId);
+        Notification notification = notificationRepository.findById(notificationId)
+            .orElseThrow(() -> new NotificationException(NotificationErrorCode.NOTIFICATION_NOT_FOUND));
+        if (!notification.getReceiver().getId().equals(receiverId)) {
+            throw new NotificationException(NotificationErrorCode.NOTIFICATION_FORBIDDEN);
+        }
+        notificationRepository.delete(notification);
+        log.info("알림 삭제 완료 - notificationId: {}, receiverId: {}", notificationId, receiverId);
     }
 }

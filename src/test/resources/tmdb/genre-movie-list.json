@@ -1,0 +1,80 @@
+{
+    "genres": [
+        {
+            "id": 28,
+            "name": "\uc561\uc158"
+        },
+        {
+            "id": 12,
+            "name": "\ubaa8\ud5d8"
+        },
+        {
+            "id": 16,
+            "name": "\uc560\ub2c8\uba54\uc774\uc158"
+        },
+        {
+            "id": 35,
+            "name": "\ucf54\ubbf8\ub514"
+        },
+        {
+            "id": 80,
+            "name": "\ubc94\uc8c4"
+        },
+        {
+            "id": 99,
+            "name": "\ub2e4\ud050\uba58\ud130\ub9ac"
+        },
+        {
+            "id": 18,
+            "name": "\ub4dc\ub77c\ub9c8"
+        },
+        {
+            "id": 10751,
+            "name": "\uac00\uc871"
+        },
+        {
+            "id": 14,
+            "name": "\ud310\ud0c0\uc9c0"
+        },
+        {
+            "id": 36,
+            "name": "\uc5ed\uc0ac"
+        },
+        {
+            "id": 27,
+            "name": "\uacf5\ud3ec"
+        },
+        {
+            "id": 10402,
+            "name": "\uc74c\uc545"
+        },
+        {
+            "id": 9648,
+            "name": "\ubbf8\uc2a4\ud130\ub9ac"
+        },
+        {
+            "id": 10749,
+            "name": "\ub85c\ub9e8\uc2a4"
+        },
+        {
+            "id": 878,
+            "name": "SF"
+        },
+        {
+            "id": 10770,
+            "name": "TV \uc601\ud654"
+        },
+        {
+            "id": 53,
+            "name": "\uc2a4\ub9b4\ub7ec"
+        },
+        {
+            "id": 10752,
+            "name": "\uc804\uc7c1"
+        },
+        {
+            "id": 37,
+            "name": "\uc11c\ubd80"
+        }
+    ]
+}

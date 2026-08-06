@@ -15,6 +15,7 @@ import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -40,6 +41,17 @@ public class GlobalExceptionHandler {
       return handleCustomException(customException);
     }
     return handleException(e);
+  }
+
+  // 경로 변수/파라미터 타입 변환 실패 (e.g. UUID 형식 오류)
+  @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+  public ResponseEntity<ApiResponse<Void>> handleMethodArgumentTypeMismatch(
+      MethodArgumentTypeMismatchException e) {
+    log.warn("[TypeMismatch] Parameter: {}, ExpectedType: {}", e.getName(), e.getRequiredType());
+    return ResponseEntity
+        .status(CommonErrorCode.INVALID_INPUT.getStatus())
+        .body(ApiResponse.error(CommonErrorCode.INVALID_INPUT.getCode(),
+            CommonErrorCode.INVALID_INPUT.getMessage()));
   }
 
   // @Valid 검증 실패 (요청 body)

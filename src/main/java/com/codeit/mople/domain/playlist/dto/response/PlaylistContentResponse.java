@@ -21,7 +21,7 @@ public record PlaylistContentResponse(
 
     return new PlaylistContentResponse(
         content.getId(),
-        content.getType().name(),
+        content.getType().getValue(),
         content.getTitle(),
         content.getDescription(),
         content.getThumbnailUrl(),

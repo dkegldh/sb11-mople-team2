@@ -49,7 +49,7 @@ public class ContentService{
     //ContentType 변환 방어 로직
     ContentType contentType;
     try {
-      contentType = ContentType.valueOf(request.type().toUpperCase());
+      contentType = ContentType.from(request.type());
     } catch (IllegalArgumentException e) {
       log.warn("콘텐츠 생성 실패(잘못된 ContentType) - type: {}", request.type());
       throw new ContentException(ContentErrorCode.INVALID_CONTENT_TYPE, Map.of("type", request.type()));
@@ -71,7 +71,7 @@ public class ContentService{
 
     return new ContentResponse(
         savedContent.getId(),
-        savedContent.getType().name(),
+        savedContent.getType().getValue(),
         savedContent.getTitle(),
         savedContent.getDescription(),
         savedContent.getThumbnailUrl(),
@@ -110,7 +110,7 @@ public class ContentService{
     List<ContentResponse> contentResponses = pageContents.stream()
         .map(content -> new ContentResponse(
             content.getId(),
-            content.getType().name(),
+            content.getType().getValue(),
             content.getTitle(),
             content.getDescription(),
             content.getThumbnailUrl(),
@@ -160,7 +160,7 @@ public class ContentService{
 
     return new ContentResponse(
         content.getId(),
-        content.getType().name(),
+        content.getType().getValue(),
         content.getTitle(),
         content.getDescription(),
         content.getThumbnailUrl(),
@@ -200,7 +200,7 @@ public class ContentService{
 
     return new ContentResponse(
         content.getId(),
-        content.getType().name(),
+        content.getType().getValue(),
         content.getTitle(),
         content.getDescription(),
         content.getThumbnailUrl(),

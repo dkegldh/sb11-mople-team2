@@ -67,7 +67,7 @@ public class PlaylistContentRepositoryTest {
     );
 
     content2 = new Content(
-        ContentType.DRAMA,
+        ContentType.TV_SERIES,
         "전설의 고향",
         "설명2",
         "전설의 고향.png",

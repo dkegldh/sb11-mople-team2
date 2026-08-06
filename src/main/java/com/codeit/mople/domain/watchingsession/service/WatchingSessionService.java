@@ -98,7 +98,7 @@ public class WatchingSessionService {
             ),
             new WatchingSessionContentDto(
                 session.getContent().getId(),
-                session.getContent().getType().name(),
+                session.getContent().getType().getValue(),
                 session.getContent().getTitle(),
                 session.getContent().getDescription(),
                 session.getContent().getThumbnailUrl(),

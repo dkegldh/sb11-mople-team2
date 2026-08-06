@@ -5,6 +5,7 @@ import com.codeit.mople.domain.conversation.exception.ConversationException;
 import com.codeit.mople.domain.directmessage.entity.DirectMessage;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.global.entity.BaseEntity;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
@@ -44,6 +45,7 @@ public class Conversation extends BaseEntity {
   @JoinColumn(name = "last_message_id")
   private DirectMessage lastMessage;
 
+  @Column(nullable = false)
   private Instant lastMessageAt;
 
   private Instant userALastReadAt;

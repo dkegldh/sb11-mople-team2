@@ -4,8 +4,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willDoNothing;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -13,6 +17,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.codeit.mople.domain.auth.security.CustomUserDetails;
 import com.codeit.mople.domain.notification.dto.response.CursorResponseNotificationDto;
+import com.codeit.mople.domain.notification.exception.NotificationErrorCode;
+import com.codeit.mople.domain.notification.exception.NotificationException;
 import com.codeit.mople.domain.notification.dto.response.NotificationResponse;
 import com.codeit.mople.domain.notification.NotificationLevel;
 import com.codeit.mople.domain.notification.service.NotificationService;
@@ -293,6 +299,92 @@ class NotificationControllerTest {
                     .param("limit", "20"))
                 .andDo(print())
                 .andExpect(status().isUnauthorized());
+
+            verifyNoInteractions(notificationService);
+        }
+    }
+
+    @Nested
+    @DisplayName("DELETE /api/notifications/{notificationId} - 알림 삭제")
+    class DeleteNotification {
+
+        @Test
+        @DisplayName("성공: 본인 알림을 삭제하면 204를 반환한다.")
+        void success_204_when_delete_notification() throws Exception {
+            // given
+            UUID notificationId = UUID.randomUUID();
+            willDoNothing().given(notificationService).deleteNotification(any(), any());
+
+            // when & then
+            mockMvc.perform(delete("/api/notifications/{notificationId}", notificationId)
+                    .with(user(principal))
+                    .with(csrf()))
+                .andDo(print())
+                .andExpect(status().isNoContent());
+
+            then(notificationService).should()
+                .deleteNotification(eq(notificationId), eq(principal.getUserId()));
+        }
+
+        @Test
+        @DisplayName("실패: 인증 없이 요청하면 401을 반환한다.")
+        void fail_401_when_unauthenticated() throws Exception {
+            // when & then
+            mockMvc.perform(delete("/api/notifications/{notificationId}", UUID.randomUUID())
+                    .with(csrf()))
+                .andDo(print())
+                .andExpect(status().isUnauthorized());
+
+            verifyNoInteractions(notificationService);
+        }
+
+        @Test
+        @DisplayName("실패: 존재하지 않는 알림이면 404를 반환한다.")
+        void fail_404_when_notification_not_found() throws Exception {
+            // given
+            UUID notificationId = UUID.randomUUID();
+            willThrow(new NotificationException(NotificationErrorCode.NOTIFICATION_NOT_FOUND))
+                .given(notificationService).deleteNotification(any(), any());
+
+            // when & then
+            mockMvc.perform(delete("/api/notifications/{notificationId}", notificationId)
+                    .with(user(principal))
+                    .with(csrf()))
+                .andDo(print())
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("NOTIFICATION-001"));
+        }
+
+        @Test
+        @DisplayName("실패: 본인 알림이 아니면 403을 반환한다.")
+        void fail_403_when_not_owner() throws Exception {
+            // given
+            UUID notificationId = UUID.randomUUID();
+            willThrow(new NotificationException(NotificationErrorCode.NOTIFICATION_FORBIDDEN))
+                .given(notificationService).deleteNotification(any(), any());
+
+            // when & then
+            mockMvc.perform(delete("/api/notifications/{notificationId}", notificationId)
+                    .with(user(principal))
+                    .with(csrf()))
+                .andDo(print())
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("NOTIFICATION-002"));
+        }
+
+        @Test
+        @DisplayName("실패: notificationId가 UUID 형식이 아니면 400을 반환한다.")
+        void fail_400_when_notification_id_is_not_uuid() throws Exception {
+            // when & then
+            mockMvc.perform(delete("/api/notifications/not-a-uuid")
+                    .with(user(principal))
+                    .with(csrf()))
+                .andDo(print())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("COMMON-001"));
 
             verifyNoInteractions(notificationService);
         }

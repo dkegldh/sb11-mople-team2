@@ -1,6 +1,7 @@
 package com.codeit.mople.domain.conversation.controller;
 
 import com.codeit.mople.domain.auth.security.CustomUserDetails;
+import com.codeit.mople.domain.conversation.controller.api.ConversationApi;
 import com.codeit.mople.domain.conversation.dto.request.ConversationCreateRequest;
 import com.codeit.mople.domain.conversation.dto.request.ConversationCursorRequest;
 import com.codeit.mople.domain.conversation.dto.response.ConversationDto;
@@ -23,10 +24,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/conversations")
-public class ConversationController {
+public class ConversationController implements ConversationApi {
 
   private final ConversationService conversationService;
 
+  @Override
   @PostMapping
   public ResponseEntity<ConversationDto> createConversation(
       @AuthenticationPrincipal CustomUserDetails userDetails,
@@ -36,6 +38,7 @@ public class ConversationController {
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
   }
 
+  @Override
   @GetMapping
   public ResponseEntity<CursorResponseConversationDto> findConversations(
       @AuthenticationPrincipal CustomUserDetails userDetails,
@@ -46,6 +49,7 @@ public class ConversationController {
   }
 
   // 다른 사용자의 프로필에 들어가서 "메시지 보내기" 버튼을 눌렀을 때 호출
+  @Override
   @GetMapping("/with")
   public ResponseEntity<ConversationDto> findConversationWithUser(
       @AuthenticationPrincipal CustomUserDetails userDetails,
@@ -56,6 +60,7 @@ public class ConversationController {
   }
 
   // 사용자 대화방 목록 페이지에서 특정 대화방 목록을 클릭하여 진입했을 때 호출
+  @Override
   @GetMapping("/{conversationId}")
   public ResponseEntity<ConversationDto> findConversation(
       @AuthenticationPrincipal CustomUserDetails userDetails,

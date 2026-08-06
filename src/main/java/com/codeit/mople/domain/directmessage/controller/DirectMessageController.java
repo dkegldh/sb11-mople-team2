@@ -1,13 +1,20 @@
 package com.codeit.mople.domain.directmessage.controller;
 
 import com.codeit.mople.domain.auth.security.CustomUserDetails;
+import com.codeit.mople.domain.directmessage.controller.api.DirectMessageApi;
 import com.codeit.mople.domain.directmessage.dto.request.DirectMessageCursorRequest;
+import com.codeit.mople.domain.directmessage.dto.request.DirectMessageSendRequest;
 import com.codeit.mople.domain.directmessage.dto.response.CursorResponseDirectMessageDto;
+import com.codeit.mople.domain.directmessage.dto.response.DirectMessageDto;
 import com.codeit.mople.domain.directmessage.service.DirectMessageService;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.handler.annotation.DestinationVariable;
+import org.springframework.messaging.handler.annotation.MessageMapping;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -15,13 +22,29 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@Slf4j
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/conversations/{conversationId}/direct-messages")
-public class DirectMessageController {
+public class DirectMessageController implements DirectMessageApi {
 
   private final DirectMessageService directMessageService;
+  private final SimpMessagingTemplate messagingTemplate;
 
+  @MessageMapping("/conversations/{conversationId}/direct-messages")
+  public void sendDirectMessage(
+      @DestinationVariable UUID conversationId,
+      DirectMessageSendRequest request,
+      @AuthenticationPrincipal CustomUserDetails userDetails
+  ) {
+    UUID senderId = userDetails.getUserId();
+    DirectMessageDto responseDto = directMessageService.sendMessage(conversationId, senderId, request.content());
+
+    String destination = "/sub/conversations/" + conversationId + "/direct-messages";
+    messagingTemplate.convertAndSend(destination, responseDto);
+  }
+
+  @Override
   @GetMapping
   public ResponseEntity<CursorResponseDirectMessageDto> getDirectMessages(
       @PathVariable UUID conversationId,
@@ -32,6 +55,7 @@ public class DirectMessageController {
     return ResponseEntity.ok(response);
   }
 
+  @Override
   @PostMapping("/{directMessageId}/read")
   public ResponseEntity<Void> readMessage(
       @PathVariable UUID conversationId,

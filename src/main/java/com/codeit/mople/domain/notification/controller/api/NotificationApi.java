@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 
 @Tag(
@@ -54,6 +55,29 @@ public interface NotificationApi {
         )
     })
     ResponseEntity<CursorResponseNotificationDto> getNotifications(
-        @io.swagger.v3.oas.annotations.Parameter(hidden = true) @org.springframework.security.core.annotation.AuthenticationPrincipal CustomUserDetails userDetails,
+        @Parameter(hidden = true) @org.springframework.security.core.annotation.AuthenticationPrincipal CustomUserDetails userDetails,
         NotificationCursorRequest request);
+
+    @Operation(summary = "알림 삭제", description = "알림을 삭제합니다. 본인 알림만 삭제할 수 있습니다.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "204", description = "삭제 성공"),
+        @ApiResponse(
+            responseCode = "401",
+            description = "인증 오류",
+            content = @Content(schema = @Schema(implementation = com.codeit.mople.global.response.ApiResponse.class))
+        ),
+        @ApiResponse(
+            responseCode = "403",
+            description = "본인 알림이 아닌 경우",
+            content = @Content(schema = @Schema(implementation = com.codeit.mople.global.response.ApiResponse.class))
+        ),
+        @ApiResponse(
+            responseCode = "404",
+            description = "알림을 찾을 수 없음",
+            content = @Content(schema = @Schema(implementation = com.codeit.mople.global.response.ApiResponse.class))
+        )
+    })
+    ResponseEntity<Void> deleteNotification(
+        @Parameter(hidden = true) @org.springframework.security.core.annotation.AuthenticationPrincipal CustomUserDetails userDetails,
+        UUID notificationId);
 }
