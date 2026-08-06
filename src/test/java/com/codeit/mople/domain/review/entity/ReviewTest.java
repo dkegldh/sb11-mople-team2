@@ -82,7 +82,8 @@ public class ReviewTest {
       // BeforeEach에서 user, author, content, text, rating을 통해 review와 newText, newRating을 초기화
 
       // when
-      review.update(newText, newRating);
+      review.updateText(newText);
+      review.updateRating(newRating);
 
       // then
       assertThat(review.getText()).isEqualTo(newText);
@@ -97,7 +98,7 @@ public class ReviewTest {
       // BeforeEach에서 user, author, content, text, rating을 통해 review와 newText을 초기화
 
       // when
-      review.update(newText, null);
+      review.updateText(newText);
 
       // then
       assertThat(review.getText()).isEqualTo(newText);
@@ -112,7 +113,7 @@ public class ReviewTest {
       // BeforeEach에서 user, author, content, text, rating을 통해 review와 newRating을 초기화
 
       // when
-      review.update(null, newRating);
+      review.updateRating(newRating);
 
       // then
       assertThat(review.getText()).isEqualTo(text);

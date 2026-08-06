@@ -3,6 +3,7 @@ package com.codeit.mople.domain.review.integration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -189,6 +190,58 @@ public class ReviewIntegrationTest {
   }
 
   @Nested
+  @DisplayName("리뷰 목록 조회")
+  class FindAll {
+
+    @Test
+    @DisplayName("리뷰 목록 조회 성공")
+    void findAll_success() throws Exception {
+      // given
+
+      // BeforeEach에서 savedAuthor, savedContent 저장, review, userDetails를 초기화
+
+      savedReview = reviewRepository.save(review);
+
+      // when & then
+      mockMvc.perform(get("/api/reviews")
+              .param("limit", "10")
+              .param("sortDirection", "ASCENDING")
+              .param("sortBy", "RATING")
+              .with(user(userDetails))
+          )
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data").isArray())
+          .andExpect(jsonPath("$.data.length()").value(1))
+          .andExpect(jsonPath("$.data[0].id").value(savedReview.getId().toString()))
+          .andExpect(jsonPath("$.data[0].contentId").value(savedContent.getId().toString()))
+          .andExpect(jsonPath("$.data[0].author.userId").value(savedAuthor.getId().toString()))
+          .andExpect(jsonPath("$.data[0].text").value(reviewText))
+          .andExpect(jsonPath("$.data[0].rating").value(reviewRating))
+          .andExpect(jsonPath("$.hasNext").value(false))
+          .andExpect(jsonPath("$.totalCount").value(1L))
+          .andExpect(jsonPath("$.sortBy").value("RATING"))
+          .andExpect(jsonPath("$.sortDirection").value("ASCENDING"));
+    }
+
+    @Test
+    @DisplayName("리뷰 목록 조회 실패 - 인증되지 않은 사용자(401 에러)")
+    void findAll_fail_unauthorized() throws Exception {
+      // given
+
+      // BeforeEach에서 userDetails를 초기화
+
+      // when & then
+      mockMvc.perform(get("/api/reviews")
+              .param("limit", "10")
+              .param("sortDirection", "ASCENDING")
+              .param("sortBy", "RATING")
+          )
+          .andExpect(status().isUnauthorized());
+    }
+
+  }
+
+  @Nested
   @DisplayName("리뷰 수정")
   class Update {
 
@@ -197,16 +250,20 @@ public class ReviewIntegrationTest {
     void update_success() throws Exception {
       // given
       savedReview = reviewRepository.save(review);
+      
+      // 리뷰 생성 후 savedContent의 평균 평점, 리뷰 개수 설정
+      savedContent.updateRatingStats(reviewRating, 1);
+      contentRepository.save(savedContent);
 
       // BeforeEach에서 updateRequest, userDetails를 초기화
 
       // when & then
       mockMvc.perform(patch("/api/reviews/{reviewId}", savedReview.getId())
-          .contentType(MediaType.APPLICATION_JSON)
-          .content(objectMapper.writeValueAsString(updateRequest))
-          .with(user(userDetails))
-          .with(csrf())
-      )
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(objectMapper.writeValueAsString(updateRequest))
+              .with(user(userDetails))
+              .with(csrf())
+          )
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.id").value(savedReview.getId().toString()))
           .andExpect(jsonPath("$.contentId").value(savedContent.getId().toString()))
@@ -215,10 +272,17 @@ public class ReviewIntegrationTest {
           .andExpect(jsonPath("$.text").value(newText))
           .andExpect(jsonPath("$.rating").value(newRating));
 
+      // Review 검증
       Review updatedReview = reviewRepository.findById(savedReview.getId()).orElseThrow();
 
       assertThat(updatedReview.getText()).isEqualTo(newText);
       assertThat(updatedReview.getRating()).isEqualTo(newRating);
+
+      // Content 검증
+      Content content = contentRepository.findById(savedContent.getId()).orElseThrow();
+
+      assertThat(content.getReviewCount()).isEqualTo(1);
+      assertThat(content.getAverageRating()).isEqualTo(newRating);
     }
 
     @Test
@@ -231,11 +295,11 @@ public class ReviewIntegrationTest {
 
       // when & then
       mockMvc.perform(patch("/api/reviews/{reviewId}", notExistReviewId)
-          .contentType(MediaType.APPLICATION_JSON)
-          .content(objectMapper.writeValueAsString(updateRequest))
-          .with(user(userDetails))
-          .with(csrf())
-      )
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(objectMapper.writeValueAsString(updateRequest))
+              .with(user(userDetails))
+              .with(csrf())
+          )
           .andExpect(status().isNotFound());
     }
 
@@ -249,9 +313,9 @@ public class ReviewIntegrationTest {
 
       // when & then
       mockMvc.perform(patch("/api/reviews/{reviewId}", savedReview.getId())
-          .contentType(MediaType.APPLICATION_JSON)
-          .with(csrf())
-      )
+              .contentType(MediaType.APPLICATION_JSON)
+              .with(csrf())
+          )
           .andExpect(status().isUnauthorized());
 
       Review review = reviewRepository.findById(savedReview.getId()).orElseThrow();
@@ -276,9 +340,9 @@ public class ReviewIntegrationTest {
 
       // when & then
       mockMvc.perform(delete("/api/reviews/{reviewId}", savedReview.getId())
-          .with(user(userDetails))
-          .with(csrf())
-      )
+              .with(user(userDetails))
+              .with(csrf())
+          )
           .andExpect(status().isNoContent());
 
       // DB에 리뷰 검증(행이 하나도 없어야 함)
@@ -300,9 +364,9 @@ public class ReviewIntegrationTest {
 
       // when & then
       mockMvc.perform(delete("/api/reviews/{reviewId}", notExistReviewId)
-          .with(user(userDetails))
-          .with(csrf())
-      )
+              .with(user(userDetails))
+              .with(csrf())
+          )
           .andExpect(status().isNotFound());
     }
 
@@ -314,8 +378,8 @@ public class ReviewIntegrationTest {
 
       // when & then
       mockMvc.perform(delete("/api/reviews/{reviewId}", savedReview.getId())
-          .with(csrf())
-      )
+              .with(csrf())
+          )
           .andExpect(status().isUnauthorized());
 
       assertThat(reviewRepository.findById(savedReview.getId())).isNotEmpty();

@@ -9,12 +9,20 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "reviews")
+@Table(name = "reviews",
+    uniqueConstraints = {
+        @UniqueConstraint(
+            name = "uk_review_content_author",
+            columnNames = {"content_id", "author_id"}
+        )
+    }
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Review extends BaseEntity {
@@ -44,16 +52,12 @@ public class Review extends BaseEntity {
     return new Review(content, author, text, rating);
   }
 
-  public void update(String text, Double rating) {
+  public void updateText(String text) {
+    this.text = text;
+  }
 
-    if (text != null) {
-      this.text = text;
-    }
-
-    if (rating != null) {
-      this.rating = rating;
-    }
-
+  public void updateRating(Double rating) {
+    this.rating = rating;
   }
 
 }

@@ -94,11 +94,13 @@ public class DirectMessageServiceTest {
       given(directMessageRepository.findDirectMessageByCursor(eq(conversationId), eq(mockRequest), any()))
           .willReturn(List.of(message));
 
+      Instant messageTime = Instant.now().minusSeconds(5);
+
       given(message.getId()).willReturn(messageId);
       given(message.getConversation()).willReturn(conversation);
       given(message.getSender()).willReturn(userA);
       given(message.getReceiver()).willReturn(userB);
-      given(message.getCreatedAt()).willReturn(Instant.now());
+      given(message.getCreatedAt()).willReturn(messageTime);
       given(message.getContent()).willReturn("안녕하세요!");
 
       given(userB.getId()).willReturn(userBId);
@@ -109,7 +111,7 @@ public class DirectMessageServiceTest {
       //then
       assertThat(result.data()).hasSize(1);
       assertThat(result.data().get(0).content()).isEqualTo("안녕하세요!");
-      verify(conversation).updateLastReadAt(eq(userAId), any(Instant.now().getClass()));
+      verify(conversation).updateLastReadAt(userAId, messageTime);
     }
 
     @Test

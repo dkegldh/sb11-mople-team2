@@ -213,7 +213,6 @@ public class PlaylistIntegrationTest {
                   .param("sortDirection", "ASCENDING")
                   .param("sortBy", "UPDATED_AT")
                   .with(user(userDetails))
-                  .with(csrf())
               )
               .andExpect(status().isOk())
               .andExpect(jsonPath("$.data").isArray())
@@ -250,7 +249,6 @@ public class PlaylistIntegrationTest {
               .param("limit", "2")
               .param("sortDirection", "ASCENDING")
               .param("sortBy", "UPDATED_AT")
-              .with(csrf())
           )
           .andExpect(status().isUnauthorized());
     }

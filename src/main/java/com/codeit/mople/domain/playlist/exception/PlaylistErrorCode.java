@@ -27,6 +27,7 @@ public enum PlaylistErrorCode implements ErrorCode {
   PLAYLIST_CONTENT_DUPLICATE(HttpStatus.BAD_REQUEST,"PLAYLIST-013","이미 플레이리스트에 담긴 콘텐츠입니다."),
 
   UN_PLAYLIST_CONTENT_NOT_FOUND(HttpStatus.BAD_REQUEST,"PLAYLIST-014","플레이리스트에 콘텐츠가 없습니다."),
+
   PLAYLIST_INVALID_CURSOR(HttpStatus.BAD_REQUEST, "PLAYLIST-015", "유효하지 않은 커서 값입니다.");
 
   private final HttpStatus status;

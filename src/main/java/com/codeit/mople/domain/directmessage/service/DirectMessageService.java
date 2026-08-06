@@ -40,15 +40,18 @@ public class DirectMessageService {
 
     validateConversationParticipant(conversation, requesterId);
 
-    // 채팅 방에 들어왔으므로 유저의 읽은 시각 업데이트
-    conversation.updateLastReadAt(requesterId, Instant.now());
-
     Instant cursorTime = request.parseCursorToInstant();
     List<DirectMessage> messages = directMessageRepository.findDirectMessageByCursor(conversationId,
         request, cursorTime);
 
     boolean hasNext = messages.size() > request.limit();
     List<DirectMessage> slicedMessages = hasNext ? messages.subList(0, request.limit()) : messages;
+
+    // 스크롤 시마다 발생하는 UPDATE 오버헤드를 방지하기 위해 처음 채팅 방에 들어왔을 때 유저의 읽은 시각을 가장 최근 메시지의 생성 시각으로 업데이트
+    if (cursorTime == null && !slicedMessages.isEmpty()) {
+      conversation.updateLastReadAt(requesterId, slicedMessages.get(0).getCreatedAt());
+      log.debug("대화방 최초 진입 감지, lastReadAt 워터마크 갱신 완료 - conversationId: {}", conversationId);
+    }
 
     List<DirectMessageDto> directMessageDtos = slicedMessages.stream()
         .map(DirectMessageDto::from)

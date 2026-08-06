@@ -70,7 +70,7 @@ public class PlaylistRepositoryImpl implements PlaylistCustomRepository {
             ownerIdEqual(condition.ownerIdEqual()),
             subscriberIdEqual(condition.subscriberIdEqual())
         )
-        .fetchOne(); // long타입으로 변환(결과가 하나만 나옴, fetch로 하면 List<Long>이 되어버림))
+        .fetchOne(); // Long 타입으로 변환(결과가 하나만 나옴, fetch로 하면 List<Long>이 되어버림)
 
     return count == null ? 0L : count;
   }
@@ -174,6 +174,11 @@ public class PlaylistRepositoryImpl implements PlaylistCustomRepository {
         throw new PlaylistException(PlaylistErrorCode.PLAYLIST_INVALID_CURSOR);
       }
 
+      // 구독자 수는 0 이상(음수가 들어올 경우 예외 처리)
+      if (cursor < 0) {
+        throw new PlaylistException(PlaylistErrorCode.PLAYLIST_INVALID_CURSOR);
+      }
+
       // 경우 3 : 구독순 오름차순
       if (condition.sortDirection() == SortDirection.ASCENDING) {
         return playlist.subscriberCount.gt(cursor)
@@ -214,4 +219,5 @@ public class PlaylistRepositoryImpl implements PlaylistCustomRepository {
         new OrderSpecifier<>(Order.ASC, playlist.id) // tie-breaker
     };
   }
+
 }

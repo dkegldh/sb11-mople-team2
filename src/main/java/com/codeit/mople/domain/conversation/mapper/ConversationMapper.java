@@ -14,9 +14,7 @@ import org.springframework.stereotype.Component;
 public class ConversationMapper {
 
   public ConversationDto toDto(Conversation conversation, UUID requesterId) {
-    User withUser = conversation.getUserA().getId().equals(requesterId)
-        ? conversation.getUserB()
-        : conversation.getUserA();
+    User withUser = conversation.getPartnerOf(requesterId);
 
     UserSummary withSummary = new UserSummary(
         withUser.getId(),

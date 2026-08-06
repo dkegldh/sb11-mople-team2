@@ -1,5 +1,6 @@
 package com.codeit.mople.domain.auth.controller;
 
+import com.codeit.mople.domain.auth.controller.api.AuthApi;
 import com.codeit.mople.domain.auth.dto.request.ResetPasswordRequest;
 import com.codeit.mople.domain.auth.dto.request.SignInRequest;
 import com.codeit.mople.domain.auth.dto.response.AuthTokens;
@@ -9,6 +10,7 @@ import com.codeit.mople.domain.auth.exception.AuthException;
 import com.codeit.mople.domain.auth.service.AuthService;
 import com.codeit.mople.global.error.CommonErrorCode;
 import com.codeit.mople.global.error.CustomException;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.time.Duration;
 import java.time.Instant;
@@ -16,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.web.csrf.CsrfToken;
@@ -31,7 +34,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
-public class AuthController {
+public class AuthController implements AuthApi {
 
   private static final String REFRESH_TOKEN_COOKIE = "refreshToken";
 
@@ -43,12 +46,19 @@ public class AuthController {
   @Value("${password-reset.enabled:false}")
   private boolean passwordResetEnabled;
 
-  @PostMapping("/sign-in")
-  public ResponseEntity<TokenResponse> signIn(@Valid @ModelAttribute SignInRequest request) {
+  @Override
+  @PostMapping(value = "/sign-in", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+  public ResponseEntity<TokenResponse> signIn(
+      @Valid @ModelAttribute SignInRequest request, HttpServletRequest servletRequest) {
+    if (servletRequest.getQueryString() != null) {
+      // 쿼리 스트링으로 로그인 정보가 전달되면 접근/프록시 로그에 비밀번호가 남을 수 있어 차단한다.
+      throw new CustomException(CommonErrorCode.INVALID_INPUT);
+    }
     AuthTokens tokens = authService.signIn(request);
     return withRefreshTokenCookie(tokens);
   }
 
+  @Override
   @PostMapping("/sign-out")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public ResponseEntity<Void> signOut(
@@ -60,6 +70,7 @@ public class AuthController {
         .build();
   }
 
+  @Override
   @PostMapping("/reset-password")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
@@ -70,6 +81,7 @@ public class AuthController {
     authService.resetPassword(request);
   }
 
+  @Override
   @PostMapping("/refresh")
   public ResponseEntity<TokenResponse> refresh(
       @CookieValue(value = REFRESH_TOKEN_COOKIE, required = false) String refreshToken) {
@@ -80,6 +92,7 @@ public class AuthController {
     return withRefreshTokenCookie(tokens);
   }
 
+  @Override
   @GetMapping("/csrf-token")
   public ResponseEntity<Void> csrfToken(CsrfToken csrfToken) {
     csrfToken.getToken();

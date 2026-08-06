@@ -12,16 +12,21 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import com.codeit.mople.domain.content.entity.Content;
 import com.codeit.mople.domain.content.repository.ContentRepository;
 import com.codeit.mople.domain.review.dto.request.ReviewCreateRequest;
+import com.codeit.mople.domain.review.dto.request.ReviewQueryCondition;
+import com.codeit.mople.domain.review.dto.request.ReviewQueryCondition.ReviewSortBy;
+import com.codeit.mople.domain.review.dto.request.ReviewQueryCondition.SortDirection;
 import com.codeit.mople.domain.review.dto.request.ReviewUpdateRequest;
+import com.codeit.mople.domain.review.dto.response.ReviewCursorResponse;
 import com.codeit.mople.domain.review.dto.response.ReviewResponse;
 import com.codeit.mople.domain.review.entity.Review;
 import com.codeit.mople.domain.review.exception.ReviewErrorCode;
 import com.codeit.mople.domain.review.exception.ReviewException;
-import com.codeit.mople.domain.review.mapper.ReviewMapper;
 import com.codeit.mople.domain.review.repository.ReviewRepository;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.repository.UserRepository;
+import com.codeit.mople.global.dto.UserSummary;
 import com.codeit.mople.global.error.CustomException;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,15 +37,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 public class ReviewServiceTest {
 
   @Mock
   private ReviewRepository reviewRepository;
-
-  @Mock
-  private ReviewMapper reviewMapper;
 
   @Mock
   private UserRepository userRepository;
@@ -59,8 +62,11 @@ public class ReviewServiceTest {
   private Double reviewRating;
   private ReviewCreateRequest createRequest;
 
-  private UUID reviewId;
-  private Review review;
+  private UUID review1Id;
+  private Review review1;
+  private Review review2;
+  private Review review3;
+  private Review review4;
   private ReviewUpdateRequest updateRequest;
 
   @BeforeEach
@@ -74,8 +80,8 @@ public class ReviewServiceTest {
     reviewRating = 5.0;
     createRequest = new ReviewCreateRequest(contentId, reviewText, reviewRating);
 
-    reviewId = UUID.randomUUID();
-    review = Review.create(content, author, reviewText, reviewRating);
+    review1Id = UUID.randomUUID();
+    review1 = Review.create(content, author, reviewText, reviewRating);
     updateRequest = new ReviewUpdateRequest("수정된 내용", 3.0);
   }
 
@@ -90,11 +96,23 @@ public class ReviewServiceTest {
 
       // BeforeEach에서 author, authorId, content, contentId, Review Create Request 초기화
 
+      // Content
+      given(content.getId())
+          .willReturn(contentId);
+
+      // UserSummary
+      given(author.getId())
+          .willReturn(authorId);
+      given(author.getName())
+          .willReturn("test");
+      given(author.getProfileImageUrl())
+          .willReturn("profile.png");
+
       Review review = Review.create(content, author, createRequest.text(), createRequest.rating());
 
-      ReviewResponse response = mock(ReviewResponse.class);
+      ReviewResponse response = ReviewResponse.from(review);
 
-      // User 조회 → Content 조회 → Review 저장 → ReviewMapper 호출 순
+      // User 조회 → Content 조회 → Review 저장 순
       given(userRepository.findById(authorId))
           .willReturn(Optional.of(author));
 
@@ -113,9 +131,6 @@ public class ReviewServiceTest {
       given(reviewRepository.findAverageRatingByContentId(contentId))
           .willReturn(createRequest.rating());
 
-      given(reviewMapper.toResponse(review))
-          .willReturn(response);
-
       // when
       ReviewResponse result = reviewService.create(authorId, createRequest);
 
@@ -129,8 +144,6 @@ public class ReviewServiceTest {
       verify(reviewRepository).findAverageRatingByContentId(contentId);
 
       verify(content).updateRatingStats(createRequest.rating(), 1);
-
-      verify(reviewMapper).toResponse(review);
     }
 
     @Test
@@ -149,7 +162,7 @@ public class ReviewServiceTest {
           .isInstanceOf(CustomException.class);
 
       verify(userRepository).findById(authorId);
-      verifyNoInteractions(contentRepository, reviewRepository, reviewMapper);
+      verifyNoInteractions(contentRepository, reviewRepository);
     }
 
     @Test
@@ -172,7 +185,216 @@ public class ReviewServiceTest {
 
       verify(userRepository).findById(authorId);
       verify(contentRepository).findById(contentId);
-      verifyNoInteractions(reviewRepository, reviewMapper);
+      verifyNoInteractions(reviewRepository);
+    }
+
+  }
+
+  @Nested
+  @DisplayName("리뷰 목록 조회")
+  class FindAll {
+
+    @BeforeEach
+    void setUp() {
+      // BeforeEach에서 review1 초기화(별점 3점)
+      // 실제 DB에 저장되지 않기 때문에 같은 content, author mock 객체로 사용
+      review2 = Review.create(content, author, "리뷰 내용 2", 5.0);
+      review3 = Review.create(content, author, "리뷰 내용 3", 2.0);
+      review4 = Review.create(content, author, "리뷰 내용 4", 5.0);
+    }
+
+    @Test
+    @DisplayName("리뷰 목록 조회 성공 - 기본 조건")
+    void findAll_success() {
+      // given
+
+      // BeforeEach에서 review1, review2, review3, review4 초기화
+
+      ReviewQueryCondition condition = new ReviewQueryCondition(
+          null,
+          null,
+          null,
+          10,
+          SortDirection.DESCENDING,
+          ReviewSortBy.CREATED_AT
+      );
+
+      given(reviewRepository.findAll(condition))
+          .willReturn(java.util.List.of(review1, review2, review3, review4));
+
+      given(reviewRepository.count(condition))
+          .willReturn(4L);
+
+      // Content
+      given(content.getId())
+          .willReturn(contentId);
+
+      // UserSummary
+      given(author.getId())
+          .willReturn(authorId);
+      given(author.getName())
+          .willReturn("test");
+      given(author.getProfileImageUrl())
+          .willReturn("profile.png");
+
+      // when
+      ReviewCursorResponse result = reviewService.findAll(condition);
+
+      // then
+      assertThat(result.data()).hasSize(4);
+      assertThat(result.totalCount()).isEqualTo(4L);
+      assertThat(result.hasNext()).isFalse();
+
+      assertThat(result.data())
+          .extracting(ReviewResponse::text)
+          .containsExactlyInAnyOrder(
+              review1.getText(),
+              review2.getText(),
+              review3.getText(),
+              review4.getText()
+          );
+
+      verify(reviewRepository).findAll(condition);
+      verify(reviewRepository).count(condition);
+    }
+
+    @Test
+    @DisplayName("리뷰 목록 조회 성공 - 다음 페이지 존재")
+    void findAll_success_hasNext() {
+      // given
+
+      // BeforeEach에서 review1, review2, review3, review4 초기화
+
+      // cursor, idAfter에 review4에 대한 정보가 와야함
+      ReviewQueryCondition condition = new ReviewQueryCondition(
+          null,
+          null,
+          null,
+          2,
+          SortDirection.DESCENDING,
+          ReviewSortBy.RATING
+      );
+
+      // review2, review4 별점 : 5점, review1 별점 : 3점, review3 별점 : 2점
+      // limit + 1까지 조회하기 때문에 review1 포함
+      given(reviewRepository.findAll(condition))
+          .willReturn(List.of(review2, review4, review1));
+
+      given(reviewRepository.count(condition))
+          .willReturn(4L);
+
+      // Content
+      given(content.getId())
+          .willReturn(contentId);
+
+      // UserSummary
+      given(author.getId())
+          .willReturn(authorId);
+      given(author.getName())
+          .willReturn("test");
+      given(author.getProfileImageUrl())
+          .willReturn("profile.png");
+
+      // when
+      ReviewCursorResponse result = reviewService.findAll(condition);
+
+      // then
+      assertThat(result.data()).hasSize(2);
+      assertThat(result.totalCount()).isEqualTo(4L);
+      assertThat(result.hasNext()).isTrue();
+
+      // nextCursor, nextIdAfter
+      assertThat(result.nextCursor()).isEqualTo(String.valueOf(review4.getRating()));
+      assertThat(result.nextIdAfter()).isEqualTo(review4.getId());
+
+      verify(reviewRepository).findAll(condition);
+
+      // cursor 존재로 인해 totalCount
+      verify(reviewRepository).count(condition);
+    }
+
+    @Test
+    @DisplayName("리뷰 목록 조회 성공 - 마지막 페이지")
+    void findAll_success_lastPage() {
+      // given
+
+      // BeforeEach에서 review1, review2, review3, review4 초기화
+
+      ReviewQueryCondition condition = new ReviewQueryCondition(
+          null,
+          null,
+          null,
+          10,
+          SortDirection.DESCENDING,
+          ReviewSortBy.RATING
+      );
+
+      given(reviewRepository.findAll(condition))
+          .willReturn(List.of(review2, review4, review1, review3));
+
+      given(reviewRepository.count(condition))
+          .willReturn(4L);
+
+      // Content
+      given(content.getId())
+          .willReturn(contentId);
+
+      // UserSummary
+      given(author.getId())
+          .willReturn(authorId);
+      given(author.getName())
+          .willReturn("test");
+      given(author.getProfileImageUrl())
+          .willReturn("profile.png");
+
+      // when
+      ReviewCursorResponse result = reviewService.findAll(condition);
+
+      // then
+      assertThat(result.data()).hasSize(4);
+      assertThat(result.totalCount()).isEqualTo(4L);
+      assertThat(result.hasNext()).isFalse();
+      assertThat(result.nextCursor()).isNull();
+      assertThat(result.nextIdAfter()).isNull();
+
+      verify(reviewRepository).findAll(condition);
+      verify(reviewRepository).count(condition);
+    }
+
+    @Test
+    @DisplayName("리뷰 목록 조회 성공 - 조회 결과 없음")
+    void findAll_success_empty() {
+      // given
+
+      // BeforeEach에서 review1, review2, review3, review4 초기화
+
+      ReviewQueryCondition condition = new ReviewQueryCondition(
+          null,
+          null,
+          null,
+          10,
+          SortDirection.DESCENDING,
+          ReviewSortBy.RATING
+      );
+
+      given(reviewRepository.findAll(condition))
+          .willReturn(List.of());
+
+      given(reviewRepository.count(condition))
+          .willReturn(0L);
+
+      // when
+      ReviewCursorResponse result = reviewService.findAll(condition);
+
+      // then
+      assertThat(result.data()).isEmpty();
+      assertThat(result.totalCount()).isEqualTo(0L);
+      assertThat(result.hasNext()).isFalse();
+      assertThat(result.nextCursor()).isNull();
+      assertThat(result.nextIdAfter()).isNull();
+
+      verify(reviewRepository).findAll(condition);
+      verify(reviewRepository).count(condition);
     }
 
   }
@@ -188,40 +410,42 @@ public class ReviewServiceTest {
 
       // BeforeEach에서 reviewId, review, authorId, contentId, updateRequest 초기화
 
-      ReviewResponse response = mock(ReviewResponse.class);
-
-      given(reviewRepository.findById(reviewId))
-          .willReturn(Optional.of(review));
-
-      // 리뷰 작성자 설정
-      given(author.getId())
-          .willReturn(authorId);
-
-      // 콘텐츠 ID 설정
+      // Content
       given(content.getId())
           .willReturn(contentId);
 
-      given(reviewRepository.countByContentId(contentId))
-          .willReturn(1L);
+      // UserSummary
+      given(author.getId())
+          .willReturn(authorId);
+      given(author.getName())
+          .willReturn("test");
+      given(author.getProfileImageUrl())
+          .willReturn("profile.png");
+
+      ReviewResponse response = new ReviewResponse(
+          review1.getId(),
+          contentId,
+          new UserSummary(authorId, "test", "profile.png"),
+          updateRequest.text(),
+          updateRequest.rating()
+      );
+
+      given(reviewRepository.findById(review1Id))
+          .willReturn(Optional.of(review1));
 
       given(reviewRepository.findAverageRatingByContentId(contentId))
           .willReturn(updateRequest.rating());
 
-      given(reviewMapper.toResponse(review))
-          .willReturn(response);
-
       // when
-      ReviewResponse result = reviewService.update(reviewId, updateRequest, authorId);
+      ReviewResponse result = reviewService.update(review1Id, updateRequest, authorId);
 
       // then
       assertThat(result).isEqualTo(response);
-      assertThat(review.getText()).isEqualTo(updateRequest.text());
-      assertThat(review.getRating()).isEqualTo(updateRequest.rating());
+      assertThat(review1.getText()).isEqualTo(updateRequest.text());
+      assertThat(review1.getRating()).isEqualTo(updateRequest.rating());
 
-      verify(reviewRepository).findById(reviewId);
-      verify(reviewRepository).countByContentId(contentId);
+      verify(reviewRepository).findById(review1Id);
       verify(reviewRepository).findAverageRatingByContentId(contentId);
-      verify(reviewMapper).toResponse(review);
     }
 
     @Test
@@ -231,20 +455,20 @@ public class ReviewServiceTest {
 
       // BeforeEach에서 reviewId, authorId, updateRequest 초기화
 
-      given(reviewRepository.findById(reviewId))
+      given(reviewRepository.findById(review1Id))
           .willReturn(Optional.empty());
 
       // when & then
       assertThatThrownBy(() ->
-          reviewService.update(reviewId, updateRequest, authorId)
+          reviewService.update(review1Id, updateRequest, authorId)
       )
           .isInstanceOf(ReviewException.class)
           .extracting("errorCode")
           .isEqualTo(ReviewErrorCode.REVIEW_NOT_FOUND);
 
-      verify(reviewRepository).findById(reviewId);
+      verify(reviewRepository).findById(review1Id);
 
-      verifyNoInteractions(author, content, reviewMapper);
+      verifyNoInteractions(author, content);
     }
 
     @Test
@@ -255,15 +479,15 @@ public class ReviewServiceTest {
 
       // BeforeEach에서 reviewId, authorId, updateRequest를 초기화
 
-      given(reviewRepository.findById(reviewId))
-          .willReturn(Optional.of(review));
+      given(reviewRepository.findById(review1Id))
+          .willReturn(Optional.of(review1));
 
       given(author.getId())
           .willReturn(authorId);
 
       // when & then
       assertThatThrownBy(() ->
-          reviewService.update(reviewId, updateRequest, noAuthorId)
+          reviewService.update(review1Id, updateRequest, noAuthorId)
       )
           .isInstanceOf(ReviewException.class)
           .extracting("errorCode")
@@ -280,18 +504,18 @@ public class ReviewServiceTest {
     @DisplayName("리뷰 삭제 성공")
     void delete_success() {
       // given
-      
+
       // BeforeEach에서 review, reviewId, authorId 초기화
-      
-      given(reviewRepository.findById(reviewId))
-          .willReturn(Optional.of(review));
-      
+
+      given(reviewRepository.findById(review1Id))
+          .willReturn(Optional.of(review1));
+
       given(author.getId())
           .willReturn(authorId);
-      
+
       given(content.getId())
           .willReturn(contentId);
-      
+
       // reviewRepository.delete() 메서드는 void이기 때문에 값을 반환하지 않음
 
       // 콘텐츠 개수는 0개여야 하고
@@ -301,13 +525,13 @@ public class ReviewServiceTest {
       // 콘텐츠 개수가 0개이기 때문에 0.0점을 반환
       given(reviewRepository.findAverageRatingByContentId(contentId))
           .willReturn(0.0);
-      
+
       // when
-      reviewService.delete(reviewId, authorId);
-      
+      reviewService.delete(review1Id, authorId);
+
       // then
-      verify(reviewRepository).findById(reviewId);
-      verify(reviewRepository).delete(review);
+      verify(reviewRepository).findById(review1Id);
+      verify(reviewRepository).delete(review1);
       verify(content).updateRatingStats(0.0, 0);
     }
 
@@ -315,18 +539,18 @@ public class ReviewServiceTest {
     @DisplayName("리뷰 삭제 실패 - 리뷰가 존재하지 않음")
     void delete_fail_notFoundReview() {
       // given
-      given(reviewRepository.findById(reviewId))
+      given(reviewRepository.findById(review1Id))
           .willReturn(Optional.empty());
 
       // when & then
       assertThatThrownBy(() ->
-          reviewService.delete(reviewId, authorId)
+          reviewService.delete(review1Id, authorId)
       )
           .isInstanceOf(ReviewException.class)
           .extracting("errorCode")
           .isEqualTo(ReviewErrorCode.REVIEW_NOT_FOUND);
 
-      verify(reviewRepository).findById(reviewId);
+      verify(reviewRepository).findById(review1Id);
 
       verify(reviewRepository, never()).delete(any(Review.class));
       verifyNoInteractions(content);
@@ -338,26 +562,27 @@ public class ReviewServiceTest {
       // given
       UUID noAuthorId = UUID.randomUUID();
 
-      given(reviewRepository.findById(reviewId))
-          .willReturn(Optional.of(review));
+      given(reviewRepository.findById(review1Id))
+          .willReturn(Optional.of(review1));
 
       given(author.getId())
           .willReturn(authorId);
 
       // when & then
       assertThatThrownBy(() ->
-          reviewService.delete(reviewId, noAuthorId)
+          reviewService.delete(review1Id, noAuthorId)
       )
           .isInstanceOf(ReviewException.class)
           .extracting("errorCode")
           .isEqualTo(ReviewErrorCode.REVIEW_FORBIDDEN);
 
-      verify(reviewRepository).findById(reviewId);
+      verify(reviewRepository).findById(review1Id);
       verify(author).getId();
 
       verify(reviewRepository, never()).delete(any(Review.class));
       verifyNoInteractions(content);
     }
+
   }
 
 }

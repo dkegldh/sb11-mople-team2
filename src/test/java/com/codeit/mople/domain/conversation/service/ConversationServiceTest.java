@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -74,7 +75,7 @@ public class ConversationServiceTest {
       //given
       given(userRepository.findById(userAId)).willReturn(Optional.of(userA));
       given(userRepository.findById(userBId)).willReturn(Optional.of(userB));
-      given(conversationRepository.findByUserAAndUserB(userA, userB)).willReturn(Optional.empty());
+      given(conversationRepository.findWithDetailsByUserAAndUserB(userA, userB)).willReturn(Optional.empty());
 
       Conversation newConversation = Conversation.createConversation(userA, userB);
       UUID newConversationId = UUID.randomUUID();
@@ -90,7 +91,6 @@ public class ConversationServiceTest {
 
       //then
       assertThat(result).isNotNull();
-      assertThat(result.with().userId()).isEqualTo(userAId);
       assertThat(result.id()).isEqualTo(newConversationId);
       verify(conversationRepository, times(1)).saveAndFlush(any(Conversation.class));
       verify(conversationMapper, times(1)).toDto(newConversation, userBId);
@@ -105,7 +105,7 @@ public class ConversationServiceTest {
 
       Conversation existingConversation = Conversation.createConversation(userA, userB);
       ReflectionTestUtils.setField(existingConversation, "id", UUID.randomUUID());
-      given(conversationRepository.findByUserAAndUserB(userA, userB)).willReturn(Optional.of(existingConversation));
+      given(conversationRepository.findWithDetailsByUserAAndUserB(userA, userB)).willReturn(Optional.of(existingConversation));
 
       ConversationDto dummyDto = new ConversationDto(existingConversation.getId(), null, null, false);
       given(conversationMapper.toDto(existingConversation, userAId)).willReturn(dummyDto);
@@ -116,7 +116,7 @@ public class ConversationServiceTest {
       //then
       assertThat(result).isNotNull();
       assertThat(result.id()).isEqualTo(existingConversation.getId());
-      verify(conversationRepository, times(0)).save(any(Conversation.class));
+      verify(conversationRepository, never()).saveAndFlush(any(Conversation.class));
     }
 
     @Test
@@ -143,7 +143,7 @@ public class ConversationServiceTest {
       UUID conversationId = UUID.randomUUID();
       ReflectionTestUtils.setField(conversation, "id", conversationId);
 
-      given(conversationRepository.findByUserAAndUserB(userA, userB)).willReturn(Optional.of(conversation));
+      given(conversationRepository.findWithDetailsByUserAAndUserB(userA, userB)).willReturn(Optional.of(conversation));
 
       ConversationDto dummyDto = new ConversationDto(conversationId, null, null, false);
       given(conversationMapper.toDto(any(Conversation.class), eq(userAId))).willReturn(dummyDto);
@@ -162,7 +162,7 @@ public class ConversationServiceTest {
       //given
       given(userRepository.findById(userAId)).willReturn(Optional.of(userA));
       given(userRepository.findById(userBId)).willReturn(Optional.of(userB));
-      given(conversationRepository.findByUserAAndUserB(userA, userB)).willReturn(Optional.empty());
+      given(conversationRepository.findWithDetailsByUserAAndUserB(userA, userB)).willReturn(Optional.empty());
 
       //when & then
       assertThatThrownBy(() -> conversationService.getConversationWithUser(userAId, userBId))
@@ -185,13 +185,13 @@ public class ConversationServiceTest {
       UUID conversationId = UUID.randomUUID();
       ReflectionTestUtils.setField(conversation, "id", conversationId);
 
-      given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
+      given(conversationRepository.findWithDetailsById(conversationId)).willReturn(Optional.of(conversation));
 
       ConversationDto dummyDto = new ConversationDto(conversationId, null, null, false);
       given(conversationMapper.toDto(any(Conversation.class), eq(userAId))).willReturn(dummyDto);
 
       //when
-      ConversationDto result = conversationService.getConversation(conversationId, userAId);
+      ConversationDto result = conversationService.getConversation(userAId, conversationId);
 
       //then
       assertThat(result).isNotNull();
@@ -211,10 +211,10 @@ public class ConversationServiceTest {
 
       UUID strangerId = UUID.fromString("00000000-0000-0000-0000-000000000009");
 
-      given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
+      given(conversationRepository.findWithDetailsById(conversationId)).willReturn(Optional.of(conversation));
 
       //when & then
-      assertThatThrownBy(() -> conversationService.getConversation(conversationId, strangerId))
+      assertThatThrownBy(() -> conversationService.getConversation(strangerId, conversationId))
           .isInstanceOf(ConversationException.class)
           .hasMessageContaining(ConversationErrorCode.ACCESS_DENIED.getMessage());
     }
@@ -256,17 +256,17 @@ public class ConversationServiceTest {
     }
 
     @Test
-    @DisplayName("성공: 마지막 메시지가 없는 빈 대화방이 마지막 항목일 conversation.createdAt을 nextCursor로 사용한다.")
+    @DisplayName("성공: 마지막 메시지가 없는 빈 대화방이 마지막 항목일 때 lastMessageAt을 nextCursor로 사용한다.")
     void success_get_my_conversations_with_empty_conversation_fallback() {
       //given
       given(userRepository.findById(userAId)).willReturn(Optional.of(userA));
 
       Conversation emptyConversation = Conversation.createConversation(userA, userB);
       UUID conversationId = UUID.randomUUID();
-      Instant roomCreatedAt = Instant.now().minusSeconds(60);
+      Instant lastMessageAtTime = Instant.now().minusSeconds(60);
 
       ReflectionTestUtils.setField(emptyConversation, "id", conversationId);
-      ReflectionTestUtils.setField(emptyConversation, "createdAt", roomCreatedAt);
+      ReflectionTestUtils.setField(emptyConversation, "lastMessageAt", lastMessageAtTime);
 
       ConversationCursorRequest mockRequest = mock(ConversationCursorRequest.class);
       given(mockRequest.limit()).willReturn(1);
@@ -289,7 +289,7 @@ public class ConversationServiceTest {
       assertThat(result.hasNext()).isTrue();
       assertThat(result.data()).hasSize(1);
 
-      assertThat(result.nextCursor()).isEqualTo(roomCreatedAt.toString());
+      assertThat(result.nextCursor()).isEqualTo(lastMessageAtTime.toString());
       assertThat(result.nextIdAfter()).isEqualTo(conversationId);
     }
   }

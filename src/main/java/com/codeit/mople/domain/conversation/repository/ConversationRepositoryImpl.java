@@ -5,6 +5,8 @@ import static com.codeit.mople.domain.directmessage.entity.QDirectMessage.direct
 
 import com.codeit.mople.domain.conversation.dto.request.ConversationCursorRequest;
 import com.codeit.mople.domain.conversation.entity.Conversation;
+import com.codeit.mople.domain.directmessage.entity.QDirectMessage;
+import com.codeit.mople.domain.user.entity.QUser;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
@@ -25,13 +27,18 @@ public class ConversationRepositoryImpl implements ConversationRepositoryCustom{
       ConversationCursorRequest request,
       Instant cursorTime) {
 
+    // 묵시적 INNER JOIN 방지를 위한 명시적 Q 클래스 별칭 생성
+    QDirectMessage lastMessage = new QDirectMessage("lastMessage");
+    QUser sender = new QUser("sender");
+
     return queryFactory
         .selectFrom(conversation)
         .leftJoin(conversation.userA).fetchJoin()
         .leftJoin(conversation.userB).fetchJoin()
-        .leftJoin(conversation.lastMessage).fetchJoin()
+        // 빈 방 누락 방지를 위해 별칭을 주어 명시적 LEFT JOIN 결합 보장
+        .leftJoin(conversation.lastMessage, lastMessage).fetchJoin()
         // DTO에서 상대방(sender) 정보 스냅샷 매핑 처리를 위해 Fetch Join 적용
-        .leftJoin(conversation.lastMessage.sender).fetchJoin()
+        .leftJoin(lastMessage.sender, sender).fetchJoin()
         .where(
             isMyConversation(requesterId),
             containsKeyword(request.keywordLike(), requesterId),
@@ -41,7 +48,7 @@ public class ConversationRepositoryImpl implements ConversationRepositoryCustom{
         .orderBy(
             // 1순위: 마지막 메시지 시간 최신순 고정
             // lastMessage가 null이면 대화방 자체의 생성 시간을 기준으로 내림차순
-            conversation.lastMessage.createdAt.coalesce(conversation.createdAt).desc(),
+            conversation.lastMessageAt.desc(),
             conversation.id.desc() // 2순위: 동시간 충돌 방지용 PK 내림차순
         )
         .fetch();
@@ -86,13 +93,11 @@ public class ConversationRepositoryImpl implements ConversationRepositoryCustom{
       return null;
     }
 
-    var timeAxis = conversation.lastMessage.createdAt.coalesce(conversation.createdAt);
-
     if (idAfter != null) {
-      return timeAxis.lt(cursorTime)
-          .or(timeAxis.eq(cursorTime).and(conversation.id.lt(idAfter)));
+      return conversation.lastMessageAt.lt(cursorTime)
+          .or(conversation.lastMessageAt.eq(cursorTime).and(conversation.id.lt(idAfter)));
     }
 
-    return timeAxis.lt(cursorTime);
+    return conversation.lastMessageAt.lt(cursorTime);
   }
 }

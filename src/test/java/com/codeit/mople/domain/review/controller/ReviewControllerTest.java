@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -19,7 +20,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.codeit.mople.domain.auth.security.CustomUserDetails;
 import com.codeit.mople.domain.review.dto.request.ReviewCreateRequest;
+import com.codeit.mople.domain.review.dto.request.ReviewQueryCondition;
+import com.codeit.mople.domain.review.dto.request.ReviewQueryCondition.ReviewSortBy;
+import com.codeit.mople.domain.review.dto.request.ReviewQueryCondition.SortDirection;
 import com.codeit.mople.domain.review.dto.request.ReviewUpdateRequest;
+import com.codeit.mople.domain.review.dto.response.ReviewCursorResponse;
 import com.codeit.mople.domain.review.dto.response.ReviewResponse;
 import com.codeit.mople.domain.review.exception.ReviewErrorCode;
 import com.codeit.mople.domain.review.exception.ReviewException;
@@ -30,6 +35,7 @@ import com.codeit.mople.global.config.SecurityConfig;
 import com.codeit.mople.global.dto.UserSummary;
 import com.codeit.mople.global.jwt.JwtProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -120,7 +126,6 @@ public class ReviewControllerTest {
       mockMvc.perform(post("/api/reviews")
               .with(user(userDetails))
               .with(csrf())
-              .param("authorId", authorId.toString())
               .contentType(MediaType.APPLICATION_JSON)
               .content(objectMapper.writeValueAsString(createRequest))
           )
@@ -148,7 +153,6 @@ public class ReviewControllerTest {
       mockMvc.perform(post("/api/reviews")
               .with(user(userDetails))
               .with(csrf())
-              .param("authorId", authorId.toString())
               .contentType(MediaType.APPLICATION_JSON)
               .content(objectMapper.writeValueAsString(invalidRequest))
           )
@@ -167,7 +171,26 @@ public class ReviewControllerTest {
       mockMvc.perform(post("/api/reviews")
               .with(user(userDetails))
               .with(csrf())
-              .param("authorId", authorId.toString())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(objectMapper.writeValueAsString(invalidRequest))
+          )
+          .andExpect(status().isBadRequest());
+
+      verifyNoInteractions(reviewService);
+    }
+
+    @Test
+    @DisplayName("리뷰 생성 실패 - 리뷰 내용 길이가 500 초과(400 에러)")
+    void create_fail_textGreaterThanMax() throws Exception {
+      // given
+      // 501자 길이의 리뷰 내용
+      String text = "a".repeat(501);
+      ReviewCreateRequest invalidRequest = new ReviewCreateRequest(contentId, text, reviewRating);
+
+      // when & then
+      mockMvc.perform(post("/api/reviews")
+              .with(user(userDetails))
+              .with(csrf())
               .contentType(MediaType.APPLICATION_JSON)
               .content(objectMapper.writeValueAsString(invalidRequest))
           )
@@ -186,7 +209,6 @@ public class ReviewControllerTest {
       mockMvc.perform(post("/api/reviews")
               .with(user(userDetails))
               .with(csrf())
-              .param("authorId", authorId.toString())
               .contentType(MediaType.APPLICATION_JSON)
               .content(objectMapper.writeValueAsString(invalidRequest))
           )
@@ -205,7 +227,6 @@ public class ReviewControllerTest {
       mockMvc.perform(post("/api/reviews")
               .with(user(userDetails))
               .with(csrf())
-              .param("authorId", authorId.toString())
               .contentType(MediaType.APPLICATION_JSON)
               .content(objectMapper.writeValueAsString(invalidRequest))
           )
@@ -224,9 +245,212 @@ public class ReviewControllerTest {
       mockMvc.perform(post("/api/reviews")
               .with(user(userDetails))
               .with(csrf())
-              .param("authorId", authorId.toString())
               .contentType(MediaType.APPLICATION_JSON)
               .content(objectMapper.writeValueAsString(invalidRequest))
+          )
+          .andExpect(status().isBadRequest());
+
+      verifyNoInteractions(reviewService);
+    }
+
+  }
+
+  @Nested
+  @DisplayName("리뷰 목록 조회")
+  class FindAll {
+
+    @Test
+    @DisplayName("리뷰 목록 조회 성공")
+    void findAll_success() throws Exception {
+      // given
+
+      // BeforeEach에서 reviewId, contentId, authorId, reviewText, reviewRating, userDetails를 초기화
+
+      ReviewResponse reviewResponse = new ReviewResponse(
+          reviewId,
+          contentId,
+          new UserSummary(
+              authorId,
+              "test",
+              null
+          ),
+          reviewText,
+          reviewRating
+      );
+
+      ReviewCursorResponse response = new ReviewCursorResponse(
+          List.of(reviewResponse),
+          null,
+          null,
+          false,
+          1L,
+          ReviewSortBy.RATING,
+          SortDirection.DESCENDING
+      );
+
+      given(reviewService.findAll(any(ReviewQueryCondition.class)))
+          .willReturn(response);
+
+      // when & then
+      mockMvc.perform(get("/api/reviews")
+              .param("limit", "10")
+              .param("sortDirection", "DESCENDING")
+              .param("sortBy", "RATING")
+              .with(user(userDetails))
+          )
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data").isArray())
+          .andExpect(jsonPath("$.hasNext").value(false))
+          .andExpect(jsonPath("$.totalCount").value(1L))
+          .andExpect(jsonPath("$.sortBy").value("RATING"))
+          .andExpect(jsonPath("$.sortDirection").value("DESCENDING"));
+
+      verify(reviewService).findAll(any(ReviewQueryCondition.class));
+    }
+
+    @Test
+    @DisplayName("리뷰 목록 조회 실패 - limit 누락(400 에러)")
+    void findAll_fail_withoutLimit() throws Exception {
+      // given
+
+      // BeforeEach에서 userDetails를 초기화
+
+      // when & then
+      mockMvc.perform(get("/api/reviews")
+              .param("sortDirection", "DESCENDING")
+              .param("sortBy", "RATING")
+              .with(user(userDetails))
+          )
+          .andExpect(status().isBadRequest());
+
+      verifyNoInteractions(reviewService);
+    }
+
+    @Test
+    @DisplayName("리뷰 목록 조회 실패 - 정렬 조건 누락(400 에러)")
+    void findAll_fail_withoutSortBy() throws Exception {
+      // given
+
+      // BeforeEach에서 userDetails를 초기화
+
+      // when & then
+      mockMvc.perform(get("/api/reviews")
+              .param("limit", "10")
+              .param("sortDirection", "DESCENDING")
+              .with(user(userDetails))
+          )
+          .andExpect(status().isBadRequest());
+
+      verifyNoInteractions(reviewService);
+    }
+
+    @Test
+    @DisplayName("리뷰 목록 조회 실패 - 정렬 방향 누락(400 에러)")
+    void findAll_fail_withoutSortDirection() throws Exception {
+      // given
+
+      // BeforeEach에서 userDetails를 초기화
+
+      // when & then
+      mockMvc.perform(get("/api/reviews")
+              .param("limit", "10")
+              .param("sortBy", "RATING")
+              .with(user(userDetails))
+          )
+          .andExpect(status().isBadRequest());
+
+      verifyNoInteractions(reviewService);
+    }
+
+    @Test
+    @DisplayName("리뷰 목록 조회 실패 - limit 값 1 미만(400 에러)")
+    void findAll_fail_limitLessThanMin() throws Exception {
+      // given
+
+      // BeforeEach에서 userDetails를 초기화
+
+      // when & then
+      mockMvc.perform(get("/api/reviews")
+              .param("limit", "0")
+              .param("sortDirection", "DESCENDING")
+              .param("sortBy", "RATING")
+              .with(user(userDetails))
+          )
+          .andExpect(status().isBadRequest());
+
+      verifyNoInteractions(reviewService);
+    }
+
+    @Test
+    @DisplayName("리뷰 목록 조회 실패 - limit 값 100 초과(400 에러)")
+    void findAll_fail_limitGreaterThanMax() throws Exception {
+      // given
+
+      // BeforeEach에서 userDetails를 초기화
+
+      // when & then
+      mockMvc.perform(get("/api/reviews")
+              .param("limit", "101")
+              .param("sortDirection", "DESCENDING")
+              .param("sortBy", "RATING")
+              .with(user(userDetails))
+          )
+          .andExpect(status().isBadRequest());
+
+      verifyNoInteractions(reviewService);
+    }
+
+    @Test
+    @DisplayName("리뷰 목록 조회 실패 - 잘못된 limit 값(400 에러)")
+    void findAll_fail_invalidLimit() throws Exception {
+      // given
+
+      // BeforeEach에서 userDetails를 초기화
+
+      // when & then
+      mockMvc.perform(get("/api/reviews")
+              .param("limit", "ANY")
+              .param("sortDirection", "DESCENDING")
+              .param("sortBy", "RATING")
+              .with(user(userDetails))
+          )
+          .andExpect(status().isBadRequest());
+
+      verifyNoInteractions(reviewService);
+    }
+
+    @Test
+    @DisplayName("리뷰 목록 조회 실패 - 잘못된 정렬 조건(400 에러)")
+    void findAll_fail_invalidSortBy() throws Exception {
+      // given
+
+      // BeforeEach에서 userDetails를 초기화
+
+      // when & then
+      mockMvc.perform(get("/api/reviews")
+              .param("limit", "10")
+              .param("sortDirection", "DESCENDING")
+              .param("sortBy", "ANY")
+              .with(user(userDetails))
+          )
+          .andExpect(status().isBadRequest());
+
+      verifyNoInteractions(reviewService);
+    }
+
+    @Test
+    @DisplayName("리뷰 목록 조회 실패 - 잘못된 정렬 방향(400 에러)")
+    void findAll_fail_invalidSortDirection() throws Exception {
+      // given
+
+      // BeforeEach에서 userDetails를 초기화
+
+      // when & then
+      mockMvc.perform(get("/api/reviews")
+              .param("limit", "10")
+              .param("sortDirection", "ANY")
+              .param("sortBy", "RATING")
+              .with(user(userDetails))
           )
           .andExpect(status().isBadRequest());
 
@@ -300,6 +524,27 @@ public class ReviewControllerTest {
     }
 
     @Test
+    @DisplayName("리뷰 수정 실패 - 리뷰 내용 길이가 500 초과(400 에러)")
+    void update_fail_textGraterThanMax() throws Exception {
+      // given
+      // 501자 길이의 리뷰 내용
+      String text = "a".repeat(501);
+      ReviewUpdateRequest invalidRequest = new ReviewUpdateRequest(text, reviewRating);
+
+      // when & then
+      mockMvc.perform(patch("/api/reviews/{reviewId}", reviewId)
+              .with(user(userDetails))
+              .with(csrf())
+              .param("authorId", authorId.toString())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(objectMapper.writeValueAsString(invalidRequest))
+          )
+          .andExpect(status().isBadRequest());
+
+      verifyNoInteractions(reviewService);
+    }
+
+    @Test
     @DisplayName("리뷰 수정 실패 - 별점이 최소 범위 미만(1점 미만, 400 에러)")
     void update_fail_underRating() throws Exception {
       // given
@@ -335,6 +580,23 @@ public class ReviewControllerTest {
           .andExpect(status().isBadRequest());
 
       verifyNoInteractions(reviewService);
+    }
+
+    @Test
+    @DisplayName("리뷰 수정 실패 - 수정할 리뷰 내용과 별점 모두 없음(400 에러)")
+    void update_fail_noUpdateField() throws Exception {
+      // given
+      ReviewUpdateRequest invalidRequest = new ReviewUpdateRequest(null, null);
+
+      // BeforeEach에서 reviewId, userDetails 초기화
+
+      // when & then
+      mockMvc.perform(patch("/api/reviews/{reviewId}", reviewId)
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(objectMapper.writeValueAsString(invalidRequest))
+              .with(user(userDetails))
+              .with(csrf()))
+          .andExpect(status().isBadRequest());
     }
 
     @Test

@@ -210,7 +210,6 @@ public class PlaylistControllerTest {
       // when & then
       mockMvc.perform(get("/api/playlists/{playlistId}", playlistId)
               .with(user(userDetails))
-              .with(csrf())
           )
           .andExpect(status().isOk());
 
@@ -234,7 +233,6 @@ public class PlaylistControllerTest {
       // when & then
       mockMvc.perform(get("/api/playlists/{playlistId}", notExistPlaylistId)
               .with(user(userDetails))
-              .with(csrf())
           )
           .andExpect(status().isNotFound());
 
@@ -273,7 +271,6 @@ public class PlaylistControllerTest {
               .param("sortDirection", "ASCENDING")
               .param("sortBy", "UPDATED_AT")
               .with(user(userDetails))
-              .with(csrf())
           )
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data").isArray())
@@ -298,7 +295,7 @@ public class PlaylistControllerTest {
               .param("sortDirection", "ASCENDING")
               .param("sortBy", "UPDATED_AT")
               .with(user(userDetails))
-              .with(csrf()))
+          )
           .andExpect(status().isBadRequest());
 
       verifyNoInteractions(playlistService);
@@ -316,7 +313,7 @@ public class PlaylistControllerTest {
               .param("limit", "10")
               .param("sortDirection", "ASCENDING")
               .with(user(userDetails))
-              .with(csrf()))
+          )
           .andExpect(status().isBadRequest());
 
       verifyNoInteractions(playlistService);
@@ -334,7 +331,7 @@ public class PlaylistControllerTest {
               .param("limit", "10")
               .param("sortBy", "UPDATED_AT")
               .with(user(userDetails))
-              .with(csrf()))
+          )
           .andExpect(status().isBadRequest());
 
       verifyNoInteractions(playlistService);
@@ -353,7 +350,7 @@ public class PlaylistControllerTest {
               .param("sortDirection", "ASCENDING")
               .param("sortBy", "UPDATED_AT")
               .with(user(userDetails))
-              .with(csrf()))
+          )
           .andExpect(status().isBadRequest());
 
       verifyNoInteractions(playlistService);
@@ -372,7 +369,7 @@ public class PlaylistControllerTest {
               .param("sortDirection", "ASCENDING")
               .param("sortBy", "UPDATED_AT")
               .with(user(userDetails))
-              .with(csrf()))
+          )
           .andExpect(status().isBadRequest());
 
       verifyNoInteractions(playlistService);
@@ -391,7 +388,7 @@ public class PlaylistControllerTest {
               .param("sortDirection", "ASCENDING")
               .param("sortBy", "ANY")
               .with(user(userDetails))
-              .with(csrf()))
+          )
           .andExpect(status().isBadRequest());
 
       verifyNoInteractions(playlistService);
@@ -410,7 +407,7 @@ public class PlaylistControllerTest {
               .param("sortDirection", "ANY")
               .param("sortBy", "UPDATED_AT")
               .with(user(userDetails))
-              .with(csrf()))
+          )
           .andExpect(status().isBadRequest());
 
       verifyNoInteractions(playlistService);

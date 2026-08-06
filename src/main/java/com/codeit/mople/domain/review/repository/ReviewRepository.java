@@ -1,12 +1,15 @@
 package com.codeit.mople.domain.review.repository;
 
 import com.codeit.mople.domain.review.entity.Review;
+import com.codeit.mople.domain.review.repository.querydsl.ReviewCustomRepository;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface ReviewRepository extends JpaRepository<Review, UUID> {
+public interface ReviewRepository extends
+    JpaRepository<Review, UUID>,
+    ReviewCustomRepository {
 
   // Review 테이블에서 Review의 contentId가 받아온 contentId와 일치하는 행들의 개수를 계산(콘텐츠 리뷰 개수)
   long countByContentId(UUID contentId);

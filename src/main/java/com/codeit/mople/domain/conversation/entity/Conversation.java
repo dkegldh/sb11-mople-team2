@@ -1,5 +1,7 @@
 package com.codeit.mople.domain.conversation.entity;
 
+import com.codeit.mople.domain.conversation.exception.ConversationErrorCode;
+import com.codeit.mople.domain.conversation.exception.ConversationException;
 import com.codeit.mople.domain.directmessage.entity.DirectMessage;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.global.entity.BaseEntity;
@@ -42,6 +44,8 @@ public class Conversation extends BaseEntity {
   @JoinColumn(name = "last_message_id")
   private DirectMessage lastMessage;
 
+  private Instant lastMessageAt;
+
   private Instant userALastReadAt;
 
   private Instant userBLastReadAt;
@@ -49,11 +53,19 @@ public class Conversation extends BaseEntity {
   private Conversation(User userA, User userB) {
     this.userA = userA;
     this.userB = userB;
+    // 메시지가 0개인 신설 빈 방은 방 생성 시각을 초기 정렬 축으로 사용
+    this.lastMessageAt = Instant.now();
   }
 
   // 대화방 생성을 위한 정적 팩토리 메서드
   public static Conversation createConversation(User userA, User userB) {
     return new Conversation(userA, userB);
+  }
+
+  public User getPartnerOf(UUID requesterId) {
+    if (this.userA.getId().equals(requesterId)) return this.userB;
+    if (this.userB.getId().equals(requesterId)) return this.userA;
+    throw new ConversationException(ConversationErrorCode.ACCESS_DENIED);
   }
 
   public void updateLastReadAt(UUID userId, Instant readAt) {
@@ -65,14 +77,19 @@ public class Conversation extends BaseEntity {
       if (this.userBLastReadAt == null || readAt.isAfter(this.userBLastReadAt)) {
         this.userBLastReadAt = readAt;
       }
+    } else {
+      throw new ConversationException(ConversationErrorCode.ACCESS_DENIED);
     }
   }
 
   public void updateLastMessage(DirectMessage message) {
     this.lastMessage = message;
+    this.lastMessageAt = message.getCreatedAt();
   }
 
   public Instant getMyLastReadAt(UUID requesterId) {
-    return this.userA.getId().equals(requesterId) ? userALastReadAt : userBLastReadAt;
+    if (this.userA.getId().equals(requesterId)) return this.userALastReadAt;
+    if (this.userB.getId().equals(requesterId)) return this.userBLastReadAt;
+    throw new ConversationException(ConversationErrorCode.ACCESS_DENIED);
   }
 }

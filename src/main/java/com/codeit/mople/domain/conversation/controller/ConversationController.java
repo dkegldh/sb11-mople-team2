@@ -61,7 +61,7 @@ public class ConversationController {
       @AuthenticationPrincipal CustomUserDetails userDetails,
       @PathVariable UUID conversationId
   ) {
-    ConversationDto response = conversationService.getConversation(conversationId, userDetails.getUserId());
+    ConversationDto response = conversationService.getConversation(userDetails.getUserId(), conversationId);
     return ResponseEntity.ok(response);
   }
 }

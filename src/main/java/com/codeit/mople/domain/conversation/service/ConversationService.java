@@ -51,14 +51,14 @@ public class ConversationService {
 
     Conversation conversation;
     try {
-      conversation = conversationRepository.findByUserAAndUserB(userA, userB)
+      conversation = conversationRepository.findWithDetailsByUserAAndUserB(userA, userB)
           .orElseGet(() -> {
             log.info("기존 대화방 없음, 새 대화방 생성 - userAId: {}, userBId: {}", userAId, userBId);
             return conversationRepository.saveAndFlush(Conversation.createConversation(userA, userB));
           });
     } catch (DataIntegrityViolationException e) {
       log.info("동시 대화방 생성 충돌 발생, 기존 방 재조회 시도 - userAId: {}, userBId: {}", userAId, userBId);
-      conversation = conversationRepository.findByUserAAndUserB(userA, userB)
+      conversation = conversationRepository.findWithDetailsByUserAAndUserB(userA, userB)
           .orElseThrow(() -> new ConversationException(ConversationErrorCode.CONVERSATION_NOT_FOUND, Map.of("userAId", userAId, "userBId", userBId)));
     }
 
@@ -66,10 +66,10 @@ public class ConversationService {
     return conversationMapper.toDto(conversation, requesterId);
   }
 
-  public ConversationDto getConversation(UUID conversationId, UUID requesterId) {
+  public ConversationDto getConversation(UUID requesterId, UUID conversationId) {
     log.debug("대화방 단건 조회 요청 - conversationId: {}, requesterId: {}", conversationId, requesterId);
 
-    Conversation conversation = conversationRepository.findById(conversationId)
+    Conversation conversation = conversationRepository.findWithDetailsById(conversationId)
         .orElseThrow(() -> new ConversationException(ConversationErrorCode.CONVERSATION_NOT_FOUND, Map.of("conversationId", conversationId)));
 
     validateParticipant(conversation, requesterId);
@@ -89,7 +89,7 @@ public class ConversationService {
     User userB = userRepository.findById(userBId)
         .orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND, Map.of("userId", userBId)));
 
-    Conversation conversation = conversationRepository.findByUserAAndUserB(userA, userB)
+    Conversation conversation = conversationRepository.findWithDetailsByUserAAndUserB(userA, userB)
         .orElseThrow(() -> new ConversationException(ConversationErrorCode.CONVERSATION_NOT_FOUND, Map.of("userAId", userAId, "userBId", userBId)));
 
     return conversationMapper.toDto(conversation, requesterId);
@@ -119,9 +119,7 @@ public class ConversationService {
       Conversation lastItem = slicedConversations.get(slicedConversations.size() - 1);
 
       // 대화방에 lastMessage가 없으면 대화방의 createdAt을 커서로 사용
-      Instant nextTime = (lastItem.getLastMessage() != null && lastItem.getLastMessage().getCreatedAt() != null)
-          ? lastItem.getLastMessage().getCreatedAt()
-          : lastItem.getCreatedAt();
+      Instant nextTime = lastItem.getLastMessageAt();
 
       if (nextTime != null) {
         nextCursor = nextTime.toString();
