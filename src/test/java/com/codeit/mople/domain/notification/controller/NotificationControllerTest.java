@@ -33,9 +33,6 @@ import org.springframework.test.web.servlet.MockMvc;
 @DisplayName("NotificationController 테스트")
 class NotificationControllerTest {
 
-    // TODO(@AuthenticationPrincipal 구현 시 제거 후 principal.getUserId()로 교체)
-    private static final UUID TEMP_RECEIVER_ID = UUID.fromString("00000000-0000-0000-0000-000000000000");
-
     @Autowired
     MockMvc mockMvc;
 
@@ -87,7 +84,7 @@ class NotificationControllerTest {
                 .andExpect(jsonPath("$.sortBy").value("createdAt"))
                 .andExpect(jsonPath("$.sortDirection").value("DESCENDING"));
 
-            then(notificationService).should().getNotifications(eq(TEMP_RECEIVER_ID), any());
+            then(notificationService).should().getNotifications(eq(principal.getUserId()), any());
         }
 
         @Test
@@ -110,7 +107,7 @@ class NotificationControllerTest {
                 .andExpect(jsonPath("$.hasNext").value(false))
                 .andExpect(jsonPath("$.totalCount").value(0));
 
-            then(notificationService).should().getNotifications(eq(TEMP_RECEIVER_ID), any());
+            then(notificationService).should().getNotifications(eq(principal.getUserId()), any());
         }
 
         @Test
@@ -134,7 +131,7 @@ class NotificationControllerTest {
                 .andExpect(jsonPath("$.nextCursor").value(nextCursor))
                 .andExpect(jsonPath("$.nextIdAfter").value(nextIdAfter.toString()));
 
-            then(notificationService).should().getNotifications(eq(TEMP_RECEIVER_ID), any());
+            then(notificationService).should().getNotifications(eq(principal.getUserId()), any());
         }
 
         @Test
@@ -239,7 +236,7 @@ class NotificationControllerTest {
                     .with(user(principal)))
                 .andExpect(status().isOk());
 
-            then(notificationService).should().getNotifications(eq(TEMP_RECEIVER_ID), any());
+            then(notificationService).should().getNotifications(eq(principal.getUserId()), any());
         }
 
         @Test
@@ -253,7 +250,7 @@ class NotificationControllerTest {
                     .with(user(principal)))
                 .andExpect(status().isOk());
 
-            then(notificationService).should().getNotifications(eq(TEMP_RECEIVER_ID), any());
+            then(notificationService).should().getNotifications(eq(principal.getUserId()), any());
         }
 
         @Test
@@ -271,7 +268,7 @@ class NotificationControllerTest {
                     .with(user(principal)))
                 .andExpect(status().isOk());
 
-            then(notificationService).should().getNotifications(eq(TEMP_RECEIVER_ID), any());
+            then(notificationService).should().getNotifications(eq(principal.getUserId()), any());
         }
 
         @Test

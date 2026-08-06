@@ -1,5 +1,6 @@
 package com.codeit.mople.domain.notification.controller.api;
 
+import com.codeit.mople.domain.auth.security.CustomUserDetails;
 import com.codeit.mople.domain.notification.dto.request.NotificationCursorRequest;
 import com.codeit.mople.domain.notification.dto.response.CursorResponseNotificationDto;
 import io.swagger.v3.oas.annotations.Operation;
@@ -52,5 +53,7 @@ public interface NotificationApi {
             content = @Content(schema = @Schema(implementation = com.codeit.mople.global.response.ApiResponse.class))
         )
     })
-    ResponseEntity<CursorResponseNotificationDto> getNotifications(NotificationCursorRequest request);
+    ResponseEntity<CursorResponseNotificationDto> getNotifications(
+        @io.swagger.v3.oas.annotations.Parameter(hidden = true) @org.springframework.security.core.annotation.AuthenticationPrincipal CustomUserDetails userDetails,
+        NotificationCursorRequest request);
 }

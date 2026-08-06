@@ -36,8 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 @DisplayName("알림 커서 페이지네이션 통합 테스트")
 public class NotificationIntegrationTest {
 
-    // NotificationController에서 사용하는 임시 receiverId
-    private static final UUID TEMP_RECEIVER_ID = UUID.fromString("00000000-0000-0000-0000-000000000000");
+    private static final UUID RECEIVER_ID = UUID.fromString("00000000-0000-0000-0000-000000000000");
 
     @Autowired
     private MockMvc mockMvc;
@@ -57,13 +56,13 @@ public class NotificationIntegrationTest {
     @BeforeEach
     void setUp() {
         alertCounter = 0;
-        // TEMP_RECEIVER_ID를 가진 User를 native SQL로 삽입 (UUID auto-generate 우회)
+        // RECEIVER_ID를 가진 User를 native SQL로 삽입 (UUID auto-generate 우회)
         entityManager.createNativeQuery(
             "INSERT INTO users (id, email, password, name, role, locked, session_version, created_at) " +
             "VALUES (:id, 'temp@test.com', 'password', '임시유저', 'USER', false, 0, CURRENT_TIMESTAMP)"
-        ).setParameter("id", TEMP_RECEIVER_ID).executeUpdate();
+        ).setParameter("id", RECEIVER_ID).executeUpdate();
 
-        principal = new CustomUserDetails(TEMP_RECEIVER_ID, Role.USER);
+        principal = new CustomUserDetails(RECEIVER_ID, Role.USER);
     }
 
     // 알림마다 1초씩 다른 명시적 timestamp를 사용해 CURRENT_TIMESTAMP 정밀도 문제 방지
@@ -74,7 +73,7 @@ public class NotificationIntegrationTest {
             "INSERT INTO notifications (id, receiver_id, title, content, level, notification_type, created_at) " +
             "VALUES (RANDOM_UUID(), :receiverId, :title, '내용', 'INFO', :type, :createdAt)"
         )
-        .setParameter("receiverId", TEMP_RECEIVER_ID)
+        .setParameter("receiverId", RECEIVER_ID)
         .setParameter("title", title)
         .setParameter("type", type.name())
         .setParameter("createdAt", createdAt)
@@ -186,7 +185,7 @@ public class NotificationIntegrationTest {
                 .andExpect(jsonPath("$.data[0].title").value("팔로우 알림"))
                 .andExpect(jsonPath("$.data[0].content").value("내용"))
                 .andExpect(jsonPath("$.data[0].level").value("INFO"))
-                .andExpect(jsonPath("$.data[0].receiverId").value(TEMP_RECEIVER_ID.toString()))
+                .andExpect(jsonPath("$.data[0].receiverId").value(RECEIVER_ID.toString()))
                 .andExpect(jsonPath("$.data[0].createdAt").isNotEmpty());
         }
     }
