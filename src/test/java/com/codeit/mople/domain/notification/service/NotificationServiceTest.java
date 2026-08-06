@@ -6,9 +6,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.mock;
 
 import com.codeit.mople.domain.notification.dto.request.NotificationCursorRequest;
+import com.codeit.mople.domain.notification.exception.NotificationErrorCode;
 import com.codeit.mople.domain.notification.exception.NotificationException;
 import com.codeit.mople.domain.notification.dto.response.CursorResponseNotificationDto;
 import com.codeit.mople.domain.notification.entity.Notification;
@@ -17,6 +19,7 @@ import com.codeit.mople.domain.notification.repository.NotificationRepository;
 import com.codeit.mople.domain.user.entity.User;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -137,6 +140,7 @@ class NotificationServiceTest {
 
             given(notificationRepository.findNotificationByCursor(eq(receiverId), isNull(), isNull(), eq(2)))
                 .willReturn(List.of(n1, n2));
+            given(notificationRepository.countByReceiver_Id(receiverId)).willReturn(2L);
 
             // when
             CursorResponseNotificationDto result = notificationService.getNotifications(receiverId, request);
@@ -146,6 +150,7 @@ class NotificationServiceTest {
             assertThat(result.hasNext()).isFalse();
             assertThat(result.nextCursor()).isNull();
             assertThat(result.nextIdAfter()).isNull();
+            assertThat(result.totalCount()).isEqualTo(2);
         }
 
         @Test
@@ -227,6 +232,62 @@ class NotificationServiceTest {
             assertThat(result.totalCount()).isEqualTo(1);
             assertThat(result.data().get(0).id()).isEqualTo(notifId);
             assertThat(result.data().get(0).createdAt()).isEqualTo(createdAt);
+        }
+    }
+
+    @Nested
+    @DisplayName("deleteNotification (알림 삭제) 테스트")
+    class DeleteNotification {
+
+        @Test
+        @DisplayName("성공: 본인 알림을 삭제하면 Repository.delete가 호출된다.")
+        void success_delete_notification() {
+            // given
+            UUID notificationId = UUID.randomUUID();
+            Notification notification = mock(Notification.class);
+            User receiver = mock(User.class);
+            given(notification.getReceiver()).willReturn(receiver);
+            given(receiver.getId()).willReturn(receiverId);
+            given(notificationRepository.findById(notificationId)).willReturn(Optional.of(notification));
+
+            // when
+            notificationService.deleteNotification(notificationId, receiverId);
+
+            // then
+            then(notificationRepository).should().delete(notification);
+        }
+
+        @Test
+        @DisplayName("실패: 존재하지 않는 알림이면 NOTIFICATION_NOT_FOUND 예외가 발생한다.")
+        void fail_throws_exception_when_notification_not_found() {
+            // given
+            UUID notificationId = UUID.randomUUID();
+            given(notificationRepository.findById(notificationId)).willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> notificationService.deleteNotification(notificationId, receiverId))
+                .isInstanceOf(NotificationException.class)
+                .satisfies(e -> assertThat(((NotificationException) e).getErrorCode())
+                    .isEqualTo(NotificationErrorCode.NOTIFICATION_NOT_FOUND));
+        }
+
+        @Test
+        @DisplayName("실패: 본인 알림이 아니면 NOTIFICATION_FORBIDDEN 예외가 발생한다.")
+        void fail_throws_exception_when_not_owner() {
+            // given
+            UUID notificationId = UUID.randomUUID();
+            UUID otherReceiverId = UUID.randomUUID();
+            Notification notification = mock(Notification.class);
+            User receiver = mock(User.class);
+            given(notification.getReceiver()).willReturn(receiver);
+            given(receiver.getId()).willReturn(receiverId); // 알림 소유자는 receiverId
+            given(notificationRepository.findById(notificationId)).willReturn(Optional.of(notification));
+
+            // when & then — 다른 유저 ID로 삭제 시도
+            assertThatThrownBy(() -> notificationService.deleteNotification(notificationId, otherReceiverId))
+                .isInstanceOf(NotificationException.class)
+                .satisfies(e -> assertThat(((NotificationException) e).getErrorCode())
+                    .isEqualTo(NotificationErrorCode.NOTIFICATION_FORBIDDEN));
         }
     }
 

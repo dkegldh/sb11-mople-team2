@@ -1,6 +1,8 @@
 package com.codeit.mople.domain.notification.integration;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -78,6 +80,23 @@ public class NotificationIntegrationTest {
         .setParameter("type", type.name())
         .setParameter("createdAt", createdAt)
         .executeUpdate();
+    }
+
+    private UUID 알림_생성_아이디_반환(String title, NotificationType type) {
+        UUID id = UUID.randomUUID();
+        alertCounter++;
+        Instant createdAt = Instant.EPOCH.plusSeconds(alertCounter);
+        entityManager.createNativeQuery(
+            "INSERT INTO notifications (id, receiver_id, title, content, level, notification_type, created_at) " +
+            "VALUES (:id, :receiverId, :title, '내용', 'INFO', :type, :createdAt)"
+        )
+        .setParameter("id", id)
+        .setParameter("receiverId", RECEIVER_ID)
+        .setParameter("title", title)
+        .setParameter("type", type.name())
+        .setParameter("createdAt", createdAt)
+        .executeUpdate();
+        return id;
     }
 
     @Nested
@@ -187,6 +206,80 @@ public class NotificationIntegrationTest {
                 .andExpect(jsonPath("$.data[0].level").value("INFO"))
                 .andExpect(jsonPath("$.data[0].receiverId").value(RECEIVER_ID.toString()))
                 .andExpect(jsonPath("$.data[0].createdAt").isNotEmpty());
+        }
+    }
+
+    @Nested
+    @DisplayName("DELETE /api/notifications/{notificationId} - 알림 삭제")
+    class DeleteNotification {
+
+        @Test
+        @DisplayName("성공: 본인 알림을 삭제하면 204가 반환되고 목록에서 사라진다.")
+        void success_delete_notification() throws Exception {
+            // given
+            UUID notificationId = 알림_생성_아이디_반환("삭제할 알림", NotificationType.NEW_FOLLOWER);
+
+            // when
+            mockMvc.perform(delete("/api/notifications/{notificationId}", notificationId)
+                    .with(user(principal))
+                    .with(csrf()))
+                .andDo(print())
+                .andExpect(status().isNoContent());
+
+            // then — 삭제 후 알림 목록 조회 시 해당 알림이 없음
+            mockMvc.perform(get("/api/notifications")
+                    .param("limit", "20")
+                    .with(user(principal)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalCount").value(0))
+                .andExpect(jsonPath("$.data").isEmpty());
+        }
+
+        @Test
+        @DisplayName("실패: 존재하지 않는 알림을 삭제하면 404를 반환한다.")
+        void fail_404_when_notification_not_found() throws Exception {
+            // given
+            UUID nonExistentId = UUID.randomUUID();
+
+            // when & then
+            mockMvc.perform(delete("/api/notifications/{notificationId}", nonExistentId)
+                    .with(user(principal))
+                    .with(csrf()))
+                .andDo(print())
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("NOTIFICATION-001"));
+        }
+
+        @Test
+        @DisplayName("실패: 다른 유저의 알림을 삭제하면 403을 반환한다.")
+        void fail_403_when_deleting_other_user_notification() throws Exception {
+            // given — 다른 유저 및 알림 삽입
+            UUID otherUserId = UUID.randomUUID();
+            entityManager.createNativeQuery(
+                "INSERT INTO users (id, email, password, name, role, locked, session_version, created_at) " +
+                "VALUES (:id, 'other2@test.com', 'password', '타유저2', 'USER', false, 0, CURRENT_TIMESTAMP)"
+            ).setParameter("id", otherUserId).executeUpdate();
+
+            UUID otherNotificationId = UUID.randomUUID();
+            alertCounter++;
+            entityManager.createNativeQuery(
+                "INSERT INTO notifications (id, receiver_id, title, content, level, notification_type, created_at) " +
+                "VALUES (:id, :receiverId, '타유저 알림', '내용', 'INFO', 'NEW_FOLLOWER', :createdAt)"
+            )
+            .setParameter("id", otherNotificationId)
+            .setParameter("receiverId", otherUserId)
+            .setParameter("createdAt", Instant.EPOCH.plusSeconds(alertCounter))
+            .executeUpdate();
+
+            // when & then — RECEIVER_ID 유저가 타유저 알림 삭제 시도
+            mockMvc.perform(delete("/api/notifications/{notificationId}", otherNotificationId)
+                    .with(user(principal))
+                    .with(csrf()))
+                .andDo(print())
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("NOTIFICATION-002"));
         }
     }
 
