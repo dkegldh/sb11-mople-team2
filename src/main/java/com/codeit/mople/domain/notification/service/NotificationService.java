@@ -4,6 +4,8 @@ import com.codeit.mople.domain.notification.dto.request.NotificationCursorReques
 import com.codeit.mople.domain.notification.dto.response.CursorResponseNotificationDto;
 import com.codeit.mople.domain.notification.dto.response.NotificationResponse;
 import com.codeit.mople.domain.notification.entity.Notification;
+import com.codeit.mople.domain.notification.exception.NotificationErrorCode;
+import com.codeit.mople.domain.notification.exception.NotificationException;
 import com.codeit.mople.domain.notification.repository.NotificationRepository;
 import java.time.Instant;
 import java.util.List;
@@ -65,5 +67,17 @@ public class NotificationService {
             request.sortBy(),
             request.sortDirection()
         );
+    }
+
+    @Transactional
+    public void deleteNotification(UUID notificationId, UUID receiverId) {
+        log.debug("알림 삭제 요청 - notificationId: {}, receiverId: {}", notificationId, receiverId);
+        Notification notification = notificationRepository.findById(notificationId)
+            .orElseThrow(() -> new NotificationException(NotificationErrorCode.NOTIFICATION_NOT_FOUND));
+        if (!notification.getReceiver().getId().equals(receiverId)) {
+            throw new NotificationException(NotificationErrorCode.NOTIFICATION_FORBIDDEN);
+        }
+        notificationRepository.delete(notification);
+        log.info("알림 삭제 완료 - notificationId: {}, receiverId: {}", notificationId, receiverId);
     }
 }
