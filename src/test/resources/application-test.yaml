@@ -9,6 +9,12 @@ spring:
       ddl-auto: create-drop
     show-sql: false
 
+  batch:
+    job:
+      enabled: false
+    jdbc:
+      initialize-schema: always
+
 jwt:
   secret: test-secret-key-for-ci-pipeline-only-1234567890
 
