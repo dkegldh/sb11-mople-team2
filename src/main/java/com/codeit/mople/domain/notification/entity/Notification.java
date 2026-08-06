@@ -61,7 +61,8 @@ public class Notification extends BaseEntity {
     private static NotificationLevel resolveLevel(NotificationType type) {
         return switch (type) {
             case ROLE_CHANGE, ACCOUNT_LOCKED -> NotificationLevel.WARNING;
-            default -> NotificationLevel.INFO;
+            case ACCOUNT_UNLOCKED, PLAYLIST_SUBSCRIBE, PLAYLIST_CONTENT_ADDED,
+                 FOLLOWEE_ACTIVITY, NEW_FOLLOWER, DIRECT_MESSAGE -> NotificationLevel.INFO;
         };
     }
 }
