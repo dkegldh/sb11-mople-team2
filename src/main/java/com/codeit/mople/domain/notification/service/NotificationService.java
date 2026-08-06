@@ -13,6 +13,7 @@ import com.codeit.mople.domain.user.exception.UserErrorCode;
 import com.codeit.mople.domain.user.exception.UserException;
 import com.codeit.mople.domain.user.repository.UserRepository;
 import java.time.Instant;
+import org.springframework.dao.DataAccessException;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -78,7 +79,7 @@ public class NotificationService {
         );
     }
 
-    @Retryable(retryFor = Exception.class, maxAttempts = 3, backoff = @Backoff(delay = 1000, multiplier = 2))
+    @Retryable(retryFor = DataAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 1000, multiplier = 2))
     @Transactional
     public void createNotification(UUID receiverId, String title, String content, NotificationType type) {
         log.debug("알림 생성 요청 - receiverId: {}, type: {}", receiverId, type);
