@@ -382,7 +382,9 @@ class NotificationControllerTest {
                     .with(user(principal))
                     .with(csrf()))
                 .andDo(print())
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("COMMON-001"));
 
             verifyNoInteractions(notificationService);
         }
