@@ -47,7 +47,7 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(MethodArgumentTypeMismatchException.class)
   public ResponseEntity<ApiResponse<Void>> handleMethodArgumentTypeMismatch(
       MethodArgumentTypeMismatchException e) {
-    log.warn("[TypeMismatch] Parameter: {}, Value: {}", e.getName(), e.getValue());
+    log.warn("[TypeMismatch] Parameter: {}, ExpectedType: {}", e.getName(), e.getRequiredType());
     return ResponseEntity
         .status(CommonErrorCode.INVALID_INPUT.getStatus())
         .body(ApiResponse.error(CommonErrorCode.INVALID_INPUT.getCode(),
