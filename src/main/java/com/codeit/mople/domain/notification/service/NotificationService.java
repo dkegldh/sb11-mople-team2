@@ -15,6 +15,9 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Recover;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -73,6 +76,7 @@ public class NotificationService {
         );
     }
 
+    @Retryable(retryFor = Exception.class, maxAttempts = 3, backoff = @Backoff(delay = 1000, multiplier = 2))
     @Transactional
     public void createNotification(UUID receiverId, String title, String content, NotificationType type) {
         log.debug("알림 생성 요청 - receiverId: {}, type: {}", receiverId, type);
@@ -80,5 +84,10 @@ public class NotificationService {
             .orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
         notificationRepository.save(Notification.create(receiver, title, content, type));
         log.info("알림 생성 완료 - receiverId: {}, type: {}", receiverId, type);
+    }
+
+    @Recover
+    public void recoverCreateNotification(Exception e, UUID receiverId, String title, String content, NotificationType type) {
+        log.error("알림 생성 최종 실패 (3회 재시도 소진) - receiverId: {}, type: {}", receiverId, type, e);
     }
 }
