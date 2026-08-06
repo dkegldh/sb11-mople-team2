@@ -34,8 +34,8 @@ public class AdminService {
     User user = userRepository.findById(userId)
         .orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
     Role previousRole = user.getRole();
-    user.changeRole(role);
     if (previousRole != role) {
+      user.changeRole(role);
       user.increaseSessionVersion();
       eventPublisher.publishEvent(new UserForceLogoutEvent(userId, ForceLogoutReason.ROLE_CHANGE));
     }
@@ -55,7 +55,9 @@ public class AdminService {
       user.unlock();
     }
     if (previousLocked != locked) {
-      user.increaseSessionVersion();
+      if (locked) {
+        user.increaseSessionVersion();
+      }
       ForceLogoutReason reason = locked ? ForceLogoutReason.ACCOUNT_LOCKED : ForceLogoutReason.ACCOUNT_UNLOCKED;
       eventPublisher.publishEvent(new UserForceLogoutEvent(userId, reason));
     }
