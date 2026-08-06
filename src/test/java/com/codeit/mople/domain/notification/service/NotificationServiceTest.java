@@ -137,6 +137,7 @@ class NotificationServiceTest {
 
             given(notificationRepository.findNotificationByCursor(eq(receiverId), isNull(), isNull(), eq(2)))
                 .willReturn(List.of(n1, n2));
+            given(notificationRepository.countByReceiver_Id(receiverId)).willReturn(2L);
 
             // when
             CursorResponseNotificationDto result = notificationService.getNotifications(receiverId, request);
@@ -146,6 +147,7 @@ class NotificationServiceTest {
             assertThat(result.hasNext()).isFalse();
             assertThat(result.nextCursor()).isNull();
             assertThat(result.nextIdAfter()).isNull();
+            assertThat(result.totalCount()).isEqualTo(2);
         }
 
         @Test
@@ -182,6 +184,7 @@ class NotificationServiceTest {
             given(notificationRepository.findNotificationByCursor(
                 eq(receiverId), eq(Instant.parse(cursorStr)), eq(idAfter), eq(20)))
                 .willReturn(List.of());
+            given(notificationRepository.countByReceiver_Id(receiverId)).willReturn(0L);
 
             // when
             CursorResponseNotificationDto result = notificationService.getNotifications(receiverId, request);
@@ -189,6 +192,7 @@ class NotificationServiceTest {
             // then - cursor 문자열이 정확한 Instant 값으로 변환되어 Repository에 전달됨
             assertThat(result.data()).isEmpty();
             assertThat(result.hasNext()).isFalse();
+            assertThat(result.totalCount()).isZero();
         }
 
         @Test
