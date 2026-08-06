@@ -4,7 +4,12 @@ import com.codeit.mople.domain.notification.dto.request.NotificationCursorReques
 import com.codeit.mople.domain.notification.dto.response.CursorResponseNotificationDto;
 import com.codeit.mople.domain.notification.dto.response.NotificationResponse;
 import com.codeit.mople.domain.notification.entity.Notification;
+import com.codeit.mople.domain.notification.entity.NotificationType;
 import com.codeit.mople.domain.notification.repository.NotificationRepository;
+import com.codeit.mople.domain.user.entity.User;
+import com.codeit.mople.domain.user.exception.UserErrorCode;
+import com.codeit.mople.domain.user.exception.UserException;
+import com.codeit.mople.domain.user.repository.UserRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -20,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
+    private final UserRepository userRepository;
 
     public CursorResponseNotificationDto getNotifications(UUID receiverId,
         NotificationCursorRequest request) {
@@ -65,5 +71,14 @@ public class NotificationService {
             request.sortBy(),
             request.sortDirection()
         );
+    }
+
+    @Transactional
+    public void createNotification(UUID receiverId, String title, String content, NotificationType type) {
+        log.debug("알림 생성 요청 - receiverId: {}, type: {}", receiverId, type);
+        User receiver = userRepository.findById(receiverId)
+            .orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
+        notificationRepository.save(Notification.create(receiver, title, content, type));
+        log.info("알림 생성 완료 - receiverId: {}, type: {}", receiverId, type);
     }
 }

@@ -6,6 +6,7 @@ import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.exception.UserErrorCode;
 import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.domain.user.exception.UserException;
+import com.codeit.mople.global.event.ForceLogoutReason;
 import com.codeit.mople.global.event.UserForceLogoutEvent;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +37,7 @@ public class AdminService {
     user.changeRole(role);
     if (previousRole != role) {
       user.increaseSessionVersion();
-      eventPublisher.publishEvent(new UserForceLogoutEvent(userId));
+      eventPublisher.publishEvent(new UserForceLogoutEvent(userId, ForceLogoutReason.ROLE_CHANGE));
     }
     log.info("권한 변경 완료 - userId: {}, role: {}", userId, role);
   }
@@ -55,7 +56,8 @@ public class AdminService {
     }
     if (previousLocked != locked) {
       user.increaseSessionVersion();
-      eventPublisher.publishEvent(new UserForceLogoutEvent(userId));
+      ForceLogoutReason reason = locked ? ForceLogoutReason.ACCOUNT_LOCKED : ForceLogoutReason.ACCOUNT_UNLOCKED;
+      eventPublisher.publishEvent(new UserForceLogoutEvent(userId, reason));
     }
     log.info("계정 잠금 변경 완료 - userId: {}, locked: {}", userId, locked);
   }
