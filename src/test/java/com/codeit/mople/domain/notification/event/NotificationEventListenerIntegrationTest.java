@@ -9,8 +9,13 @@ import com.codeit.mople.domain.auth.security.CustomUserDetails;
 import com.codeit.mople.domain.follow.dto.FollowRequest;
 import com.codeit.mople.domain.follow.repository.FollowRepository;
 import com.codeit.mople.domain.follow.service.FollowService;
+import com.codeit.mople.domain.content.entity.Content;
+import com.codeit.mople.domain.content.entity.ContentType;
+import com.codeit.mople.domain.content.repository.ContentRepository;
 import com.codeit.mople.domain.playlist.entity.Playlist;
+import com.codeit.mople.domain.playlist.repository.PlaylistContentRepository;
 import com.codeit.mople.domain.playlist.repository.PlaylistRepository;
+import com.codeit.mople.domain.playlist.repository.PlaylistSubscriptionRepository;
 import com.codeit.mople.domain.playlist.service.PlaylistService;
 import com.codeit.mople.domain.notification.entity.Notification;
 import com.codeit.mople.domain.notification.entity.NotificationType;
@@ -44,6 +49,9 @@ class NotificationEventListenerIntegrationTest {
     @Autowired private FollowRepository followRepository;
     @Autowired private PlaylistService playlistService;
     @Autowired private PlaylistRepository playlistRepository;
+    @Autowired private PlaylistSubscriptionRepository playlistSubscriptionRepository;
+    @Autowired private PlaylistContentRepository playlistContentRepository;
+    @Autowired private ContentRepository contentRepository;
     @Autowired private NotificationRepository notificationRepository;
     @Autowired private UserRepository userRepository;
     @Autowired private ApplicationEventPublisher eventPublisher;
@@ -67,7 +75,10 @@ class NotificationEventListenerIntegrationTest {
     void tearDown() {
         notificationRepository.deleteAll();
         followRepository.deleteAll();
+        playlistSubscriptionRepository.deleteAll();
+        playlistContentRepository.deleteAll();
         playlistRepository.deleteAll();
+        contentRepository.deleteAll();
         userRepository.deleteAll();
         SecurityContextHolder.clearContext();
     }
@@ -112,6 +123,34 @@ class NotificationEventListenerIntegrationTest {
         });
 
         assertThat(userRepository.findById(targetUserId).orElseThrow().getSessionVersion()).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("플레이리스트 콘텐츠 추가 트랜잭션 커밋 후 PLAYLIST_CONTENT_ADDED 알림이 구독자 전원에게 저장된다")
+    void 플레이리스트_콘텐츠_추가_트랜잭션_커밋_후_PLAYLIST_CONTENT_ADDED_알림이_구독자_전원에게_저장된다() {
+        // given
+        User owner = userRepository.findById(targetUserId).orElseThrow();
+        User subscriberA = userRepository.save(User.createUser("subA@test.com", "encoded", "구독자A"));
+        User subscriberB = userRepository.save(User.createUser("subB@test.com", "encoded", "구독자B"));
+        Playlist playlist = playlistRepository.save(Playlist.create(owner, "테스트 플레이리스트", "설명"));
+        Content content = contentRepository.save(new Content(ContentType.MOVIE, "테스트 영화", null, null, null));
+        playlistService.subscribe(playlist.getId(), subscriberA.getId());
+        playlistService.subscribe(playlist.getId(), subscriberB.getId());
+        notificationRepository.deleteAll(); // 구독 알림 제거
+
+        // when
+        playlistService.addContent(playlist.getId(), content.getId(), targetUserId);
+
+        // then
+        await().atMost(3, SECONDS).untilAsserted(() -> {
+            List<Notification> notifications = notificationRepository.findAll();
+            assertThat(notifications).hasSize(2);
+            assertThat(notifications)
+                .extracting(n -> n.getReceiver().getId())
+                .containsExactlyInAnyOrder(subscriberA.getId(), subscriberB.getId());
+            assertThat(notifications)
+                .allMatch(n -> n.getNotificationType() == NotificationType.PLAYLIST_CONTENT_ADDED);
+        });
     }
 
     @Test
