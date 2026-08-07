@@ -1,6 +1,8 @@
 package com.codeit.mople.domain.review.service;
 
 import com.codeit.mople.domain.content.entity.Content;
+import com.codeit.mople.domain.follow.event.FolloweeActivityEvent;
+import com.codeit.mople.domain.follow.repository.FollowRepository;
 import com.codeit.mople.domain.content.exception.ContentErrorCode;
 import com.codeit.mople.domain.content.exception.ContentException;
 import com.codeit.mople.domain.content.repository.ContentRepository;
@@ -23,6 +25,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,9 +35,10 @@ import org.springframework.transaction.annotation.Transactional;
 public class ReviewService {
 
   private final ReviewRepository reviewRepository;
-
   private final UserRepository userRepository;
   private final ContentRepository contentRepository;
+  private final FollowRepository followRepository;
+  private final ApplicationEventPublisher publisher;
 
   @Transactional
   public ReviewResponse create(UUID authorId, ReviewCreateRequest request) {
@@ -53,6 +57,10 @@ public class ReviewService {
     Review review = Review.create(content, author, request.text(), request.rating());
 
     Review savedReview = reviewRepository.save(review);
+
+    followRepository.findFollowerIdsByFolloweeId(authorId)
+        .forEach(followerId -> publisher.publishEvent(
+            new FolloweeActivityEvent(authorId, author.getName(), "리뷰를 작성했습니다.", followerId)));
 
     // TODO 김명근: 동시성 문제(Race Condition)는 다음 스프린트 기간 때 락 사용 등을 활용하여 개선
     // 콘텐츠의 리뷰 개수, 평균 평점을 조회
