@@ -259,7 +259,7 @@ class NotificationEventListenerIntegrationTest {
             assertThat(notifications)
                 .allMatch(n -> n.getNotificationType() == NotificationType.FOLLOWEE_ACTIVITY);
             assertThat(notifications)
-                .allMatch(n -> n.getTitle().equals("대상유저님의 새로운 활동이 있습니다."));
+                .allMatch(n -> n.getTitle().equals(creator.getName() + "님의 새로운 활동이 있습니다."));
             assertThat(notifications)
                 .allMatch(n -> n.getContent().equals("새 플레이리스트를 만들었습니다."));
         });
@@ -285,7 +285,7 @@ class NotificationEventListenerIntegrationTest {
             Notification notification = notifications.get(0);
             assertThat(notification.getNotificationType()).isEqualTo(NotificationType.FOLLOWEE_ACTIVITY);
             assertThat(notification.getReceiver().getId()).isEqualTo(follower.getId());
-            assertThat(notification.getTitle()).isEqualTo("대상유저님의 새로운 활동이 있습니다.");
+            assertThat(notification.getTitle()).isEqualTo(author.getName() + "님의 새로운 활동이 있습니다.");
             assertThat(notification.getContent()).isEqualTo("리뷰를 작성했습니다.");
         });
     }
