@@ -51,6 +51,10 @@ public class Content extends BaseTimeEntity {
   @Column(name = "watcher_count", nullable = false)
   private long watcherCount = 0L; //실시간 사용자 수
 
+  //외부 API 중복 방지용 식별자 필드
+  @Column(name = "external_id", unique = true)
+  private String externalId;
+
   public Content(ContentType type, String title, String description, String thumbnailUrl, List<String> tags) {
     this.type = type;
     this.title = title;
@@ -59,6 +63,16 @@ public class Content extends BaseTimeEntity {
 
     //생성 시 복사본(new ArrayList)을 사용하여 불변 리스트 참조 방지
     this.tags = tags != null ? new ArrayList<>(tags) : new ArrayList<>();
+  }
+
+  //외부 데이터 전용 생성자 오버로딩
+  public Content(ContentType type, String title, String description, String thumbnailUrl, List<String> tags, String externalId) {
+    this.type = type;
+    this.title = title;
+    this.description = description;
+    this.thumbnailUrl = thumbnailUrl;
+    this.tags = tags != null ? new ArrayList<>(tags) : new ArrayList<>();
+    this.externalId = externalId;
   }
 
   //새로운 리뷰가 작성되거나 삭제 될 때,

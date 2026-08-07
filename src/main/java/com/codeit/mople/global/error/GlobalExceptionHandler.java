@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeanInstantiationException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
@@ -134,5 +135,14 @@ public class GlobalExceptionHandler {
     this.constraintErrorCodes = contributors.stream()
         .flatMap(c -> c.get().entrySet().stream())
         .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
+  }
+
+  //경로 변수(PathVariable)나 쿼리 파라미터(RequestParam)의 타입 변환 실패 시 발생
+  public ResponseEntity<ApiResponse<Void>> handleMethodArgumentTypeMismatchException(
+      MethodArgumentTypeMismatchException e) {
+    log.warn("[TypeMismatch] Parameter: {}, Message: {}", e.getPropertyName(), e.getMessage());
+    return ResponseEntity
+        .status(CommonErrorCode.INVALID_INPUT.getStatus())
+        .body(ApiResponse.error(CommonErrorCode.INVALID_INPUT.getCode(), "파라미터 타입이 올바르지 않습니다."));
   }
 }

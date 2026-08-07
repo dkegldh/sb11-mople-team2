@@ -9,6 +9,10 @@ spring:
       ddl-auto: update
     show-sql: true
 
+  batch:
+    jdbc:
+      initialize-schema: always
+
 logging:
   level:
     com.codeit.mople: DEBUG
@@ -28,4 +32,4 @@ external-api:
     api-key: ${TMDB_API_KEY:}
   sportsdb:
     base-url: https://www.thesportsdb.com/api/v1/json
-    api-key: ${SPORTSDB_API_KEY:}
+    api-key: ${SPORTSDB_API_KEY:3}

@@ -144,4 +144,20 @@ public class UserRepositoryImpl implements UserRepositoryCustom{
       throw new UserException(UserErrorCode.INVALID_CURSOR);
     }
   }
+
+  @Override
+  public long countUsers(UserSearchRequest request) {
+    Long total = queryFactory
+        .select(user.count())
+        .from(user)
+        .where(
+            emailLikeCondition(request),
+            roleEqualCondition(request),
+            isLockedCondition(request)
+            //totalCount는 전체 개수이므로 커서 조건(cursorCondition)은 제외
+        )
+        .fetchOne();
+
+    return total != null ? total : 0L;
+  }
 }

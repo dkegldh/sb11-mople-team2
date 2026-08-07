@@ -3,6 +3,9 @@ spring:
     name: mople
   profiles:
     active: dev
+  batch:
+    job:
+      enabled: false
   cloud:
     openfeign:
       client:
@@ -31,6 +34,11 @@ admin:
   password: ${ADMIN_PASSWORD}
   name: "관리자"
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics
 external-api:
   tmdb:
     image-base-url: https://image.tmdb.org/t/p/w500
