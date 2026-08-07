@@ -9,6 +9,8 @@ import com.codeit.mople.domain.auth.security.CustomUserDetails;
 import com.codeit.mople.domain.follow.dto.FollowRequest;
 import com.codeit.mople.domain.follow.repository.FollowRepository;
 import com.codeit.mople.domain.follow.service.FollowService;
+import com.codeit.mople.domain.conversation.entity.Conversation;
+import com.codeit.mople.domain.conversation.repository.ConversationRepository;
 import com.codeit.mople.domain.content.entity.Content;
 import com.codeit.mople.domain.content.entity.ContentType;
 import com.codeit.mople.domain.content.repository.ContentRepository;
@@ -17,6 +19,7 @@ import com.codeit.mople.domain.playlist.repository.PlaylistContentRepository;
 import com.codeit.mople.domain.playlist.repository.PlaylistRepository;
 import com.codeit.mople.domain.playlist.repository.PlaylistSubscriptionRepository;
 import com.codeit.mople.domain.playlist.service.PlaylistService;
+import com.codeit.mople.domain.directmessage.service.DirectMessageService;
 import com.codeit.mople.domain.notification.entity.Notification;
 import com.codeit.mople.domain.notification.entity.NotificationType;
 import com.codeit.mople.domain.notification.repository.NotificationRepository;
@@ -52,6 +55,8 @@ class NotificationEventListenerIntegrationTest {
     @Autowired private PlaylistSubscriptionRepository playlistSubscriptionRepository;
     @Autowired private PlaylistContentRepository playlistContentRepository;
     @Autowired private ContentRepository contentRepository;
+    @Autowired private DirectMessageService directMessageService;
+    @Autowired private ConversationRepository conversationRepository;
     @Autowired private NotificationRepository notificationRepository;
     @Autowired private UserRepository userRepository;
     @Autowired private ApplicationEventPublisher eventPublisher;
@@ -74,6 +79,7 @@ class NotificationEventListenerIntegrationTest {
     @AfterEach
     void tearDown() {
         notificationRepository.deleteAll();
+        conversationRepository.deleteAll();
         followRepository.deleteAll();
         playlistSubscriptionRepository.deleteAll();
         playlistContentRepository.deleteAll();
@@ -123,6 +129,29 @@ class NotificationEventListenerIntegrationTest {
         });
 
         assertThat(userRepository.findById(targetUserId).orElseThrow().getSessionVersion()).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("DM 발송 트랜잭션 커밋 후 DIRECT_MESSAGE 알림이 수신자에게 저장된다")
+    void DM_발송_트랜잭션_커밋_후_DIRECT_MESSAGE_알림이_수신자에게_저장된다() {
+        // given
+        User sender = userRepository.save(User.createUser("sender@test.com", "encoded", "발신자"));
+        User receiver = userRepository.findById(targetUserId).orElseThrow();
+        Conversation conversation = conversationRepository.save(Conversation.createConversation(sender, receiver));
+
+        // when
+        directMessageService.sendMessage(conversation.getId(), sender.getId(), "안녕하세요!");
+
+        // then
+        await().atMost(3, SECONDS).untilAsserted(() -> {
+            List<Notification> notifications = notificationRepository.findAll();
+            assertThat(notifications).hasSize(1);
+            Notification notification = notifications.get(0);
+            assertThat(notification.getNotificationType()).isEqualTo(NotificationType.DIRECT_MESSAGE);
+            assertThat(notification.getReceiver().getId()).isEqualTo(targetUserId);
+            assertThat(notification.getTitle()).isEqualTo("새로운 메시지가 도착했습니다.");
+            assertThat(notification.getContent()).isEqualTo("발신자: 안녕하세요!");
+        });
     }
 
     @Test
