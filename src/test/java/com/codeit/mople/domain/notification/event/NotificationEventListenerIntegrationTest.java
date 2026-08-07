@@ -186,6 +186,8 @@ class NotificationEventListenerIntegrationTest {
                 .containsExactlyInAnyOrder(subscriberA.getId(), subscriberB.getId());
             assertThat(notifications)
                 .allMatch(n -> n.getNotificationType() == NotificationType.PLAYLIST_CONTENT_ADDED);
+            assertThat(notifications)
+                .allMatch(n -> n.getContent().equals("테스트 플레이리스트에 새 콘텐츠가 추가되었습니다."));
         });
     }
 

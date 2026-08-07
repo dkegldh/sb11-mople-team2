@@ -377,7 +377,7 @@ public class PlaylistService {
 
     playlistSubscriptionRepository.findSubscriberIdsByPlaylistId(playlistId)
         .forEach(subscriberId ->
-            publisher.publishEvent(new PlaylistContentAddedEvent(playlistId, contentId, subscriberId)));
+            publisher.publishEvent(new PlaylistContentAddedEvent(subscriberId, playlist.getTitle())));
 
   }
 

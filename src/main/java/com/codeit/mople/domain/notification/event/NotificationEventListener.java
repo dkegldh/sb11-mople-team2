@@ -53,7 +53,7 @@ public class NotificationEventListener {
         notificationService.createNotification(
             event.subscriberId(),
             "구독한 플레이리스트에 새 콘텐츠가 추가되었습니다.",
-            null,
+            event.playlistTitle() + "에 새 콘텐츠가 추가되었습니다.",
             NotificationType.PLAYLIST_CONTENT_ADDED
         );
     }
