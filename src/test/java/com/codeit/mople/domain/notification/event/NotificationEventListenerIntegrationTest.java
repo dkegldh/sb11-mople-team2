@@ -23,6 +23,7 @@ import com.codeit.mople.domain.playlist.repository.PlaylistContentRepository;
 import com.codeit.mople.domain.playlist.repository.PlaylistRepository;
 import com.codeit.mople.domain.playlist.repository.PlaylistSubscriptionRepository;
 import com.codeit.mople.domain.playlist.service.PlaylistService;
+import com.codeit.mople.domain.directmessage.repository.DirectMessageRepository;
 import com.codeit.mople.domain.directmessage.service.DirectMessageService;
 import com.codeit.mople.domain.notification.entity.Notification;
 import com.codeit.mople.domain.notification.entity.NotificationType;
@@ -35,6 +36,7 @@ import com.codeit.mople.global.event.ForceLogoutReason;
 import com.codeit.mople.global.event.UserForceLogoutEvent;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -60,7 +62,9 @@ class NotificationEventListenerIntegrationTest {
     @Autowired private PlaylistContentRepository playlistContentRepository;
     @Autowired private ContentRepository contentRepository;
     @Autowired private DirectMessageService directMessageService;
+    @Autowired private DirectMessageRepository directMessageRepository;
     @Autowired private ConversationRepository conversationRepository;
+    @Autowired private JdbcTemplate jdbcTemplate;
     @Autowired private ReviewService reviewService;
     @Autowired private ReviewRepository reviewRepository;
     @Autowired private NotificationRepository notificationRepository;
@@ -85,6 +89,8 @@ class NotificationEventListenerIntegrationTest {
     @AfterEach
     void tearDown() {
         notificationRepository.deleteAll();
+        jdbcTemplate.execute("UPDATE conversations SET last_message_id = NULL");
+        directMessageRepository.deleteAll();
         conversationRepository.deleteAll();
         followRepository.deleteAll();
         playlistSubscriptionRepository.deleteAll();
@@ -172,6 +178,7 @@ class NotificationEventListenerIntegrationTest {
         Content content = contentRepository.save(new Content(ContentType.MOVIE, "테스트 영화", null, null, null));
         playlistService.subscribe(playlist.getId(), subscriberA.getId());
         playlistService.subscribe(playlist.getId(), subscriberB.getId());
+        await().atMost(3, SECONDS).until(() -> notificationRepository.count() >= 2);
         notificationRepository.deleteAll(); // 구독 알림 제거
 
         // when
@@ -244,6 +251,7 @@ class NotificationEventListenerIntegrationTest {
         User followerB = userRepository.save(User.createUser("fB@test.com", "encoded", "팔로워B"));
         followService.follow(new FollowRequest(creator.getId()), followerA.getId());
         followService.follow(new FollowRequest(creator.getId()), followerB.getId());
+        await().atMost(3, SECONDS).until(() -> notificationRepository.count() >= 2);
         notificationRepository.deleteAll(); // 팔로우 알림 제거
 
         // when
@@ -272,6 +280,7 @@ class NotificationEventListenerIntegrationTest {
         User author = userRepository.findById(targetUserId).orElseThrow();
         User follower = userRepository.save(User.createUser("follower@test.com", "encoded", "팔로워유저"));
         followService.follow(new FollowRequest(author.getId()), follower.getId());
+        await().atMost(3, SECONDS).until(() -> notificationRepository.count() >= 1);
         notificationRepository.deleteAll(); // 팔로우 알림 제거
         Content content = contentRepository.save(new Content(ContentType.MOVIE, "테스트 영화", null, null, null));
 

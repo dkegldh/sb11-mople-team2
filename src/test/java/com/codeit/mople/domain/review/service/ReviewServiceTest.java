@@ -23,6 +23,8 @@ import com.codeit.mople.domain.review.exception.ReviewErrorCode;
 import com.codeit.mople.domain.review.exception.ReviewException;
 import com.codeit.mople.domain.review.repository.ReviewRepository;
 import com.codeit.mople.domain.user.entity.User;
+import com.codeit.mople.domain.follow.event.FolloweeActivityEvent;
+import com.codeit.mople.domain.follow.service.FollowService;
 import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.global.dto.UserSummary;
 import com.codeit.mople.global.error.CustomException;
@@ -37,6 +39,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -50,6 +53,12 @@ public class ReviewServiceTest {
 
   @Mock
   private ContentRepository contentRepository;
+
+  @Mock
+  private FollowService followService;
+
+  @Mock
+  private ApplicationEventPublisher publisher;
 
   @InjectMocks
   private ReviewService reviewService;
@@ -125,6 +134,10 @@ public class ReviewServiceTest {
       given(reviewRepository.save(any(Review.class)))
           .willReturn(review);
 
+      UUID followerId = UUID.randomUUID();
+      given(followService.getFollowerIds(authorId))
+          .willReturn(List.of(followerId));
+
       given(reviewRepository.countByContentId(contentId))
           .willReturn(1L);
 
@@ -144,6 +157,7 @@ public class ReviewServiceTest {
       verify(reviewRepository).findAverageRatingByContentId(contentId);
 
       verify(content).updateRatingStats(createRequest.rating(), 1);
+      verify(publisher).publishEvent(any(FolloweeActivityEvent.class));
     }
 
     @Test

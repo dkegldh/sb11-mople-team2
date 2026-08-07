@@ -30,9 +30,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import com.codeit.mople.domain.directmessage.event.DirectMessageReceivedEvent;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 public class DirectMessageServiceTest {
@@ -45,6 +47,9 @@ public class DirectMessageServiceTest {
 
   @Mock
   private ConversationRepository conversationRepository;
+
+  @Mock
+  private ApplicationEventPublisher publisher;
 
   private UUID userAId;
   private UUID userBId;
@@ -85,6 +90,8 @@ public class DirectMessageServiceTest {
       Instant messageCreatedAt = Instant.now();
 
       given(userA.getId()).willReturn(userAId);
+      given(userA.getName()).willReturn("userA");
+      given(userB.getId()).willReturn(userBId);
       given(conversation.getUserA()).willReturn(userA);
       given(conversation.getPartnerOf(userAId)).willReturn(userB);
 
@@ -111,6 +118,7 @@ public class DirectMessageServiceTest {
       // 가장 최근(마지막) 메시지 및 발신자 워터마크 갱신 메서드가 호출되었는지 검증
       verify(conversation).updateLastMessage(mockSavedMessage);
       verify(conversation).updateLastReadAt(userAId, messageCreatedAt);
+      verify(publisher).publishEvent(any(DirectMessageReceivedEvent.class));
     }
 
     @Test
