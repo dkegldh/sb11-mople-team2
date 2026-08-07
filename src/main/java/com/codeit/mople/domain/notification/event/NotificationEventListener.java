@@ -2,6 +2,7 @@ package com.codeit.mople.domain.notification.event;
 
 import com.codeit.mople.domain.directmessage.event.DirectMessageReceivedEvent;
 import com.codeit.mople.domain.follow.event.FollowCreatedEvent;
+import com.codeit.mople.domain.follow.event.FolloweeActivityEvent;
 import com.codeit.mople.domain.notification.entity.NotificationType;
 import com.codeit.mople.domain.notification.service.NotificationService;
 import com.codeit.mople.domain.playlist.event.PlaylistContentAddedEvent;
@@ -64,7 +65,7 @@ public class NotificationEventListener {
         notificationService.createNotification(
             event.ownerId(),
             "플레이리스트에 새 구독자가 생겼습니다.",
-            event.subscriberName() + "님이 구독했습니다.",
+            event.subscriberName() + "님이 " + event.playlistTitle() + "을(를) 구독했습니다.",
             NotificationType.PLAYLIST_SUBSCRIBE
         );
     }
@@ -90,6 +91,18 @@ public class NotificationEventListener {
             "새로운 팔로워가 생겼습니다.",
             event.followerName() + "님이 팔로우했습니다.",
             NotificationType.NEW_FOLLOWER
+        );
+    }
+
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void handleFolloweeActivity(FolloweeActivityEvent event) {
+        log.debug("팔로위 활동 알림 처리 시작 - followerId: {}", event.followerId());
+        notificationService.createNotification(
+            event.followerId(),
+            event.followeeName() + "님의 새로운 활동이 있습니다.",
+            event.activityDescription(),
+            NotificationType.FOLLOWEE_ACTIVITY
         );
     }
 }
