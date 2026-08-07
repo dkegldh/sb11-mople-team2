@@ -6,6 +6,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 import com.codeit.mople.domain.auth.security.CustomUserDetails;
+import com.codeit.mople.domain.follow.dto.FollowRequest;
+import com.codeit.mople.domain.follow.repository.FollowRepository;
+import com.codeit.mople.domain.follow.service.FollowService;
 import com.codeit.mople.domain.notification.entity.Notification;
 import com.codeit.mople.domain.notification.entity.NotificationType;
 import com.codeit.mople.domain.notification.repository.NotificationRepository;
@@ -34,6 +37,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 class NotificationEventListenerIntegrationTest {
 
     @Autowired private AdminService adminService;
+    @Autowired private FollowService followService;
+    @Autowired private FollowRepository followRepository;
     @Autowired private NotificationRepository notificationRepository;
     @Autowired private UserRepository userRepository;
     @Autowired private ApplicationEventPublisher eventPublisher;
@@ -56,6 +61,7 @@ class NotificationEventListenerIntegrationTest {
     @AfterEach
     void tearDown() {
         notificationRepository.deleteAll();
+        followRepository.deleteAll();
         userRepository.deleteAll();
         SecurityContextHolder.clearContext();
     }
@@ -100,6 +106,27 @@ class NotificationEventListenerIntegrationTest {
         });
 
         assertThat(userRepository.findById(targetUserId).orElseThrow().getSessionVersion()).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("팔로우 트랜잭션 커밋 후 NEW_FOLLOWER 알림이 followee에게 저장된다")
+    void 팔로우_트랜잭션_커밋_후_NEW_FOLLOWER_알림이_followee에게_저장된다() {
+        // given
+        User follower = userRepository.save(User.createUser("follower@test.com", "encoded", "팔로워유저"));
+
+        // when
+        followService.follow(new FollowRequest(targetUserId), follower.getId());
+
+        // then
+        await().atMost(3, SECONDS).untilAsserted(() -> {
+            List<Notification> notifications = notificationRepository.findAll();
+            assertThat(notifications).hasSize(1);
+            Notification notification = notifications.get(0);
+            assertThat(notification.getNotificationType()).isEqualTo(NotificationType.NEW_FOLLOWER);
+            assertThat(notification.getReceiver().getId()).isEqualTo(targetUserId);
+            assertThat(notification.getTitle()).isEqualTo("새로운 팔로워가 생겼습니다.");
+            assertThat(notification.getContent()).isEqualTo("팔로워유저님이 팔로우했습니다.");
+        });
     }
 
     @Test
