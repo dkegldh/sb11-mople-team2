@@ -1,5 +1,6 @@
 package com.codeit.mople.domain.notification.event;
 
+import com.codeit.mople.domain.follow.event.FollowCreatedEvent;
 import com.codeit.mople.domain.notification.entity.NotificationType;
 import com.codeit.mople.domain.notification.service.NotificationService;
 import com.codeit.mople.global.event.UserForceLogoutEvent;
@@ -39,5 +40,17 @@ public class NotificationEventListener {
         };
 
         notificationService.createNotification(event.userId(), title, content, type);
+    }
+
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void handleFollowCreated(FollowCreatedEvent event) {
+        log.debug("신규 팔로워 알림 처리 시작 - followeeId: {}", event.followeeId());
+        notificationService.createNotification(
+            event.followeeId(),
+            "새로운 팔로워가 생겼습니다.",
+            event.followerName() + "님이 팔로우했습니다.",
+            NotificationType.NEW_FOLLOWER
+        );
     }
 }
