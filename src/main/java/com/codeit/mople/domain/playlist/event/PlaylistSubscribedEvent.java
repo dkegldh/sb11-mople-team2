@@ -6,7 +6,8 @@ public record PlaylistSubscribedEvent(
     UUID ownerId,
     UUID playlistId,
     UUID subscriberId,
-    String subscriberName
+    String subscriberName,
+    String playlistTitle
 ) {
 
 }
