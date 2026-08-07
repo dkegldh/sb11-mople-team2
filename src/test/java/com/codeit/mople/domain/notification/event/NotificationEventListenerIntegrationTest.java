@@ -9,6 +9,9 @@ import com.codeit.mople.domain.auth.security.CustomUserDetails;
 import com.codeit.mople.domain.follow.dto.FollowRequest;
 import com.codeit.mople.domain.follow.repository.FollowRepository;
 import com.codeit.mople.domain.follow.service.FollowService;
+import com.codeit.mople.domain.playlist.entity.Playlist;
+import com.codeit.mople.domain.playlist.repository.PlaylistRepository;
+import com.codeit.mople.domain.playlist.service.PlaylistService;
 import com.codeit.mople.domain.notification.entity.Notification;
 import com.codeit.mople.domain.notification.entity.NotificationType;
 import com.codeit.mople.domain.notification.repository.NotificationRepository;
@@ -39,6 +42,8 @@ class NotificationEventListenerIntegrationTest {
     @Autowired private AdminService adminService;
     @Autowired private FollowService followService;
     @Autowired private FollowRepository followRepository;
+    @Autowired private PlaylistService playlistService;
+    @Autowired private PlaylistRepository playlistRepository;
     @Autowired private NotificationRepository notificationRepository;
     @Autowired private UserRepository userRepository;
     @Autowired private ApplicationEventPublisher eventPublisher;
@@ -62,6 +67,7 @@ class NotificationEventListenerIntegrationTest {
     void tearDown() {
         notificationRepository.deleteAll();
         followRepository.deleteAll();
+        playlistRepository.deleteAll();
         userRepository.deleteAll();
         SecurityContextHolder.clearContext();
     }
@@ -106,6 +112,29 @@ class NotificationEventListenerIntegrationTest {
         });
 
         assertThat(userRepository.findById(targetUserId).orElseThrow().getSessionVersion()).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("플레이리스트 구독 트랜잭션 커밋 후 PLAYLIST_SUBSCRIBE 알림이 owner에게 저장된다")
+    void 플레이리스트_구독_트랜잭션_커밋_후_PLAYLIST_SUBSCRIBE_알림이_owner에게_저장된다() {
+        // given
+        User owner = userRepository.findById(targetUserId).orElseThrow();
+        User subscriber = userRepository.save(User.createUser("subscriber@test.com", "encoded", "구독자유저"));
+        Playlist playlist = playlistRepository.save(Playlist.create(owner, "테스트 플레이리스트", "설명"));
+
+        // when
+        playlistService.subscribe(playlist.getId(), subscriber.getId());
+
+        // then
+        await().atMost(3, SECONDS).untilAsserted(() -> {
+            List<Notification> notifications = notificationRepository.findAll();
+            assertThat(notifications).hasSize(1);
+            Notification notification = notifications.get(0);
+            assertThat(notification.getNotificationType()).isEqualTo(NotificationType.PLAYLIST_SUBSCRIBE);
+            assertThat(notification.getReceiver().getId()).isEqualTo(targetUserId);
+            assertThat(notification.getTitle()).isEqualTo("플레이리스트에 새 구독자가 생겼습니다.");
+            assertThat(notification.getContent()).isEqualTo("구독자유저님이 구독했습니다.");
+        });
     }
 
     @Test
