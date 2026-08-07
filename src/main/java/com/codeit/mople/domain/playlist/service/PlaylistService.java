@@ -369,7 +369,10 @@ public class PlaylistService {
     log.info("플레이리스트에 콘텐츠 추가 성공: playlistContentId={}, playlistId={}, contentId={}, ownerId={}",
         playlistContent.getId(), playlistId, contentId, ownerId);
 
-    publisher.publishEvent(new PlaylistContentAddedEvent(playlistId, contentId));
+    playlistSubscriptionRepository.findSubscriberIdsByPlaylistId(playlistId)
+        .forEach(subscriberId ->
+            publisher.publishEvent(new PlaylistContentAddedEvent(playlistId, contentId, subscriberId)));
+
   }
 
   @Transactional
