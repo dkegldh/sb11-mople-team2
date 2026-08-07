@@ -1,5 +1,6 @@
 package com.codeit.mople.domain.notification.event;
 
+import com.codeit.mople.domain.directmessage.event.DirectMessageReceivedEvent;
 import com.codeit.mople.domain.follow.event.FollowCreatedEvent;
 import com.codeit.mople.domain.notification.entity.NotificationType;
 import com.codeit.mople.domain.notification.service.NotificationService;
@@ -65,6 +66,18 @@ public class NotificationEventListener {
             "플레이리스트에 새 구독자가 생겼습니다.",
             event.subscriberName() + "님이 구독했습니다.",
             NotificationType.PLAYLIST_SUBSCRIBE
+        );
+    }
+
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void handleDirectMessageReceived(DirectMessageReceivedEvent event) {
+        log.debug("DM 수신 알림 처리 시작 - receiverId: {}", event.receiverId());
+        notificationService.createNotification(
+            event.receiverId(),
+            "새로운 메시지가 도착했습니다.",
+            event.senderName() + ": " + event.messageContent(),
+            NotificationType.DIRECT_MESSAGE
         );
     }
 
