@@ -2,7 +2,7 @@ package com.codeit.mople.domain.review.service;
 
 import com.codeit.mople.domain.content.entity.Content;
 import com.codeit.mople.domain.follow.event.FolloweeActivityEvent;
-import com.codeit.mople.domain.follow.repository.FollowRepository;
+import com.codeit.mople.domain.follow.service.FollowService;
 import com.codeit.mople.domain.content.exception.ContentErrorCode;
 import com.codeit.mople.domain.content.exception.ContentException;
 import com.codeit.mople.domain.content.repository.ContentRepository;
@@ -37,7 +37,7 @@ public class ReviewService {
   private final ReviewRepository reviewRepository;
   private final UserRepository userRepository;
   private final ContentRepository contentRepository;
-  private final FollowRepository followRepository;
+  private final FollowService followService;
   private final ApplicationEventPublisher publisher;
 
   @Transactional
@@ -58,7 +58,7 @@ public class ReviewService {
 
     Review savedReview = reviewRepository.save(review);
 
-    followRepository.findFollowerIdsByFolloweeId(authorId)
+    followService.getFollowerIds(authorId)
         .forEach(followerId -> publisher.publishEvent(
             new FolloweeActivityEvent(authorId, author.getName(), "리뷰를 작성했습니다.", followerId)));
 
