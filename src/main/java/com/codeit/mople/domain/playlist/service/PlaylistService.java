@@ -12,6 +12,8 @@ import com.codeit.mople.domain.playlist.dto.response.PlaylistResponse;
 import com.codeit.mople.domain.playlist.entity.Playlist;
 import com.codeit.mople.domain.playlist.entity.PlaylistContent;
 import com.codeit.mople.domain.playlist.entity.PlaylistSubscription;
+import com.codeit.mople.domain.follow.event.FolloweeActivityEvent;
+import com.codeit.mople.domain.follow.repository.FollowRepository;
 import com.codeit.mople.domain.playlist.event.PlaylistContentAddedEvent;
 import com.codeit.mople.domain.playlist.event.PlaylistSubscribedEvent;
 import com.codeit.mople.domain.playlist.exception.PlaylistErrorCode;
@@ -46,7 +48,7 @@ public class PlaylistService {
   private final PlaylistContentRepository playlistContentRepository;
   private final ContentRepository contentRepository;
   private final PlaylistSubscriptionRepository playlistSubscriptionRepository;
-
+  private final FollowRepository followRepository;
   private final ApplicationEventPublisher publisher;
 
   @Transactional
@@ -72,6 +74,10 @@ public class PlaylistService {
 
     log.info("플레이리스트 생성 완료: playlistId={}, ownerId={}",
         savedPlaylist.getId(), owner.getId());
+
+    followRepository.findFollowerIdsByFolloweeId(ownerId)
+        .forEach(followerId -> publisher.publishEvent(
+            new FolloweeActivityEvent(ownerId, owner.getName(), "새 플레이리스트를 만들었습니다.", followerId)));
 
     return response;
   }
@@ -316,7 +322,7 @@ public class PlaylistService {
     log.info("플레이리스트 구독 성공: playlistSubscriptionId={}, playlistId={}, subscriberId={}",
         saved.getId(), playlistId, subscriberId);
 
-    publisher.publishEvent(new PlaylistSubscribedEvent(ownerId, playlistId, subscriberId, subscriber.getName()));
+    publisher.publishEvent(new PlaylistSubscribedEvent(ownerId, playlistId, subscriberId, subscriber.getName(), playlist.getTitle()));
   }
 
   @Transactional
