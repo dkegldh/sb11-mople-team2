@@ -316,7 +316,7 @@ public class PlaylistService {
     log.info("플레이리스트 구독 성공: playlistSubscriptionId={}, playlistId={}, subscriberId={}",
         saved.getId(), playlistId, subscriberId);
 
-    publisher.publishEvent(new PlaylistSubscribedEvent(ownerId, playlistId, subscriberId));
+    publisher.publishEvent(new PlaylistSubscribedEvent(ownerId, playlistId, subscriberId, subscriber.getName()));
   }
 
   @Transactional

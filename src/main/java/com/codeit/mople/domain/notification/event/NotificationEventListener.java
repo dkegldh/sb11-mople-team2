@@ -3,6 +3,7 @@ package com.codeit.mople.domain.notification.event;
 import com.codeit.mople.domain.follow.event.FollowCreatedEvent;
 import com.codeit.mople.domain.notification.entity.NotificationType;
 import com.codeit.mople.domain.notification.service.NotificationService;
+import com.codeit.mople.domain.playlist.event.PlaylistSubscribedEvent;
 import com.codeit.mople.global.event.UserForceLogoutEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,6 +41,18 @@ public class NotificationEventListener {
         };
 
         notificationService.createNotification(event.userId(), title, content, type);
+    }
+
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void handlePlaylistSubscribed(PlaylistSubscribedEvent event) {
+        log.debug("플레이리스트 구독 알림 처리 시작 - ownerId: {}", event.ownerId());
+        notificationService.createNotification(
+            event.ownerId(),
+            "플레이리스트에 새 구독자가 생겼습니다.",
+            event.subscriberName() + "님이 구독했습니다.",
+            NotificationType.PLAYLIST_SUBSCRIBE
+        );
     }
 
     @Async
