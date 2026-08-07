@@ -9,6 +9,10 @@ import com.codeit.mople.domain.auth.security.CustomUserDetails;
 import com.codeit.mople.domain.follow.dto.FollowRequest;
 import com.codeit.mople.domain.follow.repository.FollowRepository;
 import com.codeit.mople.domain.follow.service.FollowService;
+import com.codeit.mople.domain.playlist.dto.request.PlaylistCreateRequest;
+import com.codeit.mople.domain.review.dto.request.ReviewCreateRequest;
+import com.codeit.mople.domain.review.repository.ReviewRepository;
+import com.codeit.mople.domain.review.service.ReviewService;
 import com.codeit.mople.domain.conversation.entity.Conversation;
 import com.codeit.mople.domain.conversation.repository.ConversationRepository;
 import com.codeit.mople.domain.content.entity.Content;
@@ -57,6 +61,8 @@ class NotificationEventListenerIntegrationTest {
     @Autowired private ContentRepository contentRepository;
     @Autowired private DirectMessageService directMessageService;
     @Autowired private ConversationRepository conversationRepository;
+    @Autowired private ReviewService reviewService;
+    @Autowired private ReviewRepository reviewRepository;
     @Autowired private NotificationRepository notificationRepository;
     @Autowired private UserRepository userRepository;
     @Autowired private ApplicationEventPublisher eventPublisher;
@@ -84,6 +90,7 @@ class NotificationEventListenerIntegrationTest {
         playlistSubscriptionRepository.deleteAll();
         playlistContentRepository.deleteAll();
         playlistRepository.deleteAll();
+        reviewRepository.deleteAll();
         contentRepository.deleteAll();
         userRepository.deleteAll();
         SecurityContextHolder.clearContext();
@@ -201,7 +208,7 @@ class NotificationEventListenerIntegrationTest {
             assertThat(notification.getNotificationType()).isEqualTo(NotificationType.PLAYLIST_SUBSCRIBE);
             assertThat(notification.getReceiver().getId()).isEqualTo(targetUserId);
             assertThat(notification.getTitle()).isEqualTo("플레이리스트에 새 구독자가 생겼습니다.");
-            assertThat(notification.getContent()).isEqualTo("구독자유저님이 구독했습니다.");
+            assertThat(notification.getContent()).isEqualTo("구독자유저님이 테스트 플레이리스트을(를) 구독했습니다.");
         });
     }
 
@@ -223,6 +230,61 @@ class NotificationEventListenerIntegrationTest {
             assertThat(notification.getReceiver().getId()).isEqualTo(targetUserId);
             assertThat(notification.getTitle()).isEqualTo("새로운 팔로워가 생겼습니다.");
             assertThat(notification.getContent()).isEqualTo("팔로워유저님이 팔로우했습니다.");
+        });
+    }
+
+    @Test
+    @DisplayName("플레이리스트 생성 트랜잭션 커밋 후 FOLLOWEE_ACTIVITY 알림이 팔로워 전원에게 저장된다")
+    void 플레이리스트_생성_트랜잭션_커밋_후_FOLLOWEE_ACTIVITY_알림이_팔로워_전원에게_저장된다() {
+        // given
+        User creator = userRepository.findById(targetUserId).orElseThrow();
+        User followerA = userRepository.save(User.createUser("fA@test.com", "encoded", "팔로워A"));
+        User followerB = userRepository.save(User.createUser("fB@test.com", "encoded", "팔로워B"));
+        followService.follow(new FollowRequest(creator.getId()), followerA.getId());
+        followService.follow(new FollowRequest(creator.getId()), followerB.getId());
+        notificationRepository.deleteAll(); // 팔로우 알림 제거
+
+        // when
+        playlistService.create(new PlaylistCreateRequest("새 플레이리스트", "설명"), creator.getId());
+
+        // then
+        await().atMost(3, SECONDS).untilAsserted(() -> {
+            List<Notification> notifications = notificationRepository.findAll();
+            assertThat(notifications).hasSize(2);
+            assertThat(notifications)
+                .extracting(n -> n.getReceiver().getId())
+                .containsExactlyInAnyOrder(followerA.getId(), followerB.getId());
+            assertThat(notifications)
+                .allMatch(n -> n.getNotificationType() == NotificationType.FOLLOWEE_ACTIVITY);
+            assertThat(notifications)
+                .allMatch(n -> n.getTitle().equals("대상유저님의 새로운 활동이 있습니다."));
+            assertThat(notifications)
+                .allMatch(n -> n.getContent().equals("새 플레이리스트를 만들었습니다."));
+        });
+    }
+
+    @Test
+    @DisplayName("리뷰 작성 트랜잭션 커밋 후 FOLLOWEE_ACTIVITY 알림이 팔로워 전원에게 저장된다")
+    void 리뷰_작성_트랜잭션_커밋_후_FOLLOWEE_ACTIVITY_알림이_팔로워_전원에게_저장된다() {
+        // given
+        User author = userRepository.findById(targetUserId).orElseThrow();
+        User follower = userRepository.save(User.createUser("follower@test.com", "encoded", "팔로워유저"));
+        followService.follow(new FollowRequest(author.getId()), follower.getId());
+        notificationRepository.deleteAll(); // 팔로우 알림 제거
+        Content content = contentRepository.save(new Content(ContentType.MOVIE, "테스트 영화", null, null, null));
+
+        // when
+        reviewService.create(author.getId(), new ReviewCreateRequest(content.getId(), "좋은 영화입니다.", 4.5));
+
+        // then
+        await().atMost(3, SECONDS).untilAsserted(() -> {
+            List<Notification> notifications = notificationRepository.findAll();
+            assertThat(notifications).hasSize(1);
+            Notification notification = notifications.get(0);
+            assertThat(notification.getNotificationType()).isEqualTo(NotificationType.FOLLOWEE_ACTIVITY);
+            assertThat(notification.getReceiver().getId()).isEqualTo(follower.getId());
+            assertThat(notification.getTitle()).isEqualTo("대상유저님의 새로운 활동이 있습니다.");
+            assertThat(notification.getContent()).isEqualTo("리뷰를 작성했습니다.");
         });
     }
 
