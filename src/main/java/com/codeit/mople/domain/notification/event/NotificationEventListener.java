@@ -3,6 +3,7 @@ package com.codeit.mople.domain.notification.event;
 import com.codeit.mople.domain.follow.event.FollowCreatedEvent;
 import com.codeit.mople.domain.notification.entity.NotificationType;
 import com.codeit.mople.domain.notification.service.NotificationService;
+import com.codeit.mople.domain.playlist.event.PlaylistContentAddedEvent;
 import com.codeit.mople.domain.playlist.event.PlaylistSubscribedEvent;
 import com.codeit.mople.global.event.UserForceLogoutEvent;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +42,18 @@ public class NotificationEventListener {
         };
 
         notificationService.createNotification(event.userId(), title, content, type);
+    }
+
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void handlePlaylistContentAdded(PlaylistContentAddedEvent event) {
+        log.debug("플레이리스트 콘텐츠 추가 알림 처리 시작 - subscriberId: {}", event.subscriberId());
+        notificationService.createNotification(
+            event.subscriberId(),
+            "구독한 플레이리스트에 새 콘텐츠가 추가되었습니다.",
+            null,
+            NotificationType.PLAYLIST_CONTENT_ADDED
+        );
     }
 
     @Async
