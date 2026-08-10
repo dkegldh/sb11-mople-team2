@@ -89,7 +89,7 @@ class NotificationControllerTest {
                 notifId, createdAt, principal.getUserId(), "팔로우 알림", "홍길동님이 팔로우했습니다.", NotificationLevel.INFO);
 
             CursorResponseNotificationDto response = new CursorResponseNotificationDto(
-                List.of(notifResponse), null, null, false, 1, "createdAt", "DESCENDING");
+                List.of(notifResponse), null, null, false, 1L, "createdAt", "DESCENDING");
 
             given(notificationService.getNotifications(any(), any())).willReturn(response);
 
@@ -119,7 +119,7 @@ class NotificationControllerTest {
         void success_200_with_empty_list() throws Exception {
             // given
             CursorResponseNotificationDto response = new CursorResponseNotificationDto(
-                List.of(), null, null, false, 0, "createdAt", "DESCENDING");
+                List.of(), null, null, false, 0L, "createdAt", "DESCENDING");
 
             given(notificationService.getNotifications(any(), any())).willReturn(response);
 
@@ -144,7 +144,7 @@ class NotificationControllerTest {
             String nextCursor = "2025-08-01T09:00:00Z";
             UUID nextIdAfter = UUID.randomUUID();
             CursorResponseNotificationDto response = new CursorResponseNotificationDto(
-                List.of(), nextCursor, nextIdAfter, true, 20, "createdAt", "DESCENDING");
+                List.of(), nextCursor, nextIdAfter, true, 20L, "createdAt", "DESCENDING");
 
             given(notificationService.getNotifications(any(), any())).willReturn(response);
 
@@ -224,7 +224,7 @@ class NotificationControllerTest {
         @DisplayName("성공: limit이 1(최솟값)이면 200을 반환한다.")
         void success_200_when_limit_is_min() throws Exception {
             given(notificationService.getNotifications(any(), any())).willReturn(
-                new CursorResponseNotificationDto(List.of(), null, null, false, 0, "createdAt", "DESCENDING"));
+                new CursorResponseNotificationDto(List.of(), null, null, false, 0L, "createdAt", "DESCENDING"));
 
             mockMvc.perform(get("/api/notifications")
                     .param("limit", "1")
@@ -238,7 +238,7 @@ class NotificationControllerTest {
         @DisplayName("성공: limit이 100(최댓값)이면 200을 반환한다.")
         void success_200_when_limit_is_max() throws Exception {
             given(notificationService.getNotifications(any(), any())).willReturn(
-                new CursorResponseNotificationDto(List.of(), null, null, false, 0, "createdAt", "DESCENDING"));
+                new CursorResponseNotificationDto(List.of(), null, null, false, 0L, "createdAt", "DESCENDING"));
 
             mockMvc.perform(get("/api/notifications")
                     .param("limit", "100")
@@ -254,7 +254,7 @@ class NotificationControllerTest {
             String cursor = "2025-08-01T10:00:00Z";
             UUID idAfter = UUID.randomUUID();
             given(notificationService.getNotifications(any(), any())).willReturn(
-                new CursorResponseNotificationDto(List.of(), null, null, false, 0, "createdAt", "DESCENDING"));
+                new CursorResponseNotificationDto(List.of(), null, null, false, 0L, "createdAt", "DESCENDING"));
 
             mockMvc.perform(get("/api/notifications")
                     .param("limit", "20")

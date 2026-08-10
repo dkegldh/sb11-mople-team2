@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 
 import com.codeit.mople.domain.notification.dto.request.NotificationCursorRequest;
 import com.codeit.mople.domain.notification.exception.NotificationErrorCode;
@@ -194,6 +195,27 @@ class NotificationServiceTest {
             // then - cursor 문자열이 정확한 Instant 값으로 변환되어 Repository에 전달됨
             assertThat(result.data()).isEmpty();
             assertThat(result.hasNext()).isFalse();
+        }
+
+        @Test
+        @DisplayName("성공: cursor가 있으면(두 번째 페이지 이후) count 쿼리를 실행하지 않고 totalCount는 null이다.")
+        void success_totalCount_is_null_and_count_query_skipped_when_cursor_present() {
+            // given
+            String cursorStr = "2025-08-01T10:00:00Z";
+            UUID idAfter = UUID.randomUUID();
+            NotificationCursorRequest request = new NotificationCursorRequest(
+                cursorStr, idAfter, 20);
+
+            given(notificationRepository.findNotificationByCursor(
+                eq(receiverId), eq(Instant.parse(cursorStr)), eq(idAfter), eq(20)))
+                .willReturn(List.of());
+
+            // when
+            CursorResponseNotificationDto result = notificationService.getNotifications(receiverId, request);
+
+            // then - count 쿼리를 아예 호출하지 않고, totalCount는 null
+            assertThat(result.totalCount()).isNull();
+            then(notificationRepository).should(never()).countByReceiver_Id(any());
         }
 
         @Test
