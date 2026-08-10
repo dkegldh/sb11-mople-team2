@@ -55,8 +55,8 @@ public class NotificationService {
             nextIdAfter = lastItem.getId();
         }
 
-        // 알림은 삭제가 곧 읽음 처리이므로, 남아있는 개수가 곧 안 읽은 개수임 (API 응답 필드명은 totalCount로 유지)
-        long unreadCount = notificationRepository.countByReceiver_Id(receiverId);
+        // count 쿼리는 비용이 크므로 첫 페이지(cursor 없음)에서만 계산하고, 이후 페이지는 이전 값을 그대로 씀
+        Long unreadCount = cursorTime == null ? notificationRepository.countByReceiver_Id(receiverId) : null;
         log.info("알림 목록 조회 완료 - receiverId: {}", receiverId);
 
         return new CursorResponseNotificationDto(
