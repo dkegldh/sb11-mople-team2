@@ -5,7 +5,6 @@ import com.codeit.mople.global.error.CommonErrorCode;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
@@ -17,23 +16,10 @@ public record NotificationCursorRequest(
     @NotNull(message = "limit는 필수입니다.")
     @Min(value = 1, message = "페이지 크기는 최소 1 이상이어야 합니다.")
     @Max(value = 100, message = "페이지 크기는 최대 100을 초과할 수 없습니다.")
-    Integer limit,
-
-    @Pattern(regexp = "^(DESCENDING)$", message = "정렬 방향은 'DESCENDING'만 가능합니다.")
-    String sortDirection,
-
-    @Pattern(regexp = "^(createdAt)$", message = "정렬 기준은 'createdAt'만 가능합니다.")
-    String sortBy
+    Integer limit
 ) {
 
     public NotificationCursorRequest {
-        if (sortDirection == null || sortDirection.isBlank()) {
-            sortDirection = "DESCENDING";
-        }
-        if (sortBy == null || sortBy.isBlank()) {
-            sortBy = "createdAt";
-        }
-
         boolean hasCursor = cursor != null && !cursor.isBlank();
         boolean hasIdAfter = idAfter != null;
 
