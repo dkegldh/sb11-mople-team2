@@ -64,8 +64,8 @@ public class NotificationService {
             nextIdAfter,
             hasNext,
             totalCount,
-            request.sortBy(),
-            request.sortDirection()
+            "createdAt",
+            "DESCENDING"
         );
     }
 
