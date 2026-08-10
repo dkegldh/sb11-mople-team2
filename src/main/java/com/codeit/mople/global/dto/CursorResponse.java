@@ -16,6 +16,7 @@ public record CursorResponse<T>(
   public static <T> CursorResponse<T> of(
       List<T> fetched,
       int limit,
+      long totalCount,
       String sortBy,
       String sortDirection,
       Function<T, String> cursorExtractor,
@@ -33,6 +34,6 @@ public record CursorResponse<T>(
       nextIdAfter = idExtractor.apply(last);
     }
 
-    return new CursorResponse<>(data, nextCursor, nextIdAfter, hasNext, data.size(), sortBy, sortDirection);
+    return new CursorResponse<>(data, nextCursor, nextIdAfter, hasNext, totalCount, sortBy, sortDirection);
   }
 }

@@ -86,7 +86,7 @@ public class ReviewIntegrationTest {
     userDetails = new CustomUserDetails(savedAuthor.getId(), Role.USER);
 
     savedContent = contentRepository.save(new Content(
-            ContentType.DRAMA,
+            ContentType.TV_SERIES,
             "test",
             "test 콘텐츠",
             "test/image.png",
@@ -206,7 +206,7 @@ public class ReviewIntegrationTest {
       mockMvc.perform(get("/api/reviews")
               .param("limit", "10")
               .param("sortDirection", "ASCENDING")
-              .param("sortBy", "RATING")
+              .param("sortBy", "rating")
               .with(user(userDetails))
           )
           .andExpect(status().isOk())
@@ -219,7 +219,7 @@ public class ReviewIntegrationTest {
           .andExpect(jsonPath("$.data[0].rating").value(reviewRating))
           .andExpect(jsonPath("$.hasNext").value(false))
           .andExpect(jsonPath("$.totalCount").value(1L))
-          .andExpect(jsonPath("$.sortBy").value("RATING"))
+          .andExpect(jsonPath("$.sortBy").value("rating"))
           .andExpect(jsonPath("$.sortDirection").value("ASCENDING"));
     }
 
@@ -234,7 +234,7 @@ public class ReviewIntegrationTest {
       mockMvc.perform(get("/api/reviews")
               .param("limit", "10")
               .param("sortDirection", "ASCENDING")
-              .param("sortBy", "RATING")
+              .param("sortBy", "rating")
           )
           .andExpect(status().isUnauthorized());
     }

@@ -13,13 +13,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.codeit.mople.domain.auth.security.CustomOAuth2UserService;
 import com.codeit.mople.domain.auth.security.CustomUserDetails;
+import com.codeit.mople.domain.auth.security.handler.OAuth2FailureHandler;
+import com.codeit.mople.domain.auth.security.handler.OAuth2SuccessHandler;
 import com.codeit.mople.domain.follow.dto.FollowRequest;
 import com.codeit.mople.domain.follow.dto.FollowResponse;
 import com.codeit.mople.domain.follow.exception.FollowErrorCode;
 import com.codeit.mople.domain.follow.exception.FollowException;
 import com.codeit.mople.domain.follow.service.FollowService;
 import com.codeit.mople.domain.user.entity.Role;
+import com.codeit.mople.domain.user.repository.UserRepository;
+import com.codeit.mople.global.config.SecurityConfig;
+import com.codeit.mople.global.jwt.JwtProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,11 +34,13 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(FollowController.class)
+@Import(SecurityConfig.class)
 class FollowControllerTest {
 
   @Autowired
@@ -43,6 +51,21 @@ class FollowControllerTest {
 
   @MockitoBean
   FollowService followService;
+
+  @MockitoBean
+  JwtProvider jwtProvider;
+
+  @MockitoBean
+  UserRepository userRepository;
+
+  @MockitoBean
+  CustomOAuth2UserService customOAuth2UserService;
+
+  @MockitoBean
+  OAuth2SuccessHandler oAuth2SuccessHandler;
+
+  @MockitoBean
+  OAuth2FailureHandler oAuth2FailureHandler;
 
   CustomUserDetails principal;
   UUID followeeId;

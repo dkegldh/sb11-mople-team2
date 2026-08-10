@@ -1,8 +1,11 @@
 package com.codeit.mople.global.config;
 
-import com.codeit.mople.domain.auth.security.JsonAccessDeniedHandler;
+import com.codeit.mople.domain.auth.security.CustomOAuth2UserService;
+import com.codeit.mople.domain.auth.security.handler.JsonAccessDeniedHandler;
 import com.codeit.mople.domain.auth.security.JsonAuthenticationEntryPoint;
 import com.codeit.mople.domain.auth.security.JwtAuthenticationFilter;
+import com.codeit.mople.domain.auth.security.handler.OAuth2FailureHandler;
+import com.codeit.mople.domain.auth.security.handler.OAuth2SuccessHandler;
 import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.global.jwt.JwtProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,7 +27,10 @@ public class SecurityConfig {
 
   @Bean
   public SecurityFilterChain filterChain(HttpSecurity http, JwtProvider jwtProvider,
-      UserRepository userRepository, ObjectMapper objectMapper) throws Exception {
+      UserRepository userRepository, ObjectMapper objectMapper,
+      CustomOAuth2UserService customOAuth2UserService,
+      OAuth2SuccessHandler oAuth2SuccessHandler,
+      OAuth2FailureHandler oAuth2FailureHandler) throws Exception {
     CsrfTokenRequestAttributeHandler csrfTokenRequestHandler = new CsrfTokenRequestAttributeHandler();
     csrfTokenRequestHandler.setCsrfRequestAttributeName(null);
 
@@ -44,12 +50,19 @@ public class SecurityConfig {
             .requestMatchers(HttpMethod.POST, "/api/users").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/auth/sign-out").authenticated()
             .requestMatchers("/api/auth/**").permitAll()
+            .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
             .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+            .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+            .requestMatchers("/actuator/metrics/**").hasRole("ADMIN")
             .requestMatchers(HttpMethod.GET, "/api/users").hasRole("ADMIN")
             .requestMatchers(HttpMethod.PATCH, "/api/users/*/role").hasRole("ADMIN")
             .requestMatchers(HttpMethod.PATCH, "/api/users/*/locked").hasRole("ADMIN")
             .anyRequest().authenticated()
         )
+        .oauth2Login(oauth2 -> oauth2
+            .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
+            .successHandler(oAuth2SuccessHandler)
+            .failureHandler(oAuth2FailureHandler))
         .addFilterBefore(
             new JwtAuthenticationFilter(jwtProvider, userRepository),
             UsernamePasswordAuthenticationFilter.class

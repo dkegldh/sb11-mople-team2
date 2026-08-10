@@ -50,7 +50,7 @@ public class ReviewRepositoryTest {
     user1 = User.createUser("user1@test.com", "12345678", "user1");
     user2 = User.createUser("user2@test.com", "12345678", "user2");
     content1 = new Content(
-        ContentType.DRAMA,
+        ContentType.TV_SERIES,
         "test",
         "test 콘텐츠",
         "test/image.png",

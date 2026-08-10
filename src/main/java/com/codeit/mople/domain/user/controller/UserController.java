@@ -46,7 +46,7 @@ public class UserController implements UserApi {
 
   @Override
   @GetMapping
-  public ResponseEntity<CursorResponse<UserDto>> getUsers(UserSearchRequest request) {
+  public ResponseEntity<CursorResponse<UserDto>> getUsers(@Valid UserSearchRequest request) {
     return ResponseEntity.ok(userService.getUsers(request));
   }
 

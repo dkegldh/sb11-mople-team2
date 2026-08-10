@@ -3,6 +3,7 @@ package com.codeit.mople.domain.playlist.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -25,6 +26,7 @@ import com.codeit.mople.domain.playlist.entity.PlaylistContent;
 import com.codeit.mople.domain.playlist.entity.PlaylistSubscription;
 import com.codeit.mople.domain.playlist.event.PlaylistContentAddedEvent;
 import com.codeit.mople.domain.playlist.event.PlaylistSubscribedEvent;
+import com.codeit.mople.domain.playlist.event.PlaylistUnsubscribedEvent;
 import com.codeit.mople.domain.playlist.exception.PlaylistErrorCode;
 import com.codeit.mople.domain.playlist.exception.PlaylistException;
 import com.codeit.mople.domain.playlist.repository.PlaylistContentRepository;
@@ -45,6 +47,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -69,7 +73,16 @@ public class PlaylistServiceTest {
   private PlaylistSubscriptionRepository playlistSubscriptionRepository;
 
   @Mock
-  private ApplicationEventPublisher publisher;
+  private ApplicationEventPublisher eventPublisher;
+
+  @Captor
+  private ArgumentCaptor<PlaylistSubscribedEvent> subscribedEventCaptor;
+
+  @Captor
+  private ArgumentCaptor<PlaylistUnsubscribedEvent> unsubscribedEventCaptor;
+
+  @Captor
+  private ArgumentCaptor<PlaylistContentAddedEvent> contentAddedEventCaptor;
 
   @InjectMocks
   private PlaylistService playlistService;
@@ -695,9 +708,6 @@ public class PlaylistServiceTest {
       given(playlistRepository.findById(playlistId))
           .willReturn(Optional.of(mockPlaylist));
 
-      given(mockPlaylist.getId())
-          .willReturn(playlistId);
-
       given(mockPlaylist.getOwner())
           .willReturn(owner);
 
@@ -782,9 +792,6 @@ public class PlaylistServiceTest {
 
       // BeforeEach에서 playlist, playlistId 초기화
 
-      given(mockPlaylist.getId())
-          .willReturn(playlistId);
-
       given(mockPlaylist.getOwner())
           .willReturn(owner);
 
@@ -838,8 +845,12 @@ public class PlaylistServiceTest {
 
       // then
       verify(playlistSubscriptionRepository).save(any(PlaylistSubscription.class));
-      verify(publisher).publishEvent(any(PlaylistSubscribedEvent.class));
-      verify(playlistRepository).increaseSubscriberCount(playlistId);
+      verify(eventPublisher).publishEvent(subscribedEventCaptor.capture());
+
+      PlaylistSubscribedEvent event = subscribedEventCaptor.getValue();
+
+      assertThat(event.playlistId()).isEqualTo(playlistId);
+      assertThat(event.subscriberId()).isEqualTo(subscriberId);
     }
 
     @Test
@@ -860,7 +871,7 @@ public class PlaylistServiceTest {
           .hasFieldOrPropertyWithValue("errorCode", PlaylistErrorCode.SUBSCRIBE_DUPLICATE);
 
       verify(playlistSubscriptionRepository, never()).save(any());
-      verify(publisher, never()).publishEvent(any());
+      verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
@@ -876,7 +887,7 @@ public class PlaylistServiceTest {
           .hasFieldOrPropertyWithValue("errorCode", PlaylistErrorCode.SUBSCRIBE_NOT_FOUND);
 
       verify(playlistSubscriptionRepository, never()).save(any());
-      verify(publisher, never()).publishEvent(any());
+      verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
@@ -894,7 +905,7 @@ public class PlaylistServiceTest {
           .hasFieldOrPropertyWithValue("errorCode", PlaylistErrorCode.SUBSCRIBE_USER_NOT_FOUND);
 
       verify(playlistSubscriptionRepository, never()).save(any());
-      verify(publisher, never()).publishEvent(any());
+      verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
@@ -912,7 +923,7 @@ public class PlaylistServiceTest {
 
       verify(userRepository, never()).findById(any());
       verify(playlistSubscriptionRepository, never()).save(any());
-      verify(publisher, never()).publishEvent(any());
+      verify(eventPublisher, never()).publishEvent(any());
     }
 
   }
@@ -929,7 +940,6 @@ public class PlaylistServiceTest {
 
       given(playlistSubscriptionRepository.deleteByPlaylistIdAndSubscriberId(playlistId,
           subscriberId)).willReturn(1);
-      given(playlistRepository.decreaseSubscriberCount(playlistId)).willReturn(1);
 
       // when
       playlistService.unSubscribe(playlistId, subscriberId);
@@ -937,7 +947,12 @@ public class PlaylistServiceTest {
       // then
       verify(playlistSubscriptionRepository).deleteByPlaylistIdAndSubscriberId(playlistId,
           subscriberId);
-      verify(playlistRepository).decreaseSubscriberCount(playlistId);
+      verify(eventPublisher).publishEvent(unsubscribedEventCaptor.capture());
+
+      PlaylistUnsubscribedEvent event = unsubscribedEventCaptor.getValue();
+
+      assertThat(event.playlistId()).isEqualTo(playlistId);
+      assertThat(event.subscriberId()).isEqualTo(subscriberId);
     }
 
     @Test
@@ -978,8 +993,13 @@ public class PlaylistServiceTest {
       playlistService.addContent(playlistId, contentId, ownerId);
 
       // then
-      verify(publisher).publishEvent(any(PlaylistContentAddedEvent.class));
       verify(playlistContentRepository).save(any(PlaylistContent.class));
+      verify(eventPublisher).publishEvent(contentAddedEventCaptor.capture());
+
+      PlaylistContentAddedEvent event = contentAddedEventCaptor.getValue();
+
+      assertThat(event.playlistId()).isEqualTo(playlistId);
+      assertThat(event.contentId()).isEqualTo(contentId);
     }
 
     @Test
@@ -994,7 +1014,7 @@ public class PlaylistServiceTest {
           .isInstanceOf(PlaylistException.class)
           .hasFieldOrPropertyWithValue("errorCode", PlaylistErrorCode.PLAYLIST_CONTENT_PLAY_NOT_FOUND);
 
-      verify(publisher, never()).publishEvent(any());
+      verify(eventPublisher, never()).publishEvent(any());
       verify(playlistContentRepository, never()).save(any());
     }
 
@@ -1013,7 +1033,7 @@ public class PlaylistServiceTest {
           .isInstanceOf(PlaylistException.class)
           .hasFieldOrPropertyWithValue("errorCode", PlaylistErrorCode.PLAYLIST_CONTENT_CONTENT_NOT_FOUND);
 
-      verify(publisher, never()).publishEvent(any());
+      verify(eventPublisher, never()).publishEvent(any());
       verify(playlistContentRepository, never()).save(any());
     }
 
@@ -1036,7 +1056,7 @@ public class PlaylistServiceTest {
           .isInstanceOf(PlaylistException.class)
           .hasFieldOrPropertyWithValue("errorCode", PlaylistErrorCode.PLAYLIST_CONTENT_DUPLICATE);
 
-      verify(publisher, never()).publishEvent(any());
+      verify(eventPublisher, never()).publishEvent(any());
       verify(playlistContentRepository, never()).save(any());
     }
 
@@ -1049,7 +1069,6 @@ public class PlaylistServiceTest {
       Playlist playlist = mock(Playlist.class);
 
       given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
-      given(playlist.getId()).willReturn(playlistId);
       given(playlist.getOwner()).willReturn(owner);
       given(owner.getId()).willReturn(ownerId);
 
@@ -1058,7 +1077,7 @@ public class PlaylistServiceTest {
           .isInstanceOf(PlaylistException.class)
           .hasFieldOrPropertyWithValue("errorCode", PlaylistErrorCode.PLAYLIST_FORBIDDEN);
 
-      verify(publisher, never()).publishEvent(any());
+      verify(eventPublisher, never()).publishEvent(any());
       verify(playlistContentRepository, never()).existsByPlaylistIdAndContentId(any(), any());
       verify(playlistContentRepository, never()).save(any());
     }
@@ -1086,7 +1105,7 @@ public class PlaylistServiceTest {
       playlistService.removeContent(playlistId, contentId, ownerId);
 
       // then
-      verify(publisher, never()).publishEvent(any());
+      verify(eventPublisher, never()).publishEvent(any());
       verify(playlistContentRepository).delete(playlistContent);
     }
 
@@ -1116,7 +1135,6 @@ public class PlaylistServiceTest {
       Playlist playlist = mock(Playlist.class);
 
       given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
-      given(playlist.getId()).willReturn(playlistId);
       given(playlist.getOwner()).willReturn(owner);
       given(owner.getId()).willReturn(ownerId);
 

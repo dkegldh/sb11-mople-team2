@@ -60,8 +60,8 @@ public class NotificationIntegrationTest {
         alertCounter = 0;
         // RECEIVER_ID를 가진 User를 native SQL로 삽입 (UUID auto-generate 우회)
         entityManager.createNativeQuery(
-            "INSERT INTO users (id, email, password, name, role, locked, session_version, created_at) " +
-            "VALUES (:id, 'temp@test.com', 'password', '임시유저', 'USER', false, 0, CURRENT_TIMESTAMP)"
+            "INSERT INTO users (id, email, password, name, role, provider, locked, session_version, created_at) " +
+            "VALUES (:id, 'temp@test.com', 'password', '임시유저', 'USER', 'LOCAL', false, 0, CURRENT_TIMESTAMP)"
         ).setParameter("id", RECEIVER_ID).executeUpdate();
 
         principal = new CustomUserDetails(RECEIVER_ID, Role.USER);
@@ -162,8 +162,8 @@ public class NotificationIntegrationTest {
         void success_notifications_are_isolated_by_receiver() throws Exception {
             UUID otherReceiverId = UUID.randomUUID();
             entityManager.createNativeQuery(
-                "INSERT INTO users (id, email, password, name, role, locked, session_version, created_at) " +
-                "VALUES (:id, 'other@test.com', 'password', '타유저', 'USER', false, 0, CURRENT_TIMESTAMP)"
+                "INSERT INTO users (id, email, password, name, role, provider, locked, session_version, created_at) " +
+                "VALUES (:id, 'other@test.com', 'password', '타유저', 'USER', 'LOCAL', false, 0, CURRENT_TIMESTAMP)"
             ).setParameter("id", otherReceiverId).executeUpdate();
 
             알림_생성("내 알림", NotificationType.NEW_FOLLOWER);
@@ -257,8 +257,8 @@ public class NotificationIntegrationTest {
             // given — 다른 유저 및 알림 삽입
             UUID otherUserId = UUID.randomUUID();
             entityManager.createNativeQuery(
-                "INSERT INTO users (id, email, password, name, role, locked, session_version, created_at) " +
-                "VALUES (:id, 'other2@test.com', 'password', '타유저2', 'USER', false, 0, CURRENT_TIMESTAMP)"
+                "INSERT INTO users (id, email, password, name, role, provider, locked, session_version, created_at) " +
+                "VALUES (:id, 'other2@test.com', 'password', '타유저2', 'USER', 'LOCAL', false, 0, CURRENT_TIMESTAMP)"
             ).setParameter("id", otherUserId).executeUpdate();
 
             UUID otherNotificationId = UUID.randomUUID();

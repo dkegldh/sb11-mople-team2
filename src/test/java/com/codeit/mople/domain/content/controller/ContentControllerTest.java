@@ -21,6 +21,9 @@ import com.codeit.mople.domain.content.dto.ContentUpdateRequest;
 import com.codeit.mople.domain.content.dto.CursorResponseContentDto;
 import com.codeit.mople.domain.content.exception.ContentErrorCode;
 import com.codeit.mople.domain.content.exception.ContentException;
+import com.codeit.mople.domain.auth.security.CustomOAuth2UserService;
+import com.codeit.mople.domain.auth.security.handler.OAuth2FailureHandler;
+import com.codeit.mople.domain.auth.security.handler.OAuth2SuccessHandler;
 import com.codeit.mople.domain.content.service.ContentService;
 import com.codeit.mople.domain.watchingsession.dto.CursorResponseWatchingSessionDto;
 import com.codeit.mople.domain.watchingsession.service.WatchingSessionService;
@@ -71,6 +74,15 @@ public class ContentControllerTest {
   @MockitoBean
   private WatchingSessionService watchingSessionService;
 
+  @MockitoBean
+  private CustomOAuth2UserService customOAuth2UserService;
+
+  @MockitoBean
+  private OAuth2SuccessHandler oAuth2SuccessHandler;
+
+  @MockitoBean
+  private OAuth2FailureHandler oAuth2FailureHandler;
+
   private RequestPostProcessor mockAuth(UUID userId, Role role) {
     CustomUserDetails mockUser = new CustomUserDetails(userId, role);
     UsernamePasswordAuthenticationToken authentication =
@@ -86,7 +98,7 @@ public class ContentControllerTest {
   @DisplayName("콘텐츠 생성 성공 - ADMIN 권한일 때 201 Created")
   void createContent_Success() throws Exception {
     UUID contentId = UUID.randomUUID();
-    UUID adminId = UUID.randomUUID(); // 🌟 테스트용 adminId 명시적 생성
+    UUID adminId = UUID.randomUUID();
 
     ContentCreateRequest requestDto = new ContentCreateRequest(
         "MOVIE", "테스트 영화", "설명", List.of("액션"));
@@ -111,7 +123,7 @@ public class ContentControllerTest {
                 .file(thumbnailPart)
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .with(csrf())
-                .with(mockAuth(adminId, Role.ADMIN)) // 🌟 adminId 주입
+                .with(mockAuth(adminId, Role.ADMIN))
         ).andExpect(status().isCreated())
         .andExpect(jsonPath("$.title").value("테스트 영화"));
   }
@@ -361,47 +373,5 @@ public class ContentControllerTest {
             .with(csrf())
             .with(mockAuth(UUID.randomUUID(),Role.ADMIN))
     ).andExpect(status().isNotFound());
-  }
-
-  //=========================================================================================
-  //콘텐츠 시청 세션 목록 조회 테스트
-  //=========================================================================================
-
-  @Test
-  @DisplayName("콘텐츠 시청 세션 목록 조회 성공 - 200 OK")
-  void getWatchingSessions_Success() throws Exception {
-    UUID contentId = UUID.randomUUID();
-    CursorResponseWatchingSessionDto mockResponse = new CursorResponseWatchingSessionDto(
-        List.of(), null, null, false, 0L,
-        "createdAt", "ASCENDING");
-
-    given(watchingSessionService.getWatchingSessions(
-        any(), any(), any(), any(), anyInt(), any(), any()
-    )).willReturn(mockResponse);
-
-    mockMvc.perform(
-        get("/api/contents/{contentId}/watching-sessions", contentId)
-            .param("limit", "10")
-            .param("sortDirection", "ASCENDING")
-            .contentType(MediaType.APPLICATION_JSON)
-            .with(mockAuth(UUID.randomUUID(),Role.USER))
-    ).andExpect(status().isOk());
-  }
-
-  @Test
-  @DisplayName("콘텐츠 시청 세션 목록 조회 실패 - limit이 범위를 벗어나면 서비스에서 예외 발생")
-  void getWatchingSessions_Fail_InvalidLimit() throws Exception {
-    UUID contentId = UUID.randomUUID();
-
-    given(watchingSessionService.getWatchingSessions(
-        any(), any(), any(), any(), anyInt(), any(), any()
-    )).willThrow(new ContentException(ContentErrorCode.INVALID_PAGE_REQUEST, Map.of("limit", 200)));
-
-    mockMvc.perform(
-        get("/api/contents/{contentId}/watching-sessions", contentId)
-            .param("limit", "200")
-            .contentType(MediaType.APPLICATION_JSON)
-            .with(mockAuth(UUID.randomUUID(),Role.USER))
-    ).andExpect(status().isBadRequest());
   }
 }

@@ -1,11 +1,22 @@
 package com.codeit.mople.global.config;
 
+import com.codeit.mople.domain.user.dto.request.StringToUserSortByConverter;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.format.FormatterRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
+@RequiredArgsConstructor
 public class WebConfig implements WebMvcConfigurer {
+
+  private final StringToUserSortByConverter stringToUserSortByConverter;
+
+  @Override
+  public void addFormatters(FormatterRegistry registry) {
+    registry.addConverter(stringToUserSortByConverter);
+  }
 
   @Override
   public void addResourceHandlers(ResourceHandlerRegistry registry) {

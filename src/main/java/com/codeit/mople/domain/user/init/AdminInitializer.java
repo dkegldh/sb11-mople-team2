@@ -3,6 +3,7 @@ package com.codeit.mople.domain.user.init;
 import com.codeit.mople.domain.user.entity.Role;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.repository.UserRepository;
+import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.exception.ConstraintViolationException;
@@ -27,7 +28,7 @@ public class AdminInitializer implements ApplicationRunner {
   @Override
   public void run(ApplicationArguments args) {
     log.debug("어드민 계정 초기화 시작");
-    if (userRepository.existsByEmail(adminProperties.email())) {
+    if (userRepository.existsByEmail(adminProperties.email().toLowerCase(Locale.ROOT))) {
       log.warn("어드민 계정이메일이 이미 사용중입니다. : {}", maskEmail(adminProperties.email()));
       return;
     }

@@ -15,7 +15,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.codeit.mople.domain.auth.security.CustomOAuth2UserService;
 import com.codeit.mople.domain.auth.security.CustomUserDetails;
+import com.codeit.mople.domain.auth.security.handler.OAuth2FailureHandler;
+import com.codeit.mople.domain.auth.security.handler.OAuth2SuccessHandler;
 import com.codeit.mople.domain.notification.dto.response.CursorResponseNotificationDto;
 import com.codeit.mople.domain.notification.exception.NotificationErrorCode;
 import com.codeit.mople.domain.notification.exception.NotificationException;
@@ -23,6 +26,9 @@ import com.codeit.mople.domain.notification.dto.response.NotificationResponse;
 import com.codeit.mople.domain.notification.NotificationLevel;
 import com.codeit.mople.domain.notification.service.NotificationService;
 import com.codeit.mople.domain.user.entity.Role;
+import com.codeit.mople.domain.user.repository.UserRepository;
+import com.codeit.mople.global.config.SecurityConfig;
+import com.codeit.mople.global.jwt.JwtProvider;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -32,10 +38,12 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(NotificationController.class)
+@Import(SecurityConfig.class)
 @DisplayName("NotificationController 테스트")
 class NotificationControllerTest {
 
@@ -44,6 +52,21 @@ class NotificationControllerTest {
 
     @MockitoBean
     NotificationService notificationService;
+
+    @MockitoBean
+    JwtProvider jwtProvider;
+
+    @MockitoBean
+    UserRepository userRepository;
+
+    @MockitoBean
+    CustomOAuth2UserService customOAuth2UserService;
+
+    @MockitoBean
+    OAuth2SuccessHandler oAuth2SuccessHandler;
+
+    @MockitoBean
+    OAuth2FailureHandler oAuth2FailureHandler;
 
     CustomUserDetails principal;
 

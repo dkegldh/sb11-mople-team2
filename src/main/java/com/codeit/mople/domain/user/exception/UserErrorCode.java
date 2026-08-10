@@ -15,7 +15,8 @@ public enum UserErrorCode implements ErrorCode {
   PASSWORD_MISMATCH(HttpStatus.BAD_REQUEST, "USER-004", "현재 비밀번호가 일치하지 않습니다."),
   FORBIDDEN_ACCESS(HttpStatus.FORBIDDEN, "USER-005", "본인만 접근할 수 있습니다."),
   INVALID_CURSOR(HttpStatus.BAD_REQUEST, "USER-006", "유효하지 않은 커서 값입니다."),
-  CANNOT_MODIFY_SELF(HttpStatus.BAD_REQUEST, "USER-007", "자신의 계정은 변경할 수 없습니다.");
+  CANNOT_MODIFY_SELF(HttpStatus.BAD_REQUEST, "USER-007", "자신의 계정은 변경할 수 없습니다."),
+  INVALID_SORT_BY(HttpStatus.BAD_REQUEST, "USER-008", "유효하지 않은 정렬 기준입니다.");
 
   private final HttpStatus status;
   private final String code;

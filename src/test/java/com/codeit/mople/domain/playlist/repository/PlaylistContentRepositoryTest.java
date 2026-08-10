@@ -67,7 +67,7 @@ public class PlaylistContentRepositoryTest {
     );
 
     content2 = new Content(
-        ContentType.DRAMA,
+        ContentType.TV_SERIES,
         "전설의 고향",
         "설명2",
         "전설의 고향.png",
@@ -97,7 +97,7 @@ public class PlaylistContentRepositoryTest {
 
     @Test
     @DisplayName("플레이리스트에 콘텐츠를 추가한 순서대로 조회 성공")
-    void findAllByPlaylistIdOrderByCreatedAtAsc_success() {
+    void findAllByPlaylistIdOrderByCreatedAtAsc_success() throws InterruptedException {
       // given
       
       // BeforeEach에서 author, playlist, content1, content2, playlistContent1, playlistContent2 초기화
@@ -111,6 +111,7 @@ public class PlaylistContentRepositoryTest {
       // playlist에 첫번째 content 등록
       entityManager.persist(playlistContent2);
       entityManager.flush();
+      Thread.sleep(10);
 
       // playlist에 두번째 content 등록
       entityManager.persist(playlistContent1);
@@ -169,7 +170,7 @@ public class PlaylistContentRepositoryTest {
 
     @Test
     @DisplayName("플레이리스트 ID 목록에 해당하는 콘텐츠를 추가 순서대로 조회 성공")
-    void findAllByPlaylistIdInOrderByCreatedAtAsc_success() {
+    void findAllByPlaylistIdInOrderByCreatedAtAsc_success() throws InterruptedException {
       // given
       entityManager.persist(author);
 
@@ -182,9 +183,11 @@ public class PlaylistContentRepositoryTest {
       // playlist
       entityManager.persist(playlistContent2);
       entityManager.flush();
+      Thread.sleep(10);
 
       entityManager.persist(playlistContent1);
       entityManager.flush();
+      Thread.sleep(10);
 
       // otherPlaylist
       entityManager.persist(otherPlaylistContent);

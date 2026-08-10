@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.codeit.mople.domain.conversation.entity.Conversation;
 import com.codeit.mople.domain.conversation.exception.ConversationErrorCode;
@@ -15,7 +16,9 @@ import com.codeit.mople.domain.conversation.exception.ConversationException;
 import com.codeit.mople.domain.conversation.repository.ConversationRepository;
 import com.codeit.mople.domain.directmessage.dto.request.DirectMessageCursorRequest;
 import com.codeit.mople.domain.directmessage.dto.response.CursorResponseDirectMessageDto;
+import com.codeit.mople.domain.directmessage.dto.response.DirectMessageDto;
 import com.codeit.mople.domain.directmessage.entity.DirectMessage;
+import com.codeit.mople.domain.directmessage.event.DirectMessageCreatedEvent;
 import com.codeit.mople.domain.directmessage.exception.DirectMessageErrorCode;
 import com.codeit.mople.domain.directmessage.exception.DirectMessageException;
 import com.codeit.mople.domain.directmessage.repository.DirectMessageRepository;
@@ -32,6 +35,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 public class DirectMessageServiceTest {
@@ -44,6 +48,9 @@ public class DirectMessageServiceTest {
 
   @Mock
   private ConversationRepository conversationRepository;
+
+  @Mock
+  private ApplicationEventPublisher eventPublisher;
 
   private UUID userAId;
   private UUID userBId;
@@ -70,6 +77,85 @@ public class DirectMessageServiceTest {
     stranger = mock(User.class);
     conversation = mock(Conversation.class);
     message = mock(DirectMessage.class);
+  }
+
+  @Nested
+  @DisplayName("sendMessage (WebSocket DM 발송 및 영속화) 테스트")
+  class SendMessage {
+
+    @Test
+    @DisplayName("성공: 정당한 참여자가 메시지를 발송하면 저장되고, 대화방 메타데이터와 발신자 워터마크가 전진한다.")
+    void success_send_message() {
+      //given
+      String content = "테스트 메시지";
+      Instant messageCreatedAt = Instant.now();
+
+      given(userA.getId()).willReturn(userAId);
+      given(userB.getId()).willReturn(userBId);
+      given(conversation.getUserA()).willReturn(userA);
+      given(conversation.getPartnerOf(userAId)).willReturn(userB);
+
+      DirectMessage mockSavedMessage = mock(DirectMessage.class);
+      given(mockSavedMessage.getId()).willReturn(messageId);
+      given(mockSavedMessage.getConversation()).willReturn(conversation);
+      given(mockSavedMessage.getSender()).willReturn(userA);
+      given(mockSavedMessage.getReceiver()).willReturn(userB);
+      given(mockSavedMessage.getContent()).willReturn(content);
+      given(mockSavedMessage.getCreatedAt()).willReturn(messageCreatedAt);
+
+      given(conversationRepository.findWithLockById(conversationId))
+          .willReturn(Optional.of(conversation));
+      given(directMessageRepository.save(any(DirectMessage.class)))
+          .willReturn(mockSavedMessage);
+
+      //when
+      DirectMessageDto result = directMessageService.sendMessage(conversationId, userAId, content);
+
+      //then
+      assertThat(result).isNotNull();
+      assertThat(result.content()).isEqualTo(content);
+
+      // 가장 최근(마지막) 메시지 및 발신자 워터마크 갱신 메서드가 호출되었는지 검증
+      verify(conversation).updateLastMessage(mockSavedMessage);
+      verify(conversation).updateLastReadAt(userAId, messageCreatedAt);
+
+      verify(eventPublisher).publishEvent(new DirectMessageCreatedEvent(userBId, messageId));
+    }
+
+    @Test
+    @DisplayName("실패: 존재하지 않는 대화방 ID로 메시지를 보내면 CONVERSATION_NOT_FOUND 예외가 발생한다.")
+    void fail_conversation_not_found() {
+      //given
+      given(conversationRepository.findWithLockById(conversationId))
+          .willReturn(Optional.empty());
+
+      //when & then
+      assertThatThrownBy(() -> directMessageService.sendMessage(conversationId, userAId, "테스트 메시지"))
+          .isInstanceOf(ConversationException.class)
+          .hasMessageContaining(ConversationErrorCode.CONVERSATION_NOT_FOUND.getMessage());
+
+      verifyNoInteractions(eventPublisher);
+    }
+
+    @Test
+    @DisplayName("실패: 대화방 참여자가 아닌 제3자가 메시지 발송을 시도하면 ACCESS_DENIED 예외가 발생한다.")
+    void fail_access_denied_stranger() {
+      //given
+      given(userA.getId()).willReturn(userAId);
+      given(userB.getId()).willReturn(userBId);
+      given(conversation.getId()).willReturn(conversationId);
+      given(conversation.getUserA()).willReturn(userA);
+      given(conversation.getUserB()).willReturn(userB);
+
+      given(conversationRepository.findWithLockById(conversationId))
+          .willReturn(Optional.of(conversation));
+
+      //when & then
+      assertThatThrownBy(() -> directMessageService.sendMessage(conversationId, strangerId, "테스트 메시지"))
+          .isInstanceOf(ConversationException.class);
+
+      verifyNoInteractions(eventPublisher);
+    }
   }
 
   @Nested

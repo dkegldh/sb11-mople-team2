@@ -17,6 +17,7 @@ import com.codeit.mople.global.storage.FileStorageService;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -36,11 +37,12 @@ public class UserService {
 
   @Transactional
   public UserDto signUp(UserCreateRequest request) {
-    if(userRepository.existsByEmail(request.email())) {
-      throw new UserException(UserErrorCode.DUPLICATE_EMAIL, Map.of("email", request.email()));
+    String normalizedEmail = request.email().toLowerCase(Locale.ROOT);
+    if(userRepository.existsByEmail(normalizedEmail)) {
+      throw new UserException(UserErrorCode.DUPLICATE_EMAIL, Map.of("email", normalizedEmail));
     }
     String encodedPassword = passwordEncoder.encode(request.password());
-    User user = User.createUser(request.email(), encodedPassword, request.name());
+    User user = User.createUser(normalizedEmail, encodedPassword, request.name());
     User saved = userRepository.save(user);
     return UserDto.from(saved);
   }
@@ -52,11 +54,13 @@ public class UserService {
 
   public CursorResponse<UserDto> getUsers(UserSearchRequest request) {
     List<User> users = userRepository.searchUsers(request);
+    long totalCount = userRepository.countUsers(request);
 
     return CursorResponse.of(
         users.stream().map(UserDto::from).toList(),
         request.limitOrDefault(),
-        request.sortByOrDefault().name(),
+        totalCount,
+        request.sortByOrDefault().getValue(),
         request.sortDirectionOrDefault().name(),
         dto -> cursorValueOf(dto, request.sortByOrDefault()),
         UserDto::id
@@ -102,11 +106,11 @@ public class UserService {
 
   private String cursorValueOf(UserDto dto, UserSortBy sortBy) {
     return switch (sortBy) {
-      case name -> dto.name();
-      case email -> dto.email();
-      case createdAt -> dto.createdAt().toString();
-      case isLocked -> String.valueOf(dto.locked());
-      case role -> dto.role().name();
+      case NAME -> dto.name();
+      case EMAIL -> dto.email();
+      case CREATED_AT -> dto.createdAt().toString();
+      case IS_LOCKED -> String.valueOf(dto.locked());
+      case ROLE -> dto.role().name();
     };
   }
 }

@@ -18,7 +18,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.codeit.mople.domain.auth.security.CustomOAuth2UserService;
 import com.codeit.mople.domain.auth.security.CustomUserDetails;
+import com.codeit.mople.domain.auth.security.handler.OAuth2FailureHandler;
+import com.codeit.mople.domain.auth.security.handler.OAuth2SuccessHandler;
 import com.codeit.mople.domain.review.dto.request.ReviewCreateRequest;
 import com.codeit.mople.domain.review.dto.request.ReviewQueryCondition;
 import com.codeit.mople.domain.review.dto.request.ReviewQueryCondition.ReviewSortBy;
@@ -66,6 +69,15 @@ public class ReviewControllerTest {
 
   @MockitoBean
   private ReviewService reviewService;
+
+  @MockitoBean
+  private CustomOAuth2UserService customOAuth2UserService;
+
+  @MockitoBean
+  private OAuth2SuccessHandler oAuth2SuccessHandler;
+
+  @MockitoBean
+  private OAuth2FailureHandler oAuth2FailureHandler;
 
   private CustomUserDetails userDetails;
   private UUID authorId;
@@ -295,14 +307,14 @@ public class ReviewControllerTest {
       mockMvc.perform(get("/api/reviews")
               .param("limit", "10")
               .param("sortDirection", "DESCENDING")
-              .param("sortBy", "RATING")
+              .param("sortBy", "rating")
               .with(user(userDetails))
           )
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data").isArray())
           .andExpect(jsonPath("$.hasNext").value(false))
           .andExpect(jsonPath("$.totalCount").value(1L))
-          .andExpect(jsonPath("$.sortBy").value("RATING"))
+          .andExpect(jsonPath("$.sortBy").value("rating"))
           .andExpect(jsonPath("$.sortDirection").value("DESCENDING"));
 
       verify(reviewService).findAll(any(ReviewQueryCondition.class));
@@ -318,7 +330,7 @@ public class ReviewControllerTest {
       // when & then
       mockMvc.perform(get("/api/reviews")
               .param("sortDirection", "DESCENDING")
-              .param("sortBy", "RATING")
+              .param("sortBy", "rating")
               .with(user(userDetails))
           )
           .andExpect(status().isBadRequest());
@@ -354,7 +366,7 @@ public class ReviewControllerTest {
       // when & then
       mockMvc.perform(get("/api/reviews")
               .param("limit", "10")
-              .param("sortBy", "RATING")
+              .param("sortBy", "rating")
               .with(user(userDetails))
           )
           .andExpect(status().isBadRequest());
@@ -373,7 +385,7 @@ public class ReviewControllerTest {
       mockMvc.perform(get("/api/reviews")
               .param("limit", "0")
               .param("sortDirection", "DESCENDING")
-              .param("sortBy", "RATING")
+              .param("sortBy", "rating")
               .with(user(userDetails))
           )
           .andExpect(status().isBadRequest());
@@ -392,7 +404,7 @@ public class ReviewControllerTest {
       mockMvc.perform(get("/api/reviews")
               .param("limit", "101")
               .param("sortDirection", "DESCENDING")
-              .param("sortBy", "RATING")
+              .param("sortBy", "rating")
               .with(user(userDetails))
           )
           .andExpect(status().isBadRequest());
@@ -411,7 +423,7 @@ public class ReviewControllerTest {
       mockMvc.perform(get("/api/reviews")
               .param("limit", "ANY")
               .param("sortDirection", "DESCENDING")
-              .param("sortBy", "RATING")
+              .param("sortBy", "rating")
               .with(user(userDetails))
           )
           .andExpect(status().isBadRequest());
@@ -449,7 +461,7 @@ public class ReviewControllerTest {
       mockMvc.perform(get("/api/reviews")
               .param("limit", "10")
               .param("sortDirection", "ANY")
-              .param("sortBy", "RATING")
+              .param("sortBy", "rating")
               .with(user(userDetails))
           )
           .andExpect(status().isBadRequest());

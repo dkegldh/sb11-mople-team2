@@ -27,7 +27,7 @@ public class ReviewTest {
   void setUp() {
     author = User.createUser("test@test.com", "12345678", "test");
     content = new Content(
-        ContentType.DRAMA,
+        ContentType.TV_SERIES,
         "test",
         "test 콘텐츠",
         "test/image.png",

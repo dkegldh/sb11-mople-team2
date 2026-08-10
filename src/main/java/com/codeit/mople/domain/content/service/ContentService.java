@@ -10,6 +10,7 @@ import com.codeit.mople.domain.content.exception.ContentErrorCode;
 import com.codeit.mople.domain.content.exception.ContentException;
 import com.codeit.mople.domain.content.repository.ContentQueryRepository;
 import com.codeit.mople.domain.content.repository.ContentRepository;
+import com.codeit.mople.global.dto.CursorResponse;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -49,7 +50,7 @@ public class ContentService{
     //ContentType 변환 방어 로직
     ContentType contentType;
     try {
-      contentType = ContentType.valueOf(request.type().toUpperCase());
+      contentType = ContentType.from(request.type());
     } catch (IllegalArgumentException e) {
       log.warn("콘텐츠 생성 실패(잘못된 ContentType) - type: {}", request.type());
       throw new ContentException(ContentErrorCode.INVALID_CONTENT_TYPE, Map.of("type", request.type()));
@@ -71,7 +72,7 @@ public class ContentService{
 
     return new ContentResponse(
         savedContent.getId(),
-        savedContent.getType().name(),
+        savedContent.getType().getValue(),
         savedContent.getTitle(),
         savedContent.getDescription(),
         savedContent.getThumbnailUrl(),
@@ -103,14 +104,20 @@ public class ContentService{
     List<Content> contents = contentQueryRepository.findContentByCursor(cursorId, cursorCreatedAt, limit);
     long totalCount = contentQueryRepository.countAllContents();
 
-    //hasNext 판단 및 리스트 자르기
-    boolean hasNext = contents.size() > limit;
-    List<Content> pageContents = hasNext ? contents.subList(0, limit) : contents;
+    CursorResponse<Content> cursorResponse = CursorResponse.of(
+        contents,
+        limit,
+        totalCount,
+        "createdAt",
+        "DESCENDING",
+        content -> content.getCreatedAt() != null ?
+            content.getCreatedAt().toString() : null, Content::getId
+    );
 
-    List<ContentResponse> contentResponses = pageContents.stream()
+    List<ContentResponse> contentResponses = cursorResponse.data().stream()
         .map(content -> new ContentResponse(
             content.getId(),
-            content.getType().name(),
+            content.getType().getValue(),
             content.getTitle(),
             content.getDescription(),
             content.getThumbnailUrl(),
@@ -120,27 +127,17 @@ public class ContentService{
             content.getWatcherCount()
         )).toList();
 
-    //커서 값 추출
-    String nextCursor = null;
-    UUID nextIdAfter = null;
-
-    if (hasNext && !pageContents.isEmpty()) {
-      Content lastItem = pageContents.get(pageContents.size() - 1);
-      nextCursor = lastItem.getCreatedAt() != null ? lastItem.getCreatedAt().toString() : null;
-      nextIdAfter = lastItem.getId();
-    }
-
     log.debug("콘텐츠 목록 조회 완료 - 조회된 데이터 개수: {}", contentResponses.size());
 
     //응답 조립 후 반환
     return new CursorResponseContentDto(
         contentResponses,
-        nextCursor,
-        nextIdAfter,
-        hasNext,
-        totalCount,
-        "createdAt",
-        "DESCENDING"
+        cursorResponse.nextCursor(),
+        cursorResponse.nextIdAfter(),
+        cursorResponse.hasNext(),
+        cursorResponse.totalCount(),
+        cursorResponse.sortBy(),
+        cursorResponse.sortDirection()
     );
   }
 
@@ -160,7 +157,7 @@ public class ContentService{
 
     return new ContentResponse(
         content.getId(),
-        content.getType().name(),
+        content.getType().getValue(),
         content.getTitle(),
         content.getDescription(),
         content.getThumbnailUrl(),
@@ -200,7 +197,7 @@ public class ContentService{
 
     return new ContentResponse(
         content.getId(),
-        content.getType().name(),
+        content.getType().getValue(),
         content.getTitle(),
         content.getDescription(),
         content.getThumbnailUrl(),

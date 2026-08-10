@@ -269,13 +269,14 @@ public class PlaylistControllerTest {
       mockMvc.perform(get("/api/playlists")
               .param("limit", "10")
               .param("sortDirection", "ASCENDING")
-              .param("sortBy", "UPDATED_AT")
+              .param("sortBy", "updatedAt")
               .with(user(userDetails))
           )
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data").isArray())
           .andExpect(jsonPath("$.hasNext").value(false))
-          .andExpect(jsonPath("$.totalCount").value(0));
+          .andExpect(jsonPath("$.totalCount").value(0))
+          .andExpect(jsonPath("$.sortBy").value("updatedAt"));
 
       verify(playlistService).findAll(
           any(PlaylistQueryCondition.class),
@@ -293,7 +294,7 @@ public class PlaylistControllerTest {
       // when & then
       mockMvc.perform(get("/api/playlists")
               .param("sortDirection", "ASCENDING")
-              .param("sortBy", "UPDATED_AT")
+              .param("sortBy", "updatedAt")
               .with(user(userDetails))
           )
           .andExpect(status().isBadRequest());
@@ -329,7 +330,7 @@ public class PlaylistControllerTest {
       // when & then
       mockMvc.perform(get("/api/playlists")
               .param("limit", "10")
-              .param("sortBy", "UPDATED_AT")
+              .param("sortBy", "updatedAt")
               .with(user(userDetails))
           )
           .andExpect(status().isBadRequest());
@@ -348,7 +349,7 @@ public class PlaylistControllerTest {
       mockMvc.perform(get("/api/playlists")
               .param("limit", "0")
               .param("sortDirection", "ASCENDING")
-              .param("sortBy", "UPDATED_AT")
+              .param("sortBy", "updatedAt")
               .with(user(userDetails))
           )
           .andExpect(status().isBadRequest());
@@ -367,7 +368,7 @@ public class PlaylistControllerTest {
       mockMvc.perform(get("/api/playlists")
               .param("limit", "1000")
               .param("sortDirection", "ASCENDING")
-              .param("sortBy", "UPDATED_AT")
+              .param("sortBy", "updatedAt")
               .with(user(userDetails))
           )
           .andExpect(status().isBadRequest());
@@ -405,7 +406,7 @@ public class PlaylistControllerTest {
       mockMvc.perform(get("/api/playlists")
               .param("limit", "10")
               .param("sortDirection", "ANY")
-              .param("sortBy", "UPDATED_AT")
+              .param("sortBy", "updatedAt")
               .with(user(userDetails))
           )
           .andExpect(status().isBadRequest());

@@ -140,7 +140,7 @@ public class UserControllerTest {
 
     mockMvc.perform(get("/api/users")
         .param("limit", "10")
-        .param("sortBy", "name")
+        .param("sortBy", "NAME")
         .param("sortDirection", "ASCENDING")
         .header("Authorization", "Bearer " + adminToken))
         .andDo(print())
@@ -161,6 +161,36 @@ public class UserControllerTest {
         .header("Authorization", "Bearer " + normalUserToken))
         .andDo(print())
         .andExpect(status().isForbidden());
+  }
+
+  @Test
+  @DisplayName("limit이 100을 초과하면 400을 반환함")
+  void getUsers_returnsBadRequest_whenLimitExceedsMax() throws Exception {
+    User admin = userRepository.save(User.createUser("admin2@test.com", "encoded", "admin"));
+    admin.changeRole(Role.ADMIN);
+    userRepository.save(admin);
+    String adminToken = tokenFor(admin);
+
+    mockMvc.perform(get("/api/users")
+        .param("limit", "500")
+        .header("Authorization", "Bearer " + adminToken))
+        .andDo(print())
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  @DisplayName("limit이 0 이하면 400을 반환함")
+  void getUsers_returnsBadRequest_whenLimitIsZeroOrNegative() throws Exception {
+    User admin = userRepository.save(User.createUser("admin3@test.com", "encoded", "admin"));
+    admin.changeRole(Role.ADMIN);
+    userRepository.save(admin);
+    String adminToken = tokenFor(admin);
+
+    mockMvc.perform(get("/api/users")
+        .param("limit", "0")
+        .header("Authorization", "Bearer " + adminToken))
+        .andDo(print())
+        .andExpect(status().isBadRequest());
   }
 
   @Test

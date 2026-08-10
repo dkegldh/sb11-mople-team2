@@ -1,5 +1,6 @@
 package com.codeit.mople.domain.review.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonValue;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -34,7 +35,28 @@ public record ReviewQueryCondition(
   }
 
   public enum ReviewSortBy {
-    CREATED_AT, // 생성 순
-    RATING // 평점 순
+    CREATED_AT("createdAt"), // 생성 순
+    RATING("rating"); // 평점 순
+
+    private final String value;
+
+    ReviewSortBy(String value) {
+      this.value = value;
+    }
+
+    public static ReviewSortBy from(String value) {
+      for (ReviewSortBy sortBy : ReviewSortBy.values()) {
+        if (sortBy.value.equals(value)) {
+          return sortBy;
+        }
+      }
+
+      throw new IllegalArgumentException();
+    }
+
+    @JsonValue
+    public String getValue() {
+      return value;
+    }
   }
 }
