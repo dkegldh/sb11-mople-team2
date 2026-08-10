@@ -23,14 +23,13 @@ public interface NotificationApi {
     @Operation(
         summary = "알림 목록 커서 조회",
         description = "커서 기반 페이지네이션으로 알림 목록을 조회합니다. "
-            + "cursor와 idAfter는 반드시 함께 제공하거나 둘 다 생략해야 합니다."
+            + "cursor와 idAfter는 반드시 함께 제공하거나 둘 다 생략해야 합니다. "
+            + "정렬은 createdAt 기준 내림차순으로 고정되며 별도로 지정할 수 없습니다."
     )
     @Parameters({
         @Parameter(name = "cursor", description = "이전 페이지 마지막 항목의 createdAt (ISO-8601 형식). idAfter와 함께 사용"),
         @Parameter(name = "idAfter", description = "이전 페이지 마지막 항목의 ID. cursor와 함께 사용"),
-        @Parameter(name = "limit", description = "페이지 크기 (1~100)", required = true),
-        @Parameter(name = "sortDirection", description = "정렬 방향. 기본값: DESCENDING", schema = @Schema(allowableValues = {"DESCENDING"})),
-        @Parameter(name = "sortBy", description = "정렬 기준. 기본값: createdAt", schema = @Schema(allowableValues = {"createdAt"}))
+        @Parameter(name = "limit", description = "페이지 크기 (1~100)", required = true)
     })
     @ApiResponses({
         @ApiResponse(
