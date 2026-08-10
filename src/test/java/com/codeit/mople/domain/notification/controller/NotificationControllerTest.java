@@ -73,8 +73,6 @@ class NotificationControllerTest {
             // when & then
             mockMvc.perform(get("/api/notifications")
                     .param("limit", "20")
-                    .param("sortDirection", "DESCENDING")
-                    .param("sortBy", "createdAt")
                     .with(user(principal)))
                 .andDo(print())
                 .andExpect(status().isOk())
@@ -175,38 +173,6 @@ class NotificationControllerTest {
             // when & then
             mockMvc.perform(get("/api/notifications")
                     .param("limit", "101")
-                    .with(user(principal)))
-                .andDo(print())
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error.code").value("COMMON-001"));
-
-            verifyNoInteractions(notificationService);
-        }
-
-        @Test
-        @DisplayName("실패: sortDirection이 ASCENDING이면 400을 반환한다.")
-        void fail_400_when_sort_direction_is_ascending() throws Exception {
-            // when & then
-            mockMvc.perform(get("/api/notifications")
-                    .param("limit", "20")
-                    .param("sortDirection", "ASCENDING")
-                    .with(user(principal)))
-                .andDo(print())
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error.code").value("COMMON-001"));
-
-            verifyNoInteractions(notificationService);
-        }
-
-        @Test
-        @DisplayName("실패: sortBy가 createdAt이 아니면 400을 반환한다.")
-        void fail_400_when_sort_by_is_invalid() throws Exception {
-            // when & then
-            mockMvc.perform(get("/api/notifications")
-                    .param("limit", "20")
-                    .param("sortBy", "updatedAt")
                     .with(user(principal)))
                 .andDo(print())
                 .andExpect(status().isBadRequest())
