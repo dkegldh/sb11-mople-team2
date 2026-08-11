@@ -73,6 +73,8 @@ public class NotificationService {
     @Transactional
     public void deleteNotification(UUID notificationId, UUID receiverId) {
         log.debug("알림 삭제 요청 - notificationId: {}, receiverId: {}", notificationId, receiverId);
+        // 존재하지 않음(404)과 권한 없음(403)을 의도적으로 구분함 — id가 UUID라 열거(enumeration) 위험이 낮고,
+        // 디버깅 편의성과 클라이언트 UX(에러 메시지 구분)를 우선한 선택. 리소스 id가 노출/추측 가능해지면 재검토 필요.
         Notification notification = notificationRepository.findById(notificationId)
             .orElseThrow(() -> new NotificationException(NotificationErrorCode.NOTIFICATION_NOT_FOUND));
         if (!notification.getReceiver().getId().equals(receiverId)) {
