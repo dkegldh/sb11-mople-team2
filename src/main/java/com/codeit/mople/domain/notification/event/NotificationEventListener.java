@@ -2,11 +2,13 @@ package com.codeit.mople.domain.notification.event;
 
 import com.codeit.mople.domain.directmessage.event.DirectMessageReceivedEvent;
 import com.codeit.mople.domain.follow.event.FollowCreatedEvent;
-import com.codeit.mople.domain.follow.event.FolloweeActivityEvent;
+import com.codeit.mople.domain.follow.service.FollowService;
 import com.codeit.mople.domain.notification.entity.NotificationType;
 import com.codeit.mople.domain.notification.service.NotificationService;
 import com.codeit.mople.domain.playlist.event.PlaylistContentAddedEvent;
+import com.codeit.mople.domain.playlist.event.PlaylistCreatedEvent;
 import com.codeit.mople.domain.playlist.event.PlaylistSubscribedEvent;
+import com.codeit.mople.domain.review.event.ReviewWrittenEvent;
 import com.codeit.mople.global.event.UserForceLogoutEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +23,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class NotificationEventListener {
 
     private final NotificationService notificationService;
+    private final FollowService followService;
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -96,13 +99,27 @@ public class NotificationEventListener {
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void handleFolloweeActivity(FolloweeActivityEvent event) {
-        log.debug("팔로위 활동 알림 처리 시작 - followerId: {}", event.followerId());
-        notificationService.createNotification(
-            event.followerId(),
-            event.followeeName() + "님의 새로운 활동이 있습니다.",
-            event.activityDescription(),
-            NotificationType.FOLLOWEE_ACTIVITY
-        );
+    public void handlePlaylistCreated(PlaylistCreatedEvent event) {
+        log.debug("플레이리스트 생성 팔로워 알림 처리 시작 - ownerId: {}", event.ownerId());
+        followService.getFollowerIds(event.ownerId())
+            .forEach(followerId -> notificationService.createNotification(
+                followerId,
+                event.ownerName() + "님의 새로운 활동이 있습니다.",
+                "새 플레이리스트를 만들었습니다.",
+                NotificationType.FOLLOWEE_ACTIVITY
+            ));
+    }
+
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void handleReviewWritten(ReviewWrittenEvent event) {
+        log.debug("리뷰 작성 팔로워 알림 처리 시작 - authorId: {}", event.authorId());
+        followService.getFollowerIds(event.authorId())
+            .forEach(followerId -> notificationService.createNotification(
+                followerId,
+                event.authorName() + "님의 새로운 활동이 있습니다.",
+                "리뷰를 작성했습니다.",
+                NotificationType.FOLLOWEE_ACTIVITY
+            ));
     }
 }
