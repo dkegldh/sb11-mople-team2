@@ -835,6 +835,7 @@ public class PlaylistServiceTest {
 
       Playlist playlist = Playlist.create(owner, title, description);
       User subscriber = mock(User.class);
+      given(subscriber.getName()).willReturn("구독자");
 
       given(playlistSubscriptionRepository.existsByPlaylistIdAndSubscriberId(playlistId,
           subscriberId)).willReturn(false);
@@ -854,6 +855,8 @@ public class PlaylistServiceTest {
 
       assertThat(event.playlistId()).isEqualTo(playlistId);
       assertThat(event.subscriberId()).isEqualTo(subscriberId);
+      assertThat(event.subscriberName()).isEqualTo("구독자");
+      assertThat(event.playlistTitle()).isEqualTo(title);
     }
 
     @Test
@@ -1005,6 +1008,7 @@ public class PlaylistServiceTest {
 
       assertThat(event.playlistId()).isEqualTo(playlistId);
       assertThat(event.contentId()).isEqualTo(contentId);
+      assertThat(event.playlistTitle()).isEqualTo(title);
     }
 
     @Test
@@ -1036,6 +1040,7 @@ public class PlaylistServiceTest {
       assertThat(events).allSatisfy(event -> {
         assertThat(event.playlistId()).isEqualTo(playlistId);
         assertThat(event.contentId()).isEqualTo(contentId);
+        assertThat(event.playlistTitle()).isEqualTo(title);
       });
     }
 
