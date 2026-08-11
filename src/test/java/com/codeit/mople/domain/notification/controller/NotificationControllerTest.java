@@ -1,6 +1,7 @@
 package com.codeit.mople.domain.notification.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
@@ -162,17 +163,21 @@ class NotificationControllerTest {
         }
 
         @Test
-        @DisplayName("실패: limit이 없으면 400을 반환한다.")
-        void fail_400_when_limit_is_missing() throws Exception {
+        @DisplayName("성공: limit이 없으면 기본값 20이 적용된다.")
+        void success_200_with_default_limit_when_missing() throws Exception {
+            // given
+            given(notificationService.getNotifications(any(), any())).willReturn(
+                new CursorResponseNotificationDto(List.of(), null, null, false, 0L, "createdAt", "DESCENDING"));
+
             // when & then
             mockMvc.perform(get("/api/notifications")
                     .with(user(principal)))
                 .andDo(print())
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error.code").value("COMMON-001"));
+                .andExpect(status().isOk());
 
-            verifyNoInteractions(notificationService);
+            then(notificationService).should().getNotifications(
+                eq(principal.getUserId()),
+                argThat(request -> request.limit() == 20));
         }
 
         @Test
