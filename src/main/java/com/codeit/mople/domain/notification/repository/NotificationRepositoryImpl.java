@@ -20,7 +20,6 @@ public class NotificationRepositoryImpl implements NotificationRepositoryCustom 
         UUID idAfter, int limit) {
         return queryFactory
             .selectFrom(notification)
-            .leftJoin(notification.receiver).fetchJoin()
             .where(
                 notification.receiver.id.eq(receiverId),
                 cursorCondition(cursorTime, idAfter)
