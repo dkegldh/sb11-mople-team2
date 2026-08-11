@@ -11,6 +11,7 @@ import com.codeit.mople.domain.directmessage.entity.DirectMessage;
 import com.codeit.mople.domain.directmessage.event.DirectMessageCreatedEvent;
 import com.codeit.mople.domain.directmessage.exception.DirectMessageErrorCode;
 import com.codeit.mople.domain.directmessage.exception.DirectMessageException;
+import com.codeit.mople.domain.directmessage.event.DirectMessageReceivedEvent;
 import com.codeit.mople.domain.directmessage.repository.DirectMessageRepository;
 import com.codeit.mople.domain.user.entity.User;
 import java.time.Instant;
@@ -31,8 +32,7 @@ public class DirectMessageService {
 
   private final DirectMessageRepository directMessageRepository;
   private final ConversationRepository conversationRepository;
-
-  private final ApplicationEventPublisher eventPublisher;
+  private final ApplicationEventPublisher publisher;
 
   // DM 발송 및 DB에 저장
   @Transactional
@@ -55,9 +55,11 @@ public class DirectMessageService {
     // 안 읽은 메시지가 생기는 동시성 혼선 방지 - 발신자 자신의 워터마크를 해당 메시지의 생성 시각으로 강제 전진
     conversation.updateLastReadAt(senderId, directMessage.getCreatedAt());
 
+    publisher.publishEvent(new DirectMessageReceivedEvent(receiver.getId(), sender.getName(), content));
+
     DirectMessageDto responseDto = DirectMessageDto.from(directMessage);
 
-    eventPublisher.publishEvent(new DirectMessageCreatedEvent(receiver.getId(), directMessage.getId()));
+    publisher.publishEvent(new DirectMessageCreatedEvent(receiver.getId(), directMessage.getId()));
 
     log.info("WebSocket DM 저장 및 워터마크/마지막 메시지 갱신 완료 - conversationId: {}, messageId: {}", conversationId, directMessage.getId());
 

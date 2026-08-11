@@ -14,6 +14,7 @@ import com.codeit.mople.domain.review.entity.Review;
 import com.codeit.mople.domain.review.event.ReviewCreatedEvent;
 import com.codeit.mople.domain.review.event.ReviewDeletedEvent;
 import com.codeit.mople.domain.review.event.ReviewUpdatedEvent;
+import com.codeit.mople.domain.review.event.ReviewWrittenEvent;
 import com.codeit.mople.domain.review.exception.ReviewErrorCode;
 import com.codeit.mople.domain.review.exception.ReviewException;
 import com.codeit.mople.domain.review.repository.ReviewRepository;
@@ -37,10 +38,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class ReviewService {
 
   private final ReviewRepository reviewRepository;
-
   private final UserRepository userRepository;
   private final ContentRepository contentRepository;
-
   private final ApplicationEventPublisher publisher;
 
   @Transactional
@@ -66,6 +65,8 @@ public class ReviewService {
     Review review = Review.create(content, author, request.text(), request.rating());
 
     Review savedReview = reviewRepository.save(review);
+
+    publisher.publishEvent(new ReviewWrittenEvent(authorId, author.getName()));
 
     publisher.publishEvent(new ReviewCreatedEvent(content.getId()));
 

@@ -9,6 +9,12 @@ spring:
       ddl-auto: create-drop
     show-sql: false
 
+  batch:
+    job:
+      enabled: false
+    jdbc:
+      initialize-schema: always
+
   security:
     oauth2:
       client:

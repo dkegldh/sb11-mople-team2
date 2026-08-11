@@ -13,6 +13,7 @@ import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.exception.UserErrorCode;
 import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.global.error.CustomException;
+import com.codeit.mople.global.event.ForceLogoutReason;
 import com.codeit.mople.global.event.UserForceLogoutEvent;
 import java.util.Optional;
 import java.util.UUID;
@@ -159,8 +160,8 @@ class AdminServiceTest {
   class ChangeUserLocked {
 
     @Test
-    @DisplayName("locked(true)이면 계정을 잠금하고 강제 로그아웃 이벤트를 발행한다")
-    void locked_true이면_계정을_잠금하고_강제_로그아웃_이벤트를_발행한다() {
+    @DisplayName("locked(true)이면 계정을 잠금하고 sessionVersion을 올리며 강제 로그아웃 이벤트를 발행한다")
+    void locked_true이면_계정을_잠금하고_sessionVersion을_올리며_강제_로그아웃_이벤트를_발행한다() {
       // given
       given(userRepository.findById(userId)).willReturn(Optional.of(user));
 
@@ -169,13 +170,15 @@ class AdminServiceTest {
 
       // then
       assertThat(user.isLocked()).isTrue();
+      assertThat(user.getSessionVersion()).isEqualTo(1);
       verify(eventPublisher).publishEvent(eventCaptor.capture());
       assertThat(eventCaptor.getValue().userId()).isEqualTo(userId);
+      assertThat(eventCaptor.getValue().reason()).isEqualTo(ForceLogoutReason.ACCOUNT_LOCKED);
     }
 
     @Test
-    @DisplayName("locked(false)이면 계정 잠금을 해제하고 강제 로그아웃 이벤트를 발행한다")
-    void locked_false이면_계정_잠금을_해제하고_강제_로그아웃_이벤트를_발행한다() {
+    @DisplayName("locked(false)이면 계정 잠금을 해제하고 알림 이벤트를 발행하지만 sessionVersion은 변경하지 않는다")
+    void locked_false이면_계정_잠금을_해제하고_알림_이벤트를_발행하지만_sessionVersion은_변경하지_않는다() {
       // given
       user.lock();
       given(userRepository.findById(userId)).willReturn(Optional.of(user));
@@ -185,13 +188,15 @@ class AdminServiceTest {
 
       // then
       assertThat(user.isLocked()).isFalse();
+      assertThat(user.getSessionVersion()).isEqualTo(0);
       verify(eventPublisher).publishEvent(eventCaptor.capture());
       assertThat(eventCaptor.getValue().userId()).isEqualTo(userId);
+      assertThat(eventCaptor.getValue().reason()).isEqualTo(ForceLogoutReason.ACCOUNT_UNLOCKED);
     }
 
     @Test
-    @DisplayName("이미 잠금 상태인 계정에 잠금 요청 시 이벤트를 발행하지 않는다")
-    void 이미_잠금_상태인_계정에_잠금_요청_시_이벤트를_발행하지_않는다() {
+    @DisplayName("이미 잠금 상태인 계정에 잠금 요청 시 이벤트를 발행하지 않고 sessionVersion도 변경하지 않는다")
+    void 이미_잠금_상태인_계정에_잠금_요청_시_이벤트를_발행하지_않고_sessionVersion도_변경하지_않는다() {
       // given
       user.lock();
       given(userRepository.findById(userId)).willReturn(Optional.of(user));
@@ -201,6 +206,7 @@ class AdminServiceTest {
 
       // then
       assertThat(user.isLocked()).isTrue();
+      assertThat(user.getSessionVersion()).isEqualTo(0);
       verify(eventPublisher, never()).publishEvent(any());
     }
 

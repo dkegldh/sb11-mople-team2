@@ -46,7 +46,7 @@ public class PlaylistEventListenerTest {
       // BeforeEach에서 ownerId, playlistId, subscriberId 초기화
 
       PlaylistSubscribedEvent event =
-          new PlaylistSubscribedEvent(ownerId, playlistId, subscriberId);
+          new PlaylistSubscribedEvent(ownerId, playlistId, subscriberId, "subscriber", "playlist");
 
       // when
       eventListener.handle(event);
