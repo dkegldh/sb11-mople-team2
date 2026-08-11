@@ -1,8 +1,6 @@
 package com.codeit.mople.domain.review.service;
 
 import com.codeit.mople.domain.content.entity.Content;
-import com.codeit.mople.domain.follow.event.FolloweeActivityEvent;
-import com.codeit.mople.domain.follow.service.FollowService;
 import com.codeit.mople.domain.content.exception.ContentErrorCode;
 import com.codeit.mople.domain.content.exception.ContentException;
 import com.codeit.mople.domain.content.repository.ContentRepository;
@@ -16,6 +14,7 @@ import com.codeit.mople.domain.review.entity.Review;
 import com.codeit.mople.domain.review.event.ReviewCreatedEvent;
 import com.codeit.mople.domain.review.event.ReviewDeletedEvent;
 import com.codeit.mople.domain.review.event.ReviewUpdatedEvent;
+import com.codeit.mople.domain.review.event.ReviewWrittenEvent;
 import com.codeit.mople.domain.review.exception.ReviewErrorCode;
 import com.codeit.mople.domain.review.exception.ReviewException;
 import com.codeit.mople.domain.review.repository.ReviewRepository;
@@ -41,7 +40,6 @@ public class ReviewService {
   private final ReviewRepository reviewRepository;
   private final UserRepository userRepository;
   private final ContentRepository contentRepository;
-  private final FollowService followService;
   private final ApplicationEventPublisher publisher;
 
   @Transactional
@@ -68,9 +66,7 @@ public class ReviewService {
 
     Review savedReview = reviewRepository.save(review);
 
-    followService.getFollowerIds(authorId)
-        .forEach(followerId -> publisher.publishEvent(
-            new FolloweeActivityEvent(authorId, author.getName(), "리뷰를 작성했습니다.", followerId)));
+    publisher.publishEvent(new ReviewWrittenEvent(authorId, author.getName()));
 
     publisher.publishEvent(new ReviewCreatedEvent(content.getId()));
 
