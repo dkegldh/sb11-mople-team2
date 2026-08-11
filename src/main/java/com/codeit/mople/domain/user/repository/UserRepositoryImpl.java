@@ -7,14 +7,13 @@ import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.exception.UserErrorCode;
 import com.codeit.mople.domain.user.exception.UserException;
 import com.codeit.mople.global.dto.SortDirection;
-import com.querydsl.core.types.Ops;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
-import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.springframework.stereotype.Repository;
 
@@ -48,7 +47,7 @@ public class UserRepositoryImpl implements UserRepositoryCustom{
 
   private BooleanExpression emailLikeCondition(UserSearchRequest request) {
     return (request.emailLike() != null && !request.emailLike().isBlank())
-        ? user.email.containsIgnoreCase(request.emailLike())
+        ? user.email.startsWith(request.emailLike().toLowerCase(Locale.ROOT))
         : null;
   }
 
@@ -61,48 +60,54 @@ public class UserRepositoryImpl implements UserRepositoryCustom{
   }
 
   private BooleanExpression cursorCondition(UserSearchRequest request, boolean isAsc) {
+    if(request.cursor() == null && request.idAfter() == null) {
+      return null; // 둘 다 없으면 첫 페이지 생성
+    }
     if(request.cursor() == null || request.idAfter() == null) {
-      return null;
+      throw new UserException(UserErrorCode.INVALID_CURSOR); // 한쪽만 있으면 잘못된 요청
     }
 
     UUID idAfter = request.idAfter();
     String cursor = request.cursor();
 
     return switch (request.sortByOrDefault()) {
-      case name -> isAsc
+      case NAME -> isAsc
           ? user.name.gt(cursor).or(user.name.eq(cursor).and(user.id.gt(idAfter)))
           : user.name.lt(cursor).or(user.name.eq(cursor).and(user.id.lt(idAfter)));
-      case email -> isAsc
+      case EMAIL -> isAsc
           ? user.email.gt(cursor).or(user.email.eq(cursor).and(user.id.gt(idAfter)))
           : user.email.lt(cursor).or(user.email.eq(cursor).and(user.id.lt(idAfter)));
-      case createdAt -> {
+      case CREATED_AT -> {
         Instant cursorTime = parseCursorAsInstant(cursor);
         yield isAsc
             ? user.createdAt.gt(cursorTime).or(user.createdAt.eq(cursorTime).and(user.id.gt(idAfter)))
             : user.createdAt.lt(cursorTime).or(user.createdAt.eq(cursorTime).and(user.id.lt(idAfter)));
       }
-      case isLocked -> {
+      case IS_LOCKED -> {
         boolean cursorLocked = parseCursorAsBoolean(cursor);
         yield isAsc
             ? sameGroupOrAfter(user.locked.eq(false), user.locked.eq(true), !cursorLocked, idAfter, true)
             : sameGroupOrAfter(user.locked.eq(true), user.locked.eq(false), cursorLocked, idAfter, false);
       }
-      case role -> {
+      case ROLE -> {
         Role cursorRole = parseCursorAsRole(cursor);
+        String cursorRoleValue = cursorRole.name();
         yield isAsc
-            ? sameGroupOrAfter(user.role.eq(Role.ADMIN), user.role.eq(Role.USER), cursorRole == Role.ADMIN, idAfter, true)
-            : sameGroupOrAfter(user.role.eq(Role.USER), user.role.eq(Role.ADMIN), cursorRole == Role.USER, idAfter, false);
+            ? user.role.stringValue().gt(cursorRoleValue)
+                .or(user.role.stringValue().eq(cursorRoleValue).and(user.id.gt(idAfter)))
+            : user.role.stringValue().lt(cursorRoleValue)
+                .or(user.role.stringValue().eq(cursorRoleValue).and(user.id.lt(idAfter)));
       }
     };
   }
 
   private OrderSpecifier<?>[] orderSpecifiers(UserSearchRequest request, boolean isAsc) {
     OrderSpecifier<?> primary = switch (request.sortByOrDefault()) {
-      case name -> isAsc ? user.name.asc() : user.name.desc();
-      case email -> isAsc ? user.email.asc() : user.email.desc();
-      case createdAt -> isAsc ? user.createdAt.asc() : user.createdAt.desc();
-      case isLocked -> isAsc ? user.locked.asc() : user.locked.desc();
-      case role -> isAsc ? user.role.asc() : user.role.desc();
+      case NAME -> isAsc ? user.name.asc() : user.name.desc();
+      case EMAIL -> isAsc ? user.email.asc() : user.email.desc();
+      case CREATED_AT -> isAsc ? user.createdAt.asc() : user.createdAt.desc();
+      case IS_LOCKED -> isAsc ? user.locked.asc() : user.locked.desc();
+      case ROLE -> isAsc ? user.role.asc() : user.role.desc();
     };
     OrderSpecifier<?> secondary = isAsc ? user.id.asc() : user.id.desc();
     return new OrderSpecifier[]{primary, secondary};
@@ -114,12 +119,9 @@ public class UserRepositoryImpl implements UserRepositoryCustom{
   ) {
     BooleanExpression idCompare = useGreaterThan ? user.id.gt(idAfter) : user.id.lt(idAfter);
 
-    if (isInFirstGroup) {
-      BooleanExpression sameGroupPart = Expressions.predicate(Ops.AND, firstGroup, idCompare);
-      return Expressions.predicate(Ops.OR, sameGroupPart, secondGroup);
-    } else {
-      return Expressions.predicate(Ops.AND, secondGroup, idCompare);
-    }
+    return isInFirstGroup
+        ? firstGroup.and(idCompare).or(secondGroup)
+        :secondGroup.and(idCompare);
   }
 
   private Instant parseCursorAsInstant(String cursor) {

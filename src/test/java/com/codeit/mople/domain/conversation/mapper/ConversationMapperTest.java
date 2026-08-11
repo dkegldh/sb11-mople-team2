@@ -61,7 +61,7 @@ public class ConversationMapperTest {
 
       //then
       assertThat(result.hasUnread()).isFalse();
-      assertThat(result.latestMessage()).isNull();
+      assertThat(result.lastestMessage()).isNull();
     }
 
     @Test

@@ -5,7 +5,6 @@ import com.codeit.mople.domain.content.dto.ContentCreateRequest;
 import com.codeit.mople.domain.content.dto.ContentResponse;
 import com.codeit.mople.domain.content.dto.ContentUpdateRequest;
 import com.codeit.mople.domain.content.dto.CursorResponseContentDto;
-import com.codeit.mople.domain.watchingsession.dto.CursorResponseWatchingSessionDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -153,37 +152,5 @@ public interface ContentApi {
   })
   ResponseEntity<Void> deleteContent(
       @PathVariable UUID contentId
-  );
-
-  @Operation(
-      summary = "콘텐츠 시청 세션 목록 조회",
-      description = "특정 콘텐츠를 시청 중인 세션 목록을 조회합니다",
-      tags = {"시청 세션 관리"}
-  )
-  @ApiResponses({
-      @ApiResponse(
-          responseCode = "200",
-          description = "성공",
-          content = @Content(schema = @Schema(implementation = CursorResponseWatchingSessionDto.class))
-      ),
-      @ApiResponse(
-          responseCode = "400",
-          description = "잘못된 커서 또는 정렬 조건",
-          content = @Content(schema = @Schema(implementation = com.codeit.mople.global.response.ApiResponse.class))
-      ),
-      @ApiResponse(
-          responseCode = "404",
-          description = "콘텐츠를 찾을 수 없음",
-          content = @Content(schema = @Schema(implementation = com.codeit.mople.global.response.ApiResponse.class))
-      )
-  })
-  ResponseEntity<CursorResponseWatchingSessionDto> getWatchingSessions(
-      @PathVariable UUID contentId,
-      @RequestParam(value = "watcherNameLike", required = false) String watcherNameLike,
-      @RequestParam(value = "cursor", required = false) String cursor,
-      @RequestParam(value = "idAfter", required = false) UUID idAfter,
-      @RequestParam(value = "limit", defaultValue = "10") int limit,
-      @RequestParam(value = "sortDirection", defaultValue = "ASCENDING") String sortDirection,
-      @RequestParam(value = "sortBy", defaultValue = "createdAt") String sortBy
   );
 }

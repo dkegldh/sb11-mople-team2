@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -59,6 +60,16 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(MethodArgumentNotValidException.class)
   public ResponseEntity<ApiResponse<Void>> handleValidationException(
       MethodArgumentNotValidException e) {
+    for (FieldError fieldError : e.getBindingResult().getFieldErrors()) {
+      if (!fieldError.contains(Throwable.class)) {
+        continue;
+      }
+      CustomException cause = findCustomExceptionCause(fieldError.unwrap(Throwable.class));
+      if (cause != null) {
+        return handleCustomException(cause);
+      }
+    }
+
     String message = e.getBindingResult().getFieldErrors().stream()
         .findFirst()
         .map(fe -> fe.getField() + ": " + fe.getDefaultMessage())
@@ -67,6 +78,20 @@ public class GlobalExceptionHandler {
     return ResponseEntity
         .status(CommonErrorCode.INVALID_INPUT.getStatus())
         .body(ApiResponse.error(CommonErrorCode.INVALID_INPUT.getCode(), message));
+  }
+
+  // 커스텀 Converter(예: sortBy 카멜케이스 변환)가 던진 CustomException은
+  // DataBinder가 TypeMismatchException -> ConversionFailedException 순으로 감싸서 바인딩 오류로 만든다.
+  // 원래의 도메인 에러 코드/메시지를 응답에 살리기 위해 원인 체인을 직접 순회한다.
+  private CustomException findCustomExceptionCause(Throwable throwable) {
+    Throwable current = throwable;
+    while (current != null) {
+      if (current instanceof CustomException customException) {
+        return customException;
+      }
+      current = current.getCause();
+    }
+    return null;
   }
 
   // @Valid 검증 실패 (쿼리 파라미터, path variable 등)

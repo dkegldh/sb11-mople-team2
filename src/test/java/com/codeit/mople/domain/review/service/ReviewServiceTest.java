@@ -19,6 +19,9 @@ import com.codeit.mople.domain.review.dto.request.ReviewUpdateRequest;
 import com.codeit.mople.domain.review.dto.response.ReviewCursorResponse;
 import com.codeit.mople.domain.review.dto.response.ReviewResponse;
 import com.codeit.mople.domain.review.entity.Review;
+import com.codeit.mople.domain.review.event.ReviewCreatedEvent;
+import com.codeit.mople.domain.review.event.ReviewDeletedEvent;
+import com.codeit.mople.domain.review.event.ReviewUpdatedEvent;
 import com.codeit.mople.domain.review.exception.ReviewErrorCode;
 import com.codeit.mople.domain.review.exception.ReviewException;
 import com.codeit.mople.domain.review.repository.ReviewRepository;
@@ -40,7 +43,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 public class ReviewServiceTest {
@@ -138,12 +140,6 @@ public class ReviewServiceTest {
       given(followService.getFollowerIds(authorId))
           .willReturn(List.of(followerId));
 
-      given(reviewRepository.countByContentId(contentId))
-          .willReturn(1L);
-
-      given(reviewRepository.findAverageRatingByContentId(contentId))
-          .willReturn(createRequest.rating());
-
       // when
       ReviewResponse result = reviewService.create(authorId, createRequest);
 
@@ -153,11 +149,9 @@ public class ReviewServiceTest {
       verify(userRepository).findById(authorId);
       verify(contentRepository).findById(contentId);
       verify(reviewRepository).save(any(Review.class));
-      verify(reviewRepository).countByContentId(contentId);
-      verify(reviewRepository).findAverageRatingByContentId(contentId);
 
-      verify(content).updateRatingStats(createRequest.rating(), 1);
       verify(publisher).publishEvent(any(FolloweeActivityEvent.class));
+      verify(publisher).publishEvent(new ReviewCreatedEvent(contentId));
     }
 
     @Test
@@ -447,9 +441,6 @@ public class ReviewServiceTest {
       given(reviewRepository.findById(review1Id))
           .willReturn(Optional.of(review1));
 
-      given(reviewRepository.findAverageRatingByContentId(contentId))
-          .willReturn(updateRequest.rating());
-
       // when
       ReviewResponse result = reviewService.update(review1Id, updateRequest, authorId);
 
@@ -459,7 +450,8 @@ public class ReviewServiceTest {
       assertThat(review1.getRating()).isEqualTo(updateRequest.rating());
 
       verify(reviewRepository).findById(review1Id);
-      verify(reviewRepository).findAverageRatingByContentId(contentId);
+
+      verify(publisher).publishEvent(new ReviewUpdatedEvent(contentId));
     }
 
     @Test
@@ -532,21 +524,14 @@ public class ReviewServiceTest {
 
       // reviewRepository.delete() 메서드는 void이기 때문에 값을 반환하지 않음
 
-      // 콘텐츠 개수는 0개여야 하고
-      given(reviewRepository.countByContentId(contentId))
-          .willReturn(0L);
-
-      // 콘텐츠 개수가 0개이기 때문에 0.0점을 반환
-      given(reviewRepository.findAverageRatingByContentId(contentId))
-          .willReturn(0.0);
-
       // when
       reviewService.delete(review1Id, authorId);
 
       // then
       verify(reviewRepository).findById(review1Id);
       verify(reviewRepository).delete(review1);
-      verify(content).updateRatingStats(0.0, 0);
+
+      verify(publisher).publishEvent(new ReviewDeletedEvent(contentId));
     }
 
     @Test

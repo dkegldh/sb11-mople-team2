@@ -23,7 +23,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/users")
@@ -46,7 +48,7 @@ public class UserController implements UserApi {
 
   @Override
   @GetMapping
-  public ResponseEntity<CursorResponse<UserDto>> getUsers(UserSearchRequest request) {
+  public ResponseEntity<CursorResponse<UserDto>> getUsers(@Valid UserSearchRequest request) {
     return ResponseEntity.ok(userService.getUsers(request));
   }
 
@@ -55,9 +57,10 @@ public class UserController implements UserApi {
   public ResponseEntity<UserDto> updateProfile(
       @PathVariable UUID userId,
       @AuthenticationPrincipal CustomUserDetails principal,
-      @Valid @ModelAttribute UserUpdateRequest request
+      @Valid @RequestPart UserUpdateRequest request,
+      @RequestPart(value = "image", required = false)MultipartFile image
   ) {
-    return ResponseEntity.ok(userService.updateProfile(userId, principal.getUserId(), request));
+    return ResponseEntity.ok(userService.updateProfile(userId, principal.getUserId(), request, image));
   }
 
   @Override

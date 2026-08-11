@@ -19,6 +19,14 @@ public class UserTest {
   }
 
   @Test
+  @DisplayName("email에 대문자가 섞여 있어도 소문자로 정규화되어 저장됨")
+  void createUser_normalizesEmailToLowerCase() {
+    User user = User.createUser("TestUser@Test.com", "encodedPassword", "testUser");
+
+    assertThat(user.getEmail()).isEqualTo("testuser@test.com");
+  }
+
+  @Test
   @DisplayName("email이 null이면 User 생성 시 예외가 발생함")
   void createUser_throwsException_whenEmailIsNull() {
     assertThatThrownBy(() -> User.createUser(null, "encodedPassword", "testUser"))
@@ -114,5 +122,45 @@ public class UserTest {
     User user = User.createUser("test@test.com", "encoded", "testUser");
     assertThat(user.increaseSessionVersion()).isEqualTo(1L);
     assertThat(user.increaseSessionVersion()).isEqualTo(2L);
+  }
+
+  @Test
+  @DisplayName("createOAuthUser로 생성 시 비밀번호 없이 지정한 provider, providerId, 프로필 이미지로 생성됨")
+  void createOAuthUser_success() {
+    User user = User.createOAuthUser("oauth@test.com", "oauthUser", "https://profile.image", AuthProvider.GOOGLE, "google-sub-123");
+
+    assertThat(user.getEmail()).isEqualTo("oauth@test.com");
+    assertThat(user.getName()).isEqualTo("oauthUser");
+    assertThat(user.getProfileImageUrl()).isEqualTo("https://profile.image");
+    assertThat(user.getProvider()).isEqualTo(AuthProvider.GOOGLE);
+    assertThat(user.getProviderId()).isEqualTo("google-sub-123");
+    assertThat(user.getPassword()).isNull();
+    assertThat(user.getRole()).isEqualTo(Role.USER);
+  }
+
+  @Test
+  @DisplayName("createOAuthUser에 provider가 null이면 예외가 발생함")
+  void createOAuthUser_throwsException_whenProviderIsNull() {
+    assertThatThrownBy(() -> User.createOAuthUser("oauth@test.com", "oasuthUser", null, null, "google-sub-123"))
+        .isInstanceOf(NullPointerException.class)
+        .hasMessage("provider");
+  }
+
+  @Test
+  @DisplayName("createOAuthUser에 providerId가 null이면 예외가 발생함")
+  void createOAuthUser_throwsException_whenProviderIdIsNull() {
+    assertThatThrownBy(() -> User.createOAuthUser("oauth@test.com", "oasuthUser", null, AuthProvider.GOOGLE, null))
+        .isInstanceOf(NullPointerException.class)
+        .hasMessage("providerId");
+  }
+
+  @Test
+  @DisplayName("createUser/createAdmin로 생성한 계정은 provider가 LOCAL로 설정됨")
+  void createUser_and_createAdmin_haveLocalProvider() {
+    User user = User.createUser("test@test.com", "encodedPassword", "testUser");
+    User admin = User.createAdmin("admin@test.com", "encodedPassword", "adminUser");
+
+    assertThat(user.getProvider()).isEqualTo(AuthProvider.LOCAL);
+    assertThat(admin.getProvider()).isEqualTo(AuthProvider.LOCAL);
   }
 }

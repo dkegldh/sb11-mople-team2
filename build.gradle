@@ -30,6 +30,7 @@ dependencies {
 
     // Security & JWT
     implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
     implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
@@ -48,6 +49,7 @@ dependencies {
     // Real-time (WebSocket / SSE)
     implementation 'org.springframework.boot:spring-boot-starter-websocket'
     // SSE는 starter-web의 SseEmitter로 처리 — 별도 의존성 불필요
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 
     // Batch & 모니터링
     implementation 'org.springframework.boot:spring-boot-starter-batch'

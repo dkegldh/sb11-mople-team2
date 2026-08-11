@@ -11,6 +11,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.AccessLevel;
@@ -18,7 +19,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "contents")
+@Table(name = "contents",
+    uniqueConstraints = @UniqueConstraint(
+    name = "uk_contents_type_external_id",
+    columnNames = {"type", "external_id"}))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Content extends BaseTimeEntity {
@@ -51,8 +55,7 @@ public class Content extends BaseTimeEntity {
   @Column(name = "watcher_count", nullable = false)
   private long watcherCount = 0L; //실시간 사용자 수
 
-  //외부 API 중복 방지용 식별자 필드
-  @Column(name = "external_id", unique = true)
+  @Column(name = "external_id")
   private String externalId;
 
   public Content(ContentType type, String title, String description, String thumbnailUrl, List<String> tags) {
@@ -101,5 +104,10 @@ public class Content extends BaseTimeEntity {
       this.tags.clear();
       this.tags.addAll(tags);
     }
+  }
+
+  //실시간 시청자 수 동기화용 메서드
+  public void updateWatcherCount(long watcherCount) {
+    this.watcherCount = watcherCount;
   }
 }

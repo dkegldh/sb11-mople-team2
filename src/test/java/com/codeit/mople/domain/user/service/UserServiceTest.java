@@ -87,6 +87,21 @@ public class UserServiceTest {
   }
 
   @Test
+  @DisplayName("대소문자만 다른 이메일로 가입을 시도하면 중복으로 처리됨")
+  void signUp_throwsException_whenEmailDuplicatedWithDifferentCase() {
+    UserCreateRequest request = new UserCreateRequest("Dup@Test.com", "rawPw123", "testUser");
+    when(userRepository.existsByEmail("dup@test.com")).thenReturn(true);
+
+    assertThatThrownBy(() -> userService.signUp(request))
+        .isInstanceOf(UserException.class)
+        .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.DUPLICATE_EMAIL)
+        .satisfies(e -> {
+          UserException ue = (UserException) e;
+          assertThat(ue.getDetails()).containsEntry("email", "dup@test.com");
+        });
+  }
+
+  @Test
   @DisplayName("사용자 조회 성공")
   void getUser_success() {
     UUID userId = UUID.randomUUID();
@@ -113,7 +128,7 @@ public class UserServiceTest {
   void getUsers_success_withoutFilters() {
     UserSearchRequest request = new UserSearchRequest(
         null, null, null, null, null, 10,
-        SortDirection.ASCENDING, UserSortBy.name
+        SortDirection.ASCENDING, UserSortBy.NAME
     );
     User user1 = User.createUser("user1@test.com", "encoded", "user1");
     when(userRepository.searchUsers(request)).thenReturn(List.of(user1));
@@ -127,11 +142,30 @@ public class UserServiceTest {
   }
 
   @Test
+  @DisplayName("사용자 목록 조회 시 totalCount는 실제 전체 개수를 반환함 (페이지 크기와 다름)")
+  void getUsers_returnsActualTotalCount_notPageSize() {
+    UserSearchRequest request = new UserSearchRequest(
+        null, null, null, null, null, 2,
+        SortDirection.ASCENDING, UserSortBy.NAME
+    );
+    User user1 = User.createUser("a@test.com", "encoded", "aa");
+    User user2 = User.createUser("b@test.com", "encoded", "bb");
+    User user3 = User.createUser("c@test.com", "encoded", "cc");
+    when(userRepository.searchUsers(request)).thenReturn(List.of(user1, user2, user3));
+    when(userRepository.countUsers(request)).thenReturn(100L);
+
+    CursorResponse<UserDto> response = userService.getUsers(request);
+
+    assertThat(response.data()).hasSize(2);
+    assertThat(response.totalCount()).isEqualTo(100L);
+  }
+
+  @Test
   @DisplayName("사용자 목록 조회 시 hasNext와 nextCursor가 올바르게 설정됨")
   void getUsers_returnsCorrectCursorResponse() {
     UserSearchRequest request = new UserSearchRequest(
         null, null, null, null, null, 2,
-        SortDirection.ASCENDING, UserSortBy.name
+        SortDirection.ASCENDING, UserSortBy.NAME
     );
 
     User user1 = User.createUser("a@test.com", "encoded", "aa");
@@ -154,7 +188,7 @@ public class UserServiceTest {
   void getUsers_returnsHasNextTrue_whenMoreItemsExist() {
     UserSearchRequest request = new UserSearchRequest(
         null, null, null, null, null, 2,
-        SortDirection.ASCENDING, UserSortBy.name
+        SortDirection.ASCENDING, UserSortBy.NAME
     );
     User user1 = User.createUser("user1@test.com", "encoded", "user1");
     User user2 = User.createUser("user2@test.com", "encoded", "user2");
@@ -175,7 +209,7 @@ public class UserServiceTest {
   void getUsers_returnsHasNextFalse_whenLastPage() {
     UserSearchRequest request = new UserSearchRequest(
         null, null, null, null, null, 10,
-        SortDirection.ASCENDING, UserSortBy.name
+        SortDirection.ASCENDING, UserSortBy.NAME
     );
     User user1 = User.createUser("user1@test.com", "encoded", "user1");
     when(userRepository.searchUsers(request)).thenReturn(List.of(user1));
@@ -193,7 +227,7 @@ public class UserServiceTest {
   void getUsers_usesEmailAsCursor_whenSortByEmail() {
     UserSearchRequest request = new UserSearchRequest(
         null, null, null, null, null, 1,
-        SortDirection.ASCENDING, UserSortBy.email
+        SortDirection.ASCENDING, UserSortBy.EMAIL
     );
     User user1 = User.createUser("user1@test.com", "encoded", "user1");
     User user2 = User.createUser("user2@test.com", "encoded", "user2");
@@ -211,9 +245,9 @@ public class UserServiceTest {
     UUID userId = UUID.randomUUID();
     UUID otherUserId = UUID.randomUUID();
 
-    UserUpdateRequest request = new UserUpdateRequest("newName", null);
+    UserUpdateRequest request = new UserUpdateRequest("newName");
 
-    assertThatThrownBy(() -> userService.updateProfile(userId, otherUserId, request))
+    assertThatThrownBy(() -> userService.updateProfile(userId, otherUserId, request, null))
         .isInstanceOf(UserException.class)
         .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.FORBIDDEN_ACCESS);
   }
@@ -224,9 +258,9 @@ public class UserServiceTest {
     UUID userId = UUID.randomUUID();
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
 
-    UserUpdateRequest request = new UserUpdateRequest("newName", null);
+    UserUpdateRequest request = new UserUpdateRequest("newName");
 
-    UserDto response = userService.updateProfile(userId, userId, request);
+    UserDto response = userService.updateProfile(userId, userId, request, null);
 
     assertThat(response.name()).isEqualTo("newName");
   }
@@ -238,10 +272,10 @@ public class UserServiceTest {
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(fileStorageService.upload(any())).thenReturn("https://placeholder.mople.com/test.jpg");
 
-    MockMultipartFile image = new MockMultipartFile("profileImage", "test.jpg", "image/jpeg", "content".getBytes());
-    UserUpdateRequest request = new UserUpdateRequest(null, image);
+    MockMultipartFile image = new MockMultipartFile("image", "test.jpg", "image/jpeg", "content".getBytes());
+    UserUpdateRequest request = new UserUpdateRequest(null);
 
-    UserDto response = userService.updateProfile(userId, userId, request);
+    UserDto response = userService.updateProfile(userId, userId, request, image);
 
     assertThat(response.profileImageUrl()).isEqualTo("https://placeholder.mople.com/test.jpg");
     assertThat(response.name()).isEqualTo(user.getName());
@@ -254,10 +288,10 @@ public class UserServiceTest {
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(fileStorageService.upload(any())).thenReturn("https://placeholder.mople.com/test.jpg");
 
-    MockMultipartFile image = new MockMultipartFile("profileImage", "test.jpg", "image/jpeg", "content".getBytes());
-    UserUpdateRequest request = new UserUpdateRequest("newName", image);
+    MockMultipartFile image = new MockMultipartFile("image", "test.jpg", "image/jpeg", "content".getBytes());
+    UserUpdateRequest request = new UserUpdateRequest("newName");
 
-    UserDto response = userService.updateProfile(userId, userId, request);
+    UserDto response = userService.updateProfile(userId, userId, request, image);
 
     assertThat(response.name()).isEqualTo("newName");
     assertThat(response.profileImageUrl()).isEqualTo("https://placeholder.mople.com/test.jpg");

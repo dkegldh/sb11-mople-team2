@@ -1,5 +1,6 @@
 package com.codeit.mople.domain.review.repository;
 
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.codeit.mople.domain.content.entity.Content;

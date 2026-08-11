@@ -15,6 +15,7 @@ import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
@@ -67,14 +68,23 @@ public class ReviewRepositoryImpl implements ReviewCustomRepository {
 
     // cursor가 공백일 경우 예외 발생
     if (condition.cursor() != null && condition.cursor().isBlank()) {
-      throw new ReviewException(ReviewErrorCode.REVIEW_INVALID_CURSOR);
+      throw new ReviewException(
+          ReviewErrorCode.REVIEW_INVALID_CURSOR,
+          Map.of("cursor", condition.cursor())
+      );
     }
 
     boolean hasCursor = condition.cursor() != null;
     boolean hasIdAfter = condition.idAfter() != null;
 
     if (hasCursor != hasIdAfter) {
-      throw new ReviewException(ReviewErrorCode.REVIEW_INVALID_CURSOR);
+      throw new ReviewException(
+          ReviewErrorCode.REVIEW_INVALID_CURSOR,
+          Map.of(
+              "cursor", condition.cursor() != null ? condition.cursor() : "null",
+              "idAfter", condition.idAfter() != null ? condition.idAfter().toString() : "null"
+          )
+      );
     }
 
     if (!hasCursor) {
@@ -89,7 +99,10 @@ public class ReviewRepositoryImpl implements ReviewCustomRepository {
       try {
         cursor = Instant.parse(condition.cursor());
       } catch (DateTimeParseException e) {
-        throw new ReviewException(ReviewErrorCode.REVIEW_INVALID_CURSOR);
+        throw new ReviewException(
+            ReviewErrorCode.REVIEW_INVALID_CURSOR,
+            Map.of("cursor", condition.cursor())
+        );
       }
 
       // 경우 1 : 생성순 오름차순(=오래된 순)
@@ -115,12 +128,18 @@ public class ReviewRepositoryImpl implements ReviewCustomRepository {
       try {
         cursor = Double.parseDouble(condition.cursor());
       } catch (NumberFormatException e) {
-        throw new ReviewException(ReviewErrorCode.REVIEW_INVALID_CURSOR);
+        throw new ReviewException(
+            ReviewErrorCode.REVIEW_INVALID_CURSOR,
+            Map.of("cursor", condition.cursor())
+        );
       }
 
       // "NaN", "Infinity", 등의 유효하지 않은 값이 들어올 경우 예외 처리
       if (!Double.isFinite(cursor)) {
-        throw new ReviewException(ReviewErrorCode.REVIEW_INVALID_CURSOR);
+        throw new ReviewException(
+            ReviewErrorCode.REVIEW_INVALID_CURSOR,
+            Map.of("cursor", condition.cursor())
+        );
       }
 
       // 경우 3 : 평점순 오름차순

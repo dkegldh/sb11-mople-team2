@@ -8,6 +8,7 @@ import com.codeit.mople.domain.directmessage.dto.request.DirectMessageCursorRequ
 import com.codeit.mople.domain.directmessage.dto.response.CursorResponseDirectMessageDto;
 import com.codeit.mople.domain.directmessage.dto.response.DirectMessageDto;
 import com.codeit.mople.domain.directmessage.entity.DirectMessage;
+import com.codeit.mople.domain.directmessage.event.DirectMessageCreatedEvent;
 import com.codeit.mople.domain.directmessage.exception.DirectMessageErrorCode;
 import com.codeit.mople.domain.directmessage.exception.DirectMessageException;
 import com.codeit.mople.domain.directmessage.event.DirectMessageReceivedEvent;
@@ -56,8 +57,13 @@ public class DirectMessageService {
 
     publisher.publishEvent(new DirectMessageReceivedEvent(receiver.getId(), sender.getName(), content));
 
+    DirectMessageDto responseDto = DirectMessageDto.from(directMessage);
+
+    publisher.publishEvent(new DirectMessageCreatedEvent(receiver.getId(), directMessage.getId()));
+
     log.info("WebSocket DM 저장 및 워터마크/마지막 메시지 갱신 완료 - conversationId: {}, messageId: {}", conversationId, directMessage.getId());
-    return DirectMessageDto.from(directMessage);
+
+    return responseDto;
   }
 
   // 특정 대화방의 메시지 목록 조회
@@ -126,6 +132,10 @@ public class DirectMessageService {
       throw new DirectMessageException(DirectMessageErrorCode.DIRECT_MESSAGE_NOT_FOUND,
           Map.of("conversationId", conversationId,
               "directMessageId", directMessageId));
+    }
+
+    if (message.getSender().getId().equals(requesterId)) {
+      return;
     }
 
     if (!message.getReceiver().getId().equals(requesterId)) {

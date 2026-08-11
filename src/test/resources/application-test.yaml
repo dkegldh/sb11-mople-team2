@@ -15,6 +15,15 @@ spring:
     jdbc:
       initialize-schema: always
 
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: test-client-id
+            client-secret: test-client-secret
+            scope: email, profile
+
 jwt:
   secret: test-secret-key-for-ci-pipeline-only-1234567890
 
@@ -28,3 +37,13 @@ external-api:
   sportsdb:
     base-url: http://localhost:0
     api-key: test-key
+
+batch:
+  tmdb:
+    collect:
+      cron: "-"
+
+oauth2:
+  redirect:
+    success-uri: http://localhost:3000/
+    failure-uri: http://localhost:3000/login

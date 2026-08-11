@@ -14,6 +14,7 @@ import com.codeit.mople.domain.auth.dto.request.SignInRequest;
 import com.codeit.mople.domain.auth.dto.response.AuthTokens;
 import com.codeit.mople.domain.auth.exception.AuthErrorCode;
 import com.codeit.mople.domain.auth.exception.AuthException;
+import com.codeit.mople.domain.user.entity.AuthProvider;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.global.jwt.JwtProvider;
@@ -57,6 +58,20 @@ public class AuthServiceTest {
   void signIn_success() {
     SignInRequest request = new SignInRequest("test@test.com", "rawPassword");
     when(userRepository.findByEmail(request.username())).thenReturn(Optional.of(user));
+    when(passwordEncoder.matches(request.password(), user.getPassword())).thenReturn(true);
+    when(jwtProvider.createAccessToken(any(), anyLong())).thenReturn("issued-token");
+    when(jwtProvider.createRefreshToken(any())).thenReturn("issued-refresh-token");
+
+    AuthTokens response = authService.signIn(request);
+
+    assertThat(response.accessToken()).isEqualTo("issued-token");
+  }
+
+  @Test
+  @DisplayName("가입 시와 다른 대소문자로 입력해도 로그인이 성공함")
+  void signIn_success_withDifferentEmailCase() {
+    SignInRequest request = new SignInRequest("TEST@TEST.COM", "rawPassword");
+    when(userRepository.findByEmail("test@test.com")).thenReturn(Optional.of(user));
     when(passwordEncoder.matches(request.password(), user.getPassword())).thenReturn(true);
     when(jwtProvider.createAccessToken(any(), anyLong())).thenReturn("issued-token");
     when(jwtProvider.createRefreshToken(any())).thenReturn("issued-refresh-token");
@@ -346,6 +361,20 @@ public class AuthServiceTest {
 
     assertThat(user.isRefreshTokenValid("new-refresh", Instant.now())).isTrue();
     assertThat(user.isRefreshTokenValid("old-token", Instant.now())).isFalse();
+  }
+
+  @Test
+  @DisplayName("소셜 로그인 계정으로 이메일/비밀번호 로그인 시도 시 비밀번호 검증 없이 예외가 발생함")
+  void signIn_throwsException_whenAccountIsOAuthUser() {
+    User googleUser = User.createOAuthUser("oauth@test.com", "oauthUser", null, AuthProvider.GOOGLE, "google-sub");
+    SignInRequest request = new SignInRequest("oauth@test.com", "anyPassword");
+    when(userRepository.findByEmail(request.username())).thenReturn(Optional.of(googleUser));
+
+    assertThatThrownBy(() -> authService.signIn(request))
+        .isInstanceOf(AuthException.class)
+        .hasFieldOrPropertyWithValue("errorCode", AuthErrorCode.INVALID_CREDENTIALS);
+
+    verify(passwordEncoder, never()).matches(any(), any());
   }
 
   private AuthErrorCode catchAuthErrorCode(SignInRequest request) {

@@ -21,6 +21,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.multipart.MultipartFile;
 
 @Tag(
     name = "사용자 관리",
@@ -157,7 +159,8 @@ public interface UserApi {
   ResponseEntity<UserDto> updateProfile(
       @PathVariable UUID userId,
       @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails principal,
-      @Valid @ModelAttribute UserUpdateRequest request
+      @Valid @RequestPart UserUpdateRequest request,
+      @RequestPart(value = "image", required = false) MultipartFile image
   );
 
   @Operation(

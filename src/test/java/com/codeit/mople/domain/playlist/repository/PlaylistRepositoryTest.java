@@ -249,7 +249,7 @@ public class PlaylistRepositoryTest {
           null,
           2,
           SortDirection.DESCENDING,
-          PlaylistSortBy.SUBSCRIBER_COUNT
+          PlaylistSortBy.SUBSCRIBE_COUNT
       );
 
       // when
@@ -266,7 +266,7 @@ public class PlaylistRepositoryTest {
           last.getId(),
           2,
           SortDirection.DESCENDING,
-          PlaylistSortBy.SUBSCRIBER_COUNT
+          PlaylistSortBy.SUBSCRIBE_COUNT
       );
 
       List<Playlist> nextResult = playlistRepository.findAll(nextCondition);
@@ -297,7 +297,7 @@ public class PlaylistRepositoryTest {
           null,
           2,
           SortDirection.ASCENDING,
-          PlaylistSortBy.SUBSCRIBER_COUNT
+          PlaylistSortBy.SUBSCRIBE_COUNT
       );
 
       // when
@@ -314,7 +314,7 @@ public class PlaylistRepositoryTest {
           last.getId(),
           2,
           SortDirection.ASCENDING,
-          PlaylistSortBy.SUBSCRIBER_COUNT
+          PlaylistSortBy.SUBSCRIBE_COUNT
       );
 
       List<Playlist> nextResult = playlistRepository.findAll(nextCondition);
@@ -414,7 +414,7 @@ public class PlaylistRepositoryTest {
           null,
           2,
           SortDirection.DESCENDING,
-          PlaylistSortBy.SUBSCRIBER_COUNT
+          PlaylistSortBy.SUBSCRIBE_COUNT
       );
 
       // when
@@ -430,7 +430,7 @@ public class PlaylistRepositoryTest {
           last.getId(),
           2,
           SortDirection.DESCENDING,
-          PlaylistSortBy.SUBSCRIBER_COUNT
+          PlaylistSortBy.SUBSCRIBE_COUNT
       );
 
       List<Playlist> nextResult = playlistRepository.findAll(nextCondition);

@@ -13,6 +13,9 @@ import com.codeit.mople.domain.review.dto.request.ReviewUpdateRequest;
 import com.codeit.mople.domain.review.dto.response.ReviewCursorResponse;
 import com.codeit.mople.domain.review.dto.response.ReviewResponse;
 import com.codeit.mople.domain.review.entity.Review;
+import com.codeit.mople.domain.review.event.ReviewCreatedEvent;
+import com.codeit.mople.domain.review.event.ReviewDeletedEvent;
+import com.codeit.mople.domain.review.event.ReviewUpdatedEvent;
 import com.codeit.mople.domain.review.exception.ReviewErrorCode;
 import com.codeit.mople.domain.review.exception.ReviewException;
 import com.codeit.mople.domain.review.repository.ReviewRepository;
@@ -22,6 +25,7 @@ import com.codeit.mople.domain.user.exception.UserException;
 import com.codeit.mople.domain.user.repository.UserRepository;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,11 +51,17 @@ public class ReviewService {
         authorId, request.contentId(), request.rating());
 
     User author = userRepository.findById(authorId).orElseThrow(() ->
-        new UserException(UserErrorCode.USER_NOT_FOUND)
+        new UserException(
+            UserErrorCode.USER_NOT_FOUND,
+            Map.of("userId", authorId)
+        )
     );
 
     Content content = contentRepository.findById(request.contentId()).orElseThrow(() ->
-        new ContentException(ContentErrorCode.CONTENT_NOT_FOUND)
+        new ContentException(
+            ContentErrorCode.CONTENT_NOT_FOUND,
+            Map.of("contentId", request.contentId())
+        )
     );
 
     Review review = Review.create(content, author, request.text(), request.rating());
@@ -62,12 +72,7 @@ public class ReviewService {
         .forEach(followerId -> publisher.publishEvent(
             new FolloweeActivityEvent(authorId, author.getName(), "리뷰를 작성했습니다.", followerId)));
 
-    // TODO 김명근: 동시성 문제(Race Condition)는 다음 스프린트 기간 때 락 사용 등을 활용하여 개선
-    // 콘텐츠의 리뷰 개수, 평균 평점을 조회
-    long reviewCount = reviewRepository.countByContentId(content.getId());
-    Double averageRating = reviewRepository.findAverageRatingByContentId(content.getId());
-
-    content.updateRatingStats(averageRating, (int) reviewCount);
+    publisher.publishEvent(new ReviewCreatedEvent(content.getId()));
 
     ReviewResponse response = ReviewResponse.from(savedReview);
     log.info("리뷰 생성 완료: reviewId={}, authorId={}, contentId={}",
@@ -138,16 +143,19 @@ public class ReviewService {
   }
 
   @Transactional
-  public ReviewResponse update(UUID reviewId, ReviewUpdateRequest request, UUID authorId) {
+  public ReviewResponse update(UUID reviewId, ReviewUpdateRequest request, UUID requesterId) {
 
-    log.debug("리뷰 수정 시도: reviewId={}, authorId={}, rating={}",
-        reviewId, authorId,request.rating());
+    log.debug("리뷰 수정 시도: reviewId={}, requesterId={}, rating={}",
+        reviewId, requesterId, request.rating());
 
     Review review = reviewRepository.findById(reviewId).orElseThrow(() ->
-        new ReviewException(ReviewErrorCode.REVIEW_NOT_FOUND)
+        new ReviewException(
+            ReviewErrorCode.REVIEW_NOT_FOUND,
+            Map.of("reviewId", reviewId)
+        )
     );
 
-    validateAuthor(review, authorId);
+    validateRequesterIsAuthor(review, requesterId);
 
     if (request.text() != null) {
       review.updateText(request.text());
@@ -159,58 +167,53 @@ public class ReviewService {
 
     Content content = review.getContent();
 
-    // TODO 김명근: 동시성 문제(Race Condition)는 다음 스프린트 기간 때 락 사용 등을 활용하여 개선
     // 콘텐츠의 평균 평점을 조회
     // 리뷰 내용만 변경 된 경우 계산하지 않음
     if (request.rating() != null) {
-      Double averageRating = reviewRepository.findAverageRatingByContentId(content.getId());
-
-      content.updateRatingStats(averageRating, content.getReviewCount());
+      publisher.publishEvent(new ReviewUpdatedEvent(content.getId()));
     }
 
     ReviewResponse response = ReviewResponse.from(review);
 
-    log.info("리뷰 수정 완료: reviewId={}, authorId={}, contentId={}, rating={}",
-        reviewId, authorId, content.getId(), request.rating());
+    log.info("리뷰 수정 완료: reviewId={}, requesterId={}, contentId={}, rating={}",
+        reviewId, requesterId, content.getId(), request.rating());
 
     return response;
   }
 
   @Transactional
-  public void delete(UUID reviewId, UUID authorId) {
+  public void delete(UUID reviewId, UUID requesterId) {
 
-    log.debug("리뷰 삭제 시도: reviewId={}, authorId={}",
-        reviewId, authorId);
+    log.debug("리뷰 삭제 시도: reviewId={}, requesterId={}",
+        reviewId, requesterId);
 
     Review review = reviewRepository.findById(reviewId).orElseThrow(() ->
-        new ReviewException(ReviewErrorCode.REVIEW_NOT_FOUND)
+        new ReviewException(
+            ReviewErrorCode.REVIEW_NOT_FOUND,
+            Map.of("reviewId", reviewId)
+        )
     );
 
-    validateAuthor(review, authorId);
+    validateRequesterIsAuthor(review, requesterId);
 
     Content content = review.getContent();
 
     reviewRepository.delete(review);
 
-    long reviewCount = reviewRepository.countByContentId(content.getId());
-    Double averageRating = reviewRepository.findAverageRatingByContentId(content.getId());
+    publisher.publishEvent(new ReviewDeletedEvent(content.getId()));
 
-    Double updateAverageRating = reviewCount == 0 ? 0.0 : averageRating;
-
-    // 리뷰 삭제 후 리뷰가 0개일 때 평균 평점을 0점으로(averageRating null 방지)
-    content.updateRatingStats(
-        updateAverageRating,
-        (int) reviewCount
-    );
-
-    log.info("리뷰 삭제 완료: reviewId={}, authorId={}, contentId={}, averageRating={}, reviewCount={}",
-        reviewId, authorId, content.getId(), updateAverageRating, reviewCount);
-
+    log.info(
+        "리뷰 삭제 완료: reviewId={}, requesterId={}, contentId={}",
+        reviewId, requesterId, content.getId());
   }
 
-  private void validateAuthor(Review review, UUID authorId) {
-    if (!review.getAuthor().getId().equals(authorId)) {
-      throw new ReviewException(ReviewErrorCode.REVIEW_FORBIDDEN);
+  private void validateRequesterIsAuthor(Review review, UUID requesterId) {
+    UUID authorId = review.getAuthor().getId();
+    if (!authorId.equals(requesterId)) {
+      throw new ReviewException(
+          ReviewErrorCode.REVIEW_FORBIDDEN,
+          Map.of("authorId", authorId, "requesterId", requesterId)
+      );
     }
   }
 

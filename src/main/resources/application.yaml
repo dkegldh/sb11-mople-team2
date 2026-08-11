@@ -42,3 +42,8 @@ management:
 external-api:
   tmdb:
     image-base-url: https://image.tmdb.org/t/p/w500
+
+batch:
+  tmdb:
+    collect:
+      max-pages: 5

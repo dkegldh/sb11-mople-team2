@@ -17,6 +17,7 @@ import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
@@ -118,7 +119,10 @@ public class PlaylistRepositoryImpl implements PlaylistCustomRepository {
 
     // cursor가 공백이면 예외 발생
     if (condition.cursor() != null && condition.cursor().isBlank()) {
-      throw new PlaylistException(PlaylistErrorCode.PLAYLIST_INVALID_CURSOR);
+      throw new PlaylistException(
+          PlaylistErrorCode.PLAYLIST_INVALID_CURSOR,
+          Map.of("cursor", condition.cursor())
+      );
     }
     
     boolean hasCursor = condition.cursor() != null;
@@ -126,7 +130,13 @@ public class PlaylistRepositoryImpl implements PlaylistCustomRepository {
 
     // 커서, 보조커서 둘 중 하나만 존재하면 예외 발생(함께 존재해야 함)
     if (hasCursor != hasIdAfter) {
-      throw new PlaylistException(PlaylistErrorCode.PLAYLIST_INVALID_CURSOR);
+      throw new PlaylistException(
+          PlaylistErrorCode.PLAYLIST_INVALID_CURSOR,
+          Map.of(
+              "cursor", condition.cursor() != null ? condition.cursor() : "null",
+              "idAfter", condition.idAfter() != null ? condition.idAfter().toString() : "null"
+          )
+      );
     }
 
     // cursor, idAfter 둘 다 없으면 null 반환(첫 페이지)
@@ -143,7 +153,10 @@ public class PlaylistRepositoryImpl implements PlaylistCustomRepository {
       try {
         cursor = Instant.parse(condition.cursor());
       } catch (DateTimeParseException e) {
-        throw new PlaylistException(PlaylistErrorCode.PLAYLIST_INVALID_CURSOR);
+        throw new PlaylistException(
+            PlaylistErrorCode.PLAYLIST_INVALID_CURSOR,
+            Map.of("cursor", condition.cursor())
+        );
       }
 
       // 경우 1 : 최신순 오름차순(=오래된 순)
@@ -164,14 +177,25 @@ public class PlaylistRepositoryImpl implements PlaylistCustomRepository {
     }
 
     // 구독순 조건
-    if (condition.sortBy() == PlaylistSortBy.SUBSCRIBER_COUNT) {
+    if (condition.sortBy() == PlaylistSortBy.SUBSCRIBE_COUNT) {
       // 구독자수는 long 타입
       Long cursor;
 
       try {
         cursor = Long.parseLong(condition.cursor());
       } catch (NumberFormatException e) {
-        throw new PlaylistException(PlaylistErrorCode.PLAYLIST_INVALID_CURSOR);
+        throw new PlaylistException(
+            PlaylistErrorCode.PLAYLIST_INVALID_CURSOR,
+            Map.of("cursor", condition.cursor())
+        );
+      }
+
+      // 구독자 수는 0 이상(음수가 들어올 경우 예외 처리)
+      if (cursor < 0) {
+        throw new PlaylistException(
+            PlaylistErrorCode.PLAYLIST_INVALID_CURSOR,
+            Map.of("cursor", condition.cursor())
+        );
       }
 
       // 구독자 수는 0 이상(음수가 들어올 경우 예외 처리)

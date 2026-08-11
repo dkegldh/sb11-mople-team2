@@ -28,7 +28,8 @@ public enum PlaylistErrorCode implements ErrorCode {
 
   UN_PLAYLIST_CONTENT_NOT_FOUND(HttpStatus.BAD_REQUEST,"PLAYLIST-014","플레이리스트에 콘텐츠가 없습니다."),
 
-  PLAYLIST_INVALID_CURSOR(HttpStatus.BAD_REQUEST, "PLAYLIST-015", "유효하지 않은 커서 값입니다.");
+  PLAYLIST_INVALID_CURSOR(HttpStatus.BAD_REQUEST, "PLAYLIST-015", "유효하지 않은 커서 값입니다."),
+  PLAYLIST_INVALID_SORT_BY(HttpStatus.BAD_REQUEST, "PLAYLIST-016", "유효하지 않은 정렬 기준입니다.");
 
   private final HttpStatus status;
   private final String code;

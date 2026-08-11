@@ -6,6 +6,7 @@ import com.codeit.mople.domain.auth.dto.response.AuthTokens;
 import com.codeit.mople.domain.auth.exception.AuthErrorCode;
 import com.codeit.mople.domain.auth.exception.AuthException;
 import com.codeit.mople.domain.user.dto.response.UserDto;
+import com.codeit.mople.domain.user.entity.AuthProvider;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.global.jwt.JwtProvider;
@@ -13,6 +14,7 @@ import io.jsonwebtoken.JwtException;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -35,7 +37,7 @@ public class AuthService {
 
   @Transactional
   public AuthTokens signIn(SignInRequest request) {
-    User user = userRepository.findByEmail(request.username())
+    User user = userRepository.findByEmail(request.username().toLowerCase(Locale.ROOT))
         .orElseThrow(() -> new AuthException(AuthErrorCode.INVALID_CREDENTIALS));
 
     if(!isPasswordValid(request.password(), user)) {
@@ -53,6 +55,10 @@ public class AuthService {
   }
 
   private boolean isPasswordValid(String rawPassword, User user) {
+    // LOCAL이 아니면 비밀번호 로그인 자체를 차단
+    if(user.getProvider() != AuthProvider.LOCAL) {
+      return false;
+    }
     if(passwordEncoder.matches(rawPassword, user.getPassword())) {
       return true;
     }
@@ -62,7 +68,7 @@ public class AuthService {
 
   @Transactional
   public void resetPassword(ResetPasswordRequest request) {
-    userRepository.findByEmail(request.email())
+    userRepository.findByEmail(request.email().toLowerCase(Locale.ROOT))
         .ifPresent(user -> {
           String temporaryPassword = generateTemporaryPassword();
           Instant expiresAt = Instant.now().plus(TEMPORARY_PASSWORD_EXPIRATION_MINUTES, ChronoUnit.MINUTES);
