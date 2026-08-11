@@ -28,6 +28,7 @@ public class NotificationService {
         log.debug("알림 목록 조회 요청 - receiverId: {}, limit: {}, cursor: {}", receiverId,
             request.limit(), request.cursor());
 
+        request.validateCursorPair();
         Instant cursorTime = request.parseCursorToInstant();
         List<Notification> notifications = notificationRepository.findNotificationByCursor(
             receiverId, cursorTime, request.idAfter(), request.limit());
