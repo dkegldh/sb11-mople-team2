@@ -207,6 +207,21 @@ public class NotificationIntegrationTest {
                 .andExpect(jsonPath("$.data[0].receiverId").value(RECEIVER_ID.toString()))
                 .andExpect(jsonPath("$.data[0].createdAt").isNotEmpty());
         }
+
+        @Test
+        @DisplayName("성공: limit을 생략하면 기본값 20이 적용된다.")
+        void success_default_limit_when_omitted() throws Exception {
+            for (int i = 1; i <= 25; i++) {
+                알림_생성("알림" + i, NotificationType.NEW_FOLLOWER);
+            }
+
+            mockMvc.perform(get("/api/notifications")
+                    .with(user(principal)))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(20))
+                .andExpect(jsonPath("$.hasNext").value(true));
+        }
     }
 
     @Nested
