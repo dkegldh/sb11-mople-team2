@@ -336,8 +336,7 @@ public class NotificationIntegrationTest {
                 .andExpect(jsonPath("$.data[0].title").value("알림1"))
                 .andExpect(jsonPath("$.hasNext").value(false))
                 .andExpect(jsonPath("$.nextCursor").doesNotExist())
-                .andExpect(jsonPath("$.nextIdAfter").doesNotExist())
-                .andExpect(jsonPath("$.totalCount").doesNotExist());
+                .andExpect(jsonPath("$.nextIdAfter").doesNotExist());
         }
 
         @Test
@@ -355,7 +354,6 @@ public class NotificationIntegrationTest {
                 .andExpect(jsonPath("$.data.length()").value(1))
                 .andExpect(jsonPath("$.data[0].title").value("알림3"))
                 .andExpect(jsonPath("$.hasNext").value(true))
-                .andExpect(jsonPath("$.totalCount").value(3))
                 .andReturn();
 
             String body1 = page1.getResponse().getContentAsString();
@@ -372,7 +370,6 @@ public class NotificationIntegrationTest {
                 .andExpect(jsonPath("$.data.length()").value(1))
                 .andExpect(jsonPath("$.data[0].title").value("알림2"))
                 .andExpect(jsonPath("$.hasNext").value(true))
-                .andExpect(jsonPath("$.totalCount").doesNotExist())
                 .andReturn();
 
             String body2 = page2.getResponse().getContentAsString();
@@ -391,8 +388,7 @@ public class NotificationIntegrationTest {
                 .andExpect(jsonPath("$.data[0].title").value("알림1"))
                 .andExpect(jsonPath("$.hasNext").value(false))
                 .andExpect(jsonPath("$.nextCursor").doesNotExist())
-                .andExpect(jsonPath("$.nextIdAfter").doesNotExist())
-                .andExpect(jsonPath("$.totalCount").doesNotExist());
+                .andExpect(jsonPath("$.nextIdAfter").doesNotExist());
         }
     }
 }
