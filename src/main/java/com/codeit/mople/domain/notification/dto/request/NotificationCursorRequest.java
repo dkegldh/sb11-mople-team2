@@ -19,7 +19,9 @@ public record NotificationCursorRequest(
     Integer limit
 ) {
 
-    public NotificationCursorRequest {
+    // cursor/idAfter 짝 검증을 compact constructor에서 하면 예외가 BeanInstantiationException으로 감싸지므로,
+    // 서비스가 명시적으로 호출하는 일반 메서드로 둠 (parseCursorToInstant()와 동일한 방식)
+    public void validateCursorPair() {
         boolean hasCursor = cursor != null && !cursor.isBlank();
         boolean hasIdAfter = idAfter != null;
 
