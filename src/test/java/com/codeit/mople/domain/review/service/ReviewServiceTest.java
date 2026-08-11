@@ -22,12 +22,11 @@ import com.codeit.mople.domain.review.entity.Review;
 import com.codeit.mople.domain.review.event.ReviewCreatedEvent;
 import com.codeit.mople.domain.review.event.ReviewDeletedEvent;
 import com.codeit.mople.domain.review.event.ReviewUpdatedEvent;
+import com.codeit.mople.domain.review.event.ReviewWrittenEvent;
 import com.codeit.mople.domain.review.exception.ReviewErrorCode;
 import com.codeit.mople.domain.review.exception.ReviewException;
 import com.codeit.mople.domain.review.repository.ReviewRepository;
 import com.codeit.mople.domain.user.entity.User;
-import com.codeit.mople.domain.follow.event.FolloweeActivityEvent;
-import com.codeit.mople.domain.follow.service.FollowService;
 import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.global.dto.UserSummary;
 import com.codeit.mople.global.error.CustomException;
@@ -55,9 +54,6 @@ public class ReviewServiceTest {
 
   @Mock
   private ContentRepository contentRepository;
-
-  @Mock
-  private FollowService followService;
 
   @Mock
   private ApplicationEventPublisher publisher;
@@ -136,10 +132,6 @@ public class ReviewServiceTest {
       given(reviewRepository.save(any(Review.class)))
           .willReturn(review);
 
-      UUID followerId = UUID.randomUUID();
-      given(followService.getFollowerIds(authorId))
-          .willReturn(List.of(followerId));
-
       // when
       ReviewResponse result = reviewService.create(authorId, createRequest);
 
@@ -150,7 +142,7 @@ public class ReviewServiceTest {
       verify(contentRepository).findById(contentId);
       verify(reviewRepository).save(any(Review.class));
 
-      verify(publisher).publishEvent(any(FolloweeActivityEvent.class));
+      verify(publisher).publishEvent(new ReviewWrittenEvent(authorId, "test"));
       verify(publisher).publishEvent(new ReviewCreatedEvent(contentId));
     }
 

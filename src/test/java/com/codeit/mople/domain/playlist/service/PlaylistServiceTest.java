@@ -26,14 +26,13 @@ import com.codeit.mople.domain.playlist.entity.Playlist;
 import com.codeit.mople.domain.playlist.entity.PlaylistContent;
 import com.codeit.mople.domain.playlist.entity.PlaylistSubscription;
 import com.codeit.mople.domain.playlist.event.PlaylistContentAddedEvent;
+import com.codeit.mople.domain.playlist.event.PlaylistCreatedEvent;
 import com.codeit.mople.domain.playlist.event.PlaylistSubscribedEvent;
 import com.codeit.mople.domain.playlist.event.PlaylistUnsubscribedEvent;
 import com.codeit.mople.domain.playlist.exception.PlaylistErrorCode;
 import com.codeit.mople.domain.playlist.exception.PlaylistException;
 import com.codeit.mople.domain.playlist.repository.PlaylistContentRepository;
 import com.codeit.mople.domain.playlist.repository.PlaylistRepository;
-import com.codeit.mople.domain.follow.event.FolloweeActivityEvent;
-import com.codeit.mople.domain.follow.service.FollowService;
 import com.codeit.mople.domain.playlist.repository.PlaylistSubscriptionRepository;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.exception.UserErrorCode;
@@ -74,9 +73,6 @@ public class PlaylistServiceTest {
 
   @Mock
   private PlaylistSubscriptionRepository playlistSubscriptionRepository;
-
-  @Mock
-  private FollowService followService;
 
   @Mock
   private ApplicationEventPublisher publisher;
@@ -158,10 +154,6 @@ public class PlaylistServiceTest {
       given(playlistRepository.save(any(Playlist.class)))
           .willReturn(playlist);
 
-      UUID followerId = UUID.randomUUID();
-      given(followService.getFollowerIds(ownerId))
-          .willReturn(List.of(followerId));
-
       PlaylistResponse response = PlaylistResponse.from(
           playlist,
           ownerResponse,
@@ -179,7 +171,7 @@ public class PlaylistServiceTest {
       // 행위 중심(given(...) 메서드가 호출됐는지 검증)
       verify(userRepository).findById(ownerId);
       verify(playlistRepository).save(any(Playlist.class));
-      verify(publisher).publishEvent(any(FolloweeActivityEvent.class));
+      verify(publisher).publishEvent(new PlaylistCreatedEvent(ownerId, "test", title));
     }
 
     @Test
