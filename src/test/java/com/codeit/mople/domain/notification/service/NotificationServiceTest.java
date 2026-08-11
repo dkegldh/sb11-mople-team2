@@ -3,6 +3,7 @@ package com.codeit.mople.domain.notification.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
@@ -228,6 +229,34 @@ class NotificationServiceTest {
             // when & then — parseCursorToInstant()에서 예외 발생, Repository는 호출되지 않음
             assertThatThrownBy(() -> notificationService.getNotifications(receiverId, request))
                 .isInstanceOf(NotificationException.class);
+        }
+
+        @Test
+        @DisplayName("실패: cursor만 있고 idAfter가 없으면 NotificationException이 발생한다.")
+        void fail_throws_exception_when_cursor_without_id_after() {
+            // given
+            NotificationCursorRequest request = new NotificationCursorRequest(
+                "2025-08-01T10:00:00Z", null, 20);
+
+            // when & then — validateCursorPair()에서 예외 발생, Repository는 호출되지 않음
+            assertThatThrownBy(() -> notificationService.getNotifications(receiverId, request))
+                .isInstanceOf(NotificationException.class);
+            then(notificationRepository).should(never())
+                .findNotificationByCursor(any(), any(), any(), anyInt());
+        }
+
+        @Test
+        @DisplayName("실패: idAfter만 있고 cursor가 없으면 NotificationException이 발생한다.")
+        void fail_throws_exception_when_id_after_without_cursor() {
+            // given
+            NotificationCursorRequest request = new NotificationCursorRequest(
+                null, UUID.randomUUID(), 20);
+
+            // when & then — validateCursorPair()에서 예외 발생, Repository는 호출되지 않음
+            assertThatThrownBy(() -> notificationService.getNotifications(receiverId, request))
+                .isInstanceOf(NotificationException.class);
+            then(notificationRepository).should(never())
+                .findNotificationByCursor(any(), any(), any(), anyInt());
         }
 
         @Test

@@ -206,21 +206,6 @@ class NotificationControllerTest {
         }
 
         @Test
-        @DisplayName("실패: cursor만 있고 idAfter가 없으면 400을 반환한다.")
-        void fail_400_when_cursor_without_id_after() throws Exception {
-            // when & then
-            mockMvc.perform(get("/api/notifications")
-                    .param("limit", "20")
-                    .param("cursor", "2025-08-01T10:00:00Z")
-                    .with(user(principal)))
-                .andDo(print())
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.code").value("COMMON-001"));
-
-            verifyNoInteractions(notificationService);
-        }
-
-        @Test
         @DisplayName("성공: limit이 1(최솟값)이면 200을 반환한다.")
         void success_200_when_limit_is_min() throws Exception {
             given(notificationService.getNotifications(any(), any())).willReturn(
@@ -264,20 +249,6 @@ class NotificationControllerTest {
                 .andExpect(status().isOk());
 
             then(notificationService).should().getNotifications(eq(principal.getUserId()), any());
-        }
-
-        @Test
-        @DisplayName("실패: idAfter만 있고 cursor가 없으면 400을 반환한다.")
-        void fail_400_when_id_after_without_cursor() throws Exception {
-            mockMvc.perform(get("/api/notifications")
-                    .param("limit", "20")
-                    .param("idAfter", UUID.randomUUID().toString())
-                    .with(user(principal)))
-                .andDo(print())
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.code").value("COMMON-001"));
-
-            verifyNoInteractions(notificationService);
         }
 
         @Test
