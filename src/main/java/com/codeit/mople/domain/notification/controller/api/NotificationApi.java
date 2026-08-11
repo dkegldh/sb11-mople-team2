@@ -29,7 +29,7 @@ public interface NotificationApi {
     @Parameters({
         @Parameter(name = "cursor", description = "이전 페이지 마지막 항목의 createdAt (ISO-8601 형식). idAfter와 함께 사용"),
         @Parameter(name = "idAfter", description = "이전 페이지 마지막 항목의 ID. cursor와 함께 사용"),
-        @Parameter(name = "limit", description = "페이지 크기 (1~100)", required = true)
+        @Parameter(name = "limit", description = "페이지 크기 (1~100). 기본값: 20")
     })
     @ApiResponses({
         @ApiResponse(
