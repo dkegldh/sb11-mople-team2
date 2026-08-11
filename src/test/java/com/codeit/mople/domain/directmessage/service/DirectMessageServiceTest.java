@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -244,6 +245,8 @@ public class DirectMessageServiceTest {
       given(directMessageRepository.findById(messageId)).willReturn(Optional.of(message));
       given(message.getConversation()).willReturn(conversation);
       given(conversation.getId()).willReturn(conversationId);
+      given(message.getSender()).willReturn(userA);
+      given(userA.getId()).willReturn(userAId);
       given(message.getReceiver()).willReturn(userB);
       given(userB.getId()).willReturn(userBId);
       given(message.getCreatedAt()).willReturn(messageTime);
@@ -255,6 +258,23 @@ public class DirectMessageServiceTest {
 
       //then
       verify(conversation).updateLastReadAt(userBId, messageTime);
+    }
+
+    @Test
+    @DisplayName("성공: 발신자 본인이 자기가 보낸 메시지 읽음을 시도하면 예외 없이 조기 종료(Early Return)된다.")
+    void success_read_message_by_sender_is_ignored() {
+      //given
+      given(directMessageRepository.findById(messageId)).willReturn(Optional.of(message));
+      given(message.getConversation()).willReturn(conversation);
+      given(conversation.getId()).willReturn(conversationId);
+      given(message.getSender()).willReturn(userA);
+      given(userA.getId()).willReturn(userAId);
+
+      // when
+      directMessageService.readMessage(conversationId, messageId, userAId);
+
+      // then
+      verify(conversation, never()).updateLastReadAt(any(), any());
     }
 
     @Test
@@ -292,11 +312,13 @@ public class DirectMessageServiceTest {
       given(directMessageRepository.findById(messageId)).willReturn(Optional.of(message));
       given(message.getConversation()).willReturn(conversation);
       given(conversation.getId()).willReturn(conversationId);
+      given(message.getSender()).willReturn(userA);
+      given(userA.getId()).willReturn(userAId);
       given(message.getReceiver()).willReturn(userB);
       given(userB.getId()).willReturn(userBId);
 
-      // when & then: UserA(발신자)가 자기가 보낸 메시지를 읽음 처리하려고 시도
-      assertThatThrownBy(() -> directMessageService.readMessage(conversationId, messageId, userAId))
+      // when & then: stranger가 자기가 보낸 메시지를 읽음 처리하려고 시도
+      assertThatThrownBy(() -> directMessageService.readMessage(conversationId, messageId, strangerId))
           .isInstanceOf(DirectMessageException.class)
           .hasMessageContaining(DirectMessageErrorCode.UNAUTHORIZED_RECEIVER.getMessage());
     }

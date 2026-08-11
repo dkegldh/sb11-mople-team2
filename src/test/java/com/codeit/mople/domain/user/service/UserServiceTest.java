@@ -245,9 +245,9 @@ public class UserServiceTest {
     UUID userId = UUID.randomUUID();
     UUID otherUserId = UUID.randomUUID();
 
-    UserUpdateRequest request = new UserUpdateRequest("newName", null);
+    UserUpdateRequest request = new UserUpdateRequest("newName");
 
-    assertThatThrownBy(() -> userService.updateProfile(userId, otherUserId, request))
+    assertThatThrownBy(() -> userService.updateProfile(userId, otherUserId, request, null))
         .isInstanceOf(UserException.class)
         .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.FORBIDDEN_ACCESS);
   }
@@ -258,9 +258,9 @@ public class UserServiceTest {
     UUID userId = UUID.randomUUID();
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
 
-    UserUpdateRequest request = new UserUpdateRequest("newName", null);
+    UserUpdateRequest request = new UserUpdateRequest("newName");
 
-    UserDto response = userService.updateProfile(userId, userId, request);
+    UserDto response = userService.updateProfile(userId, userId, request, null);
 
     assertThat(response.name()).isEqualTo("newName");
   }
@@ -272,10 +272,10 @@ public class UserServiceTest {
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(fileStorageService.upload(any())).thenReturn("https://placeholder.mople.com/test.jpg");
 
-    MockMultipartFile image = new MockMultipartFile("profileImage", "test.jpg", "image/jpeg", "content".getBytes());
-    UserUpdateRequest request = new UserUpdateRequest(null, image);
+    MockMultipartFile image = new MockMultipartFile("image", "test.jpg", "image/jpeg", "content".getBytes());
+    UserUpdateRequest request = new UserUpdateRequest(null);
 
-    UserDto response = userService.updateProfile(userId, userId, request);
+    UserDto response = userService.updateProfile(userId, userId, request, image);
 
     assertThat(response.profileImageUrl()).isEqualTo("https://placeholder.mople.com/test.jpg");
     assertThat(response.name()).isEqualTo(user.getName());
@@ -288,10 +288,10 @@ public class UserServiceTest {
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(fileStorageService.upload(any())).thenReturn("https://placeholder.mople.com/test.jpg");
 
-    MockMultipartFile image = new MockMultipartFile("profileImage", "test.jpg", "image/jpeg", "content".getBytes());
-    UserUpdateRequest request = new UserUpdateRequest("newName", image);
+    MockMultipartFile image = new MockMultipartFile("image", "test.jpg", "image/jpeg", "content".getBytes());
+    UserUpdateRequest request = new UserUpdateRequest("newName");
 
-    UserDto response = userService.updateProfile(userId, userId, request);
+    UserDto response = userService.updateProfile(userId, userId, request, image);
 
     assertThat(response.name()).isEqualTo("newName");
     assertThat(response.profileImageUrl()).isEqualTo("https://placeholder.mople.com/test.jpg");

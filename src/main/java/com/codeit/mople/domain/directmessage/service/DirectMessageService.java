@@ -132,6 +132,10 @@ public class DirectMessageService {
               "directMessageId", directMessageId));
     }
 
+    if (message.getSender().getId().equals(requesterId)) {
+      return;
+    }
+
     if (!message.getReceiver().getId().equals(requesterId)) {
       log.warn("수신자가 아닌 유저의 접근, DM 읽음 처리 인가 실패 - messageId: {}, requesterId: {}", directMessageId,
           requesterId);

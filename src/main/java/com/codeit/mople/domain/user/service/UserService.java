@@ -68,14 +68,14 @@ public class UserService {
   }
 
   @Transactional
-  public UserDto updateProfile(UUID targetUserId, UUID requesterId, UserUpdateRequest request) {
+  public UserDto updateProfile(UUID targetUserId, UUID requesterId, UserUpdateRequest request, MultipartFile image) {
     validateOwner(targetUserId, requesterId);
     User user = findUserOrThrow(targetUserId);
 
     String imageUrl = null;
-    MultipartFile profileImage = request.profileImage();
-    if(profileImage != null && !profileImage.isEmpty()) {
-      imageUrl = fileStorageService.upload(profileImage);
+
+    if(image != null && !image.isEmpty()) {
+      imageUrl = fileStorageService.upload(image);
     }
 
     user.updateProfile(request.name(), imageUrl);

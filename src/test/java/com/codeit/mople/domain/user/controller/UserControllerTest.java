@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.codeit.mople.domain.user.dto.request.ChangePasswordRequest;
 import com.codeit.mople.domain.user.dto.request.UserCreateRequest;
+import com.codeit.mople.domain.user.dto.request.UserUpdateRequest;
 import com.codeit.mople.domain.user.entity.Role;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.repository.UserRepository;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
@@ -52,6 +54,12 @@ public class UserControllerTest {
 
   private String tokenFor(User user) {
     return jwtProvider.createAccessToken(user.getId(), user.getSessionVersion());
+  }
+
+  private MockMultipartFile requestPart(String name) throws Exception {
+    return new MockMultipartFile(
+        "request", "", MediaType.APPLICATION_JSON_VALUE,
+        objectMapper.writeValueAsBytes(new UserUpdateRequest(name)));
   }
 
   @Test
@@ -200,7 +208,7 @@ public class UserControllerTest {
     String token = tokenFor(user);
 
     mockMvc.perform(multipart("/api/users/{userId}", user.getId())
-        .param("name", "newName")
+        .file(requestPart("newName"))
         .header("Authorization", "Bearer " + token)
         .with(req -> { req.setMethod("PATCH"); return req; })
         .with(csrf()))
@@ -214,11 +222,11 @@ public class UserControllerTest {
   void updateProfile_success_withImage() throws Exception {
     User user = userRepository.save(User.createUser("update2@test.com", "encoded", "oldName"));
     String token = tokenFor(user);
-    MockMultipartFile image = new MockMultipartFile("profileImage", "test.jpg", "image/jpeg", "content".getBytes());
+    MockMultipartFile image = new MockMultipartFile("image", "test.jpg", "image/jpeg", "content".getBytes());
 
     mockMvc.perform(multipart("/api/users/{userId}", user.getId())
+        .file(requestPart("newName"))
         .file(image)
-        .param("name", "newName")
         .header("Authorization", "Bearer " + token)
         .with(req -> { req.setMethod("PATCH"); return req; })
         .with(csrf()))
@@ -236,7 +244,7 @@ public class UserControllerTest {
     String tooLongName = "a".repeat(21);
 
     mockMvc.perform(multipart("/api/users/{userId}", user.getId())
-        .param("name", tooLongName)
+        .file(requestPart(tooLongName))
         .header("Authorization", "Bearer " + token)
         .with(req -> { req.setMethod("PATCH"); return req; })
         .with(csrf()))
@@ -252,7 +260,7 @@ public class UserControllerTest {
     String attackerToken = tokenFor(attacker);
 
     mockMvc.perform(multipart("/api/users/{userId}", owner.getId())
-        .param("name", "newName")
+        .file(requestPart("newName"))
         .header("Authorization", "Bearer " + attackerToken)
         .with(req -> { req.setMethod("PATCH"); return req; })
         .with(csrf()))
@@ -304,7 +312,7 @@ public class UserControllerTest {
     String token = tokenFor(user);
 
     mockMvc.perform(multipart("/api/users/{userId}", user.getId())
-            .param("name", "newName")
+            .file(requestPart("newName"))
             .header("Authorization", "Bearer " + token)
             .with(req -> { req.setMethod("PATCH"); return req; }))
         // .with(csrf()) 없음!

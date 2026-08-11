@@ -47,6 +47,7 @@ public class SecurityConfig {
         .authorizeHttpRequests(auth -> auth
             .requestMatchers(PathRequest.toStaticResources().atCommonLocations()).permitAll()
             .requestMatchers("/", "/index.html", "/favicon.svg", "/assets/**").permitAll()
+            .requestMatchers("/ws/**").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/users").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/auth/sign-out").authenticated()
             .requestMatchers("/api/auth/**").permitAll()
