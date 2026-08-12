@@ -196,6 +196,8 @@ class NotificationServiceTest {
             // then - cursor 문자열이 정확한 Instant 값으로 변환되어 Repository에 전달됨
             assertThat(result.data()).isEmpty();
             assertThat(result.hasNext()).isFalse();
+            then(notificationRepository).should()
+                .findNotificationByCursor(eq(receiverId), eq(Instant.parse(cursorStr)), eq(idAfter), eq(20));
         }
 
         @Test
@@ -210,6 +212,8 @@ class NotificationServiceTest {
                 .isInstanceOf(NotificationException.class)
                 .satisfies(e -> assertThat(((NotificationException) e).getErrorCode())
                     .isEqualTo(NotificationErrorCode.NOTIFICATION_INVALID_CURSOR));
+            then(notificationRepository).should(never())
+                .findNotificationByCursor(any(), any(), any(), anyInt());
         }
 
         @Test
@@ -249,7 +253,7 @@ class NotificationServiceTest {
         void success_single_result_has_next_false() {
             // given
             NotificationCursorRequest request = new NotificationCursorRequest(
-                null, null, 20);
+                null, null, null);
 
             UUID notifId = UUID.randomUUID();
             Instant createdAt = Instant.parse("2025-08-01T09:00:00Z");
