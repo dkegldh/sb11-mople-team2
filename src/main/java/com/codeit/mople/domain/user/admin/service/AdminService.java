@@ -37,7 +37,7 @@ public class AdminService {
     if (previousRole != role) {
       user.changeRole(role);
       user.increaseSessionVersion();
-      eventPublisher.publishEvent(new UserForceLogoutEvent(userId, ForceLogoutReason.ROLE_CHANGE));
+      eventPublisher.publishEvent(new UserForceLogoutEvent(userId, ForceLogoutReason.ROLE_CHANGE, true));
     }
     log.info("권한 변경 완료 - userId: {}, role: {}", userId, role);
   }
@@ -59,7 +59,8 @@ public class AdminService {
         user.increaseSessionVersion();
       }
       ForceLogoutReason reason = locked ? ForceLogoutReason.ACCOUNT_LOCKED : ForceLogoutReason.ACCOUNT_UNLOCKED;
-      eventPublisher.publishEvent(new UserForceLogoutEvent(userId, reason));
+      // locked일 때만 위에서 increaseSessionVersion()을 호출했으므로 sessionInvalidated도 locked와 동일하다.
+      eventPublisher.publishEvent(new UserForceLogoutEvent(userId, reason, locked));
     }
     log.info("계정 잠금 변경 완료 - userId: {}, locked: {}", userId, locked);
   }
