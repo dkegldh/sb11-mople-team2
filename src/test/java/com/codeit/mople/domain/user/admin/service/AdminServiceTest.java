@@ -14,7 +14,7 @@ import com.codeit.mople.domain.user.exception.UserErrorCode;
 import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.global.error.CustomException;
 import com.codeit.mople.global.event.ForceLogoutReason;
-import com.codeit.mople.global.event.UserForceLogoutEvent;
+import com.codeit.mople.global.event.UserAccountStatusChangedEvent;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -46,7 +46,7 @@ class AdminServiceTest {
   private ApplicationEventPublisher eventPublisher;
 
   @Captor
-  private ArgumentCaptor<UserForceLogoutEvent> eventCaptor;
+  private ArgumentCaptor<UserAccountStatusChangedEvent> eventCaptor;
 
   UUID userId;   // 대상 유저
   UUID adminId;  // 현재 로그인한 어드민 (요청자)
