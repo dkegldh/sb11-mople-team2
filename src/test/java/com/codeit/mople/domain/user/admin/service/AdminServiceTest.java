@@ -86,6 +86,7 @@ class AdminServiceTest {
       assertThat(user.getRole()).isEqualTo(Role.ADMIN);
       verify(eventPublisher).publishEvent(eventCaptor.capture());
       assertThat(eventCaptor.getValue().userId()).isEqualTo(userId);
+      assertThat(eventCaptor.getValue().sessionInvalidated()).isTrue();
     }
 
     @Test
@@ -102,6 +103,7 @@ class AdminServiceTest {
       assertThat(admin.getRole()).isEqualTo(Role.USER);
       verify(eventPublisher).publishEvent(eventCaptor.capture());
       assertThat(eventCaptor.getValue().userId()).isEqualTo(userId);
+      assertThat(eventCaptor.getValue().sessionInvalidated()).isTrue();
     }
 
     @Test
@@ -174,6 +176,7 @@ class AdminServiceTest {
       verify(eventPublisher).publishEvent(eventCaptor.capture());
       assertThat(eventCaptor.getValue().userId()).isEqualTo(userId);
       assertThat(eventCaptor.getValue().reason()).isEqualTo(ForceLogoutReason.ACCOUNT_LOCKED);
+      assertThat(eventCaptor.getValue().sessionInvalidated()).isTrue();
     }
 
     @Test
@@ -192,6 +195,7 @@ class AdminServiceTest {
       verify(eventPublisher).publishEvent(eventCaptor.capture());
       assertThat(eventCaptor.getValue().userId()).isEqualTo(userId);
       assertThat(eventCaptor.getValue().reason()).isEqualTo(ForceLogoutReason.ACCOUNT_UNLOCKED);
+      assertThat(eventCaptor.getValue().sessionInvalidated()).isFalse();
     }
 
     @Test

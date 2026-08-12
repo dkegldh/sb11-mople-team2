@@ -304,7 +304,7 @@ class NotificationEventListenerIntegrationTest {
     void 이벤트_발행_후_트랜잭션_롤백_시_알림이_저장되지_않는다() {
         transactionTemplate.execute(status -> {
             status.setRollbackOnly();
-            eventPublisher.publishEvent(new UserForceLogoutEvent(targetUserId, ForceLogoutReason.ROLE_CHANGE));
+            eventPublisher.publishEvent(new UserForceLogoutEvent(targetUserId, ForceLogoutReason.ROLE_CHANGE, true));
             return null;
         });
 
