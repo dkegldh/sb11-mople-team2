@@ -30,24 +30,28 @@ public class NotificationEventListener {
     public void handleUserForceLogout(UserForceLogoutEvent event) {
         log.debug("강제 로그아웃 알림 처리 시작 - userId: {}, reason: {}", event.userId(), event.reason());
 
-        String title = switch (event.reason()) {
-            case ROLE_CHANGE -> "권한이 변경되었습니다.";
-            case ACCOUNT_LOCKED -> "계정이 잠금되었습니다.";
-            case ACCOUNT_UNLOCKED -> "계정 잠금이 해제되었습니다.";
-        };
-        String content = switch (event.reason()) {
-            case ROLE_CHANGE -> "관리자에 의해 권한이 변경되었습니다. 다시 로그인해주세요.";
-            case ACCOUNT_LOCKED -> "관리자에 의해 계정이 잠금되었습니다.";
-            case ACCOUNT_UNLOCKED -> "관리자에 의해 계정 잠금이 해제되었습니다.";
-        };
-        NotificationType type = switch (event.reason()) {
-            case ROLE_CHANGE -> NotificationType.ROLE_CHANGE;
-            case ACCOUNT_LOCKED -> NotificationType.ACCOUNT_LOCKED;
-            case ACCOUNT_UNLOCKED -> NotificationType.ACCOUNT_UNLOCKED;
+        ForceLogoutNotification notification = switch (event.reason()) {
+            case ROLE_CHANGE -> new ForceLogoutNotification(
+                "권한이 변경되었습니다.",
+                "관리자에 의해 권한이 변경되었습니다. 다시 로그인해주세요.",
+                NotificationType.ROLE_CHANGE);
+            case ACCOUNT_LOCKED -> new ForceLogoutNotification(
+                "계정이 잠금되었습니다.",
+                "관리자에 의해 계정이 잠금되었습니다.",
+                NotificationType.ACCOUNT_LOCKED);
+            case ACCOUNT_UNLOCKED -> new ForceLogoutNotification(
+                "계정 잠금이 해제되었습니다.",
+                "관리자에 의해 계정 잠금이 해제되었습니다.",
+                NotificationType.ACCOUNT_UNLOCKED);
         };
 
-        notificationService.createNotification(event.userId(), title, content, type);
+        notificationService.createNotification(
+            event.userId(), notification.title(), notification.content(), notification.type());
     }
+
+    // reason별 title/content/type을 한 switch에서 같이 채워서, reason이 추가될 때 고칠 곳을
+    // 하나로 유지한다 (ForceLogoutReason -> NotificationType 매핑 반복 제거 포함).
+    private record ForceLogoutNotification(String title, String content, NotificationType type) {}
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
