@@ -2,6 +2,7 @@ package com.codeit.mople.domain.notification.entity;
 
 import com.codeit.mople.domain.notification.NotificationLevel;
 import com.codeit.mople.domain.user.entity.User;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -38,18 +39,22 @@ class NotificationTest {
     }
 
     @Test
-    @DisplayName("ROLE_CHANGE 타입은 level이 WARNING이다")
-    void create_levelIsWarning_whenRoleChange() {
-        Notification notification = Notification.create(receiver, "권한 변경", "내용", NotificationType.ROLE_CHANGE);
+    @DisplayName("ROLE_CHANGE, ACCOUNT_LOCKED 타입은 level이 WARNING이다")
+    void create_levelIsWarning_whenWarningType() {
+        for (NotificationType type : List.of(NotificationType.ROLE_CHANGE, NotificationType.ACCOUNT_LOCKED)) {
+            Notification notification = Notification.create(receiver, "제목", "내용", type);
 
-        assertThat(notification.getLevel()).isEqualTo(NotificationLevel.WARNING);
+            assertThat(notification.getLevel())
+                .as("NotificationType=%s 일 때 level은 WARNING이어야 한다", type)
+                .isEqualTo(NotificationLevel.WARNING);
+        }
     }
 
     @Test
-    @DisplayName("ROLE_CHANGE 외 타입은 level이 INFO이다")
-    void create_levelIsInfo_whenNotRoleChange() {
+    @DisplayName("ROLE_CHANGE, ACCOUNT_LOCKED 외 타입은 level이 INFO이다")
+    void create_levelIsInfo_whenInfoType() {
         for (NotificationType type : NotificationType.values()) {
-            if (type == NotificationType.ROLE_CHANGE) continue;
+            if (type == NotificationType.ROLE_CHANGE || type == NotificationType.ACCOUNT_LOCKED) continue;
 
             Notification notification = Notification.create(receiver, "제목", "내용", type);
 

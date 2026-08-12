@@ -22,6 +22,7 @@ import com.codeit.mople.domain.review.entity.Review;
 import com.codeit.mople.domain.review.event.ReviewCreatedEvent;
 import com.codeit.mople.domain.review.event.ReviewDeletedEvent;
 import com.codeit.mople.domain.review.event.ReviewUpdatedEvent;
+import com.codeit.mople.domain.review.event.ReviewWrittenEvent;
 import com.codeit.mople.domain.review.exception.ReviewErrorCode;
 import com.codeit.mople.domain.review.exception.ReviewException;
 import com.codeit.mople.domain.review.repository.ReviewRepository;
@@ -55,7 +56,7 @@ public class ReviewServiceTest {
   private ContentRepository contentRepository;
 
   @Mock
-  private ApplicationEventPublisher eventPublisher;
+  private ApplicationEventPublisher publisher;
 
   @InjectMocks
   private ReviewService reviewService;
@@ -141,7 +142,8 @@ public class ReviewServiceTest {
       verify(contentRepository).findById(contentId);
       verify(reviewRepository).save(any(Review.class));
 
-      verify(eventPublisher).publishEvent(new ReviewCreatedEvent(contentId));
+      verify(publisher).publishEvent(new ReviewWrittenEvent(authorId, "test"));
+      verify(publisher).publishEvent(new ReviewCreatedEvent(contentId));
     }
 
     @Test
@@ -441,7 +443,7 @@ public class ReviewServiceTest {
 
       verify(reviewRepository).findById(review1Id);
 
-      verify(eventPublisher).publishEvent(new ReviewUpdatedEvent(contentId));
+      verify(publisher).publishEvent(new ReviewUpdatedEvent(contentId));
     }
 
     @Test
@@ -521,7 +523,7 @@ public class ReviewServiceTest {
       verify(reviewRepository).findById(review1Id);
       verify(reviewRepository).delete(review1);
 
-      verify(eventPublisher).publishEvent(new ReviewDeletedEvent(contentId));
+      verify(publisher).publishEvent(new ReviewDeletedEvent(contentId));
     }
 
     @Test

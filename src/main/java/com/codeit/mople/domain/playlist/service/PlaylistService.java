@@ -13,6 +13,7 @@ import com.codeit.mople.domain.playlist.entity.Playlist;
 import com.codeit.mople.domain.playlist.entity.PlaylistContent;
 import com.codeit.mople.domain.playlist.entity.PlaylistSubscription;
 import com.codeit.mople.domain.playlist.event.PlaylistContentAddedEvent;
+import com.codeit.mople.domain.playlist.event.PlaylistCreatedEvent;
 import com.codeit.mople.domain.playlist.event.PlaylistSubscribedEvent;
 import com.codeit.mople.domain.playlist.event.PlaylistUnsubscribedEvent;
 import com.codeit.mople.domain.playlist.exception.PlaylistErrorCode;
@@ -47,8 +48,7 @@ public class PlaylistService {
   private final PlaylistContentRepository playlistContentRepository;
   private final ContentRepository contentRepository;
   private final PlaylistSubscriptionRepository playlistSubscriptionRepository;
-
-  private final ApplicationEventPublisher eventPublisher;
+  private final ApplicationEventPublisher publisher;
 
   @Transactional
   public PlaylistResponse create(PlaylistCreateRequest request, UUID ownerId) {
@@ -77,6 +77,8 @@ public class PlaylistService {
 
     log.info("플레이리스트 생성 완료: playlistId={}, ownerId={}",
         savedPlaylist.getId(), owner.getId());
+
+    publisher.publishEvent(new PlaylistCreatedEvent(ownerId, owner.getName(), savedPlaylist.getTitle()));
 
     return response;
   }
@@ -317,10 +319,10 @@ public class PlaylistService {
     PlaylistSubscription saved = playlistSubscriptionRepository.save(
         PlaylistSubscription.create(playlist, subscriber));
 
-    eventPublisher.publishEvent(new PlaylistSubscribedEvent(ownerId, playlistId, subscriberId));
-
     log.info("플레이리스트 구독 성공: playlistSubscriptionId={}, playlistId={}, subscriberId={}",
         saved.getId(), playlistId, subscriberId);
+
+    publisher.publishEvent(new PlaylistSubscribedEvent(ownerId, playlistId, subscriberId, subscriber.getName(), playlist.getTitle()));
   }
 
   @Transactional
@@ -336,7 +338,7 @@ public class PlaylistService {
           Map.of("playlistId", playlistId, "subscriberId", subscriberId));
     }
 
-    eventPublisher.publishEvent(new PlaylistUnsubscribedEvent(playlistId, subscriberId));
+    publisher.publishEvent(new PlaylistUnsubscribedEvent(playlistId, subscriberId));
 
     log.info("플레이리스트 구독 취소 성공: playlist={}, subscriberId={}",
         playlistId, subscriberId);
@@ -371,7 +373,9 @@ public class PlaylistService {
     log.info("플레이리스트에 콘텐츠 추가 성공: playlistContentId={}, playlistId={}, contentId={}, requesterId={}",
         playlistContent.getId(), playlistId, contentId, requesterId);
 
-    eventPublisher.publishEvent(new PlaylistContentAddedEvent(playlistId, contentId));
+    playlistSubscriptionRepository.findSubscriberIdsByPlaylistId(playlistId)
+        .forEach(subscriberId ->
+            publisher.publishEvent(new PlaylistContentAddedEvent(subscriberId, playlistId, contentId, playlist.getTitle())));
   }
 
   @Transactional

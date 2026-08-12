@@ -33,6 +33,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import com.codeit.mople.domain.directmessage.event.DirectMessageReceivedEvent;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -51,7 +52,7 @@ public class DirectMessageServiceTest {
   private ConversationRepository conversationRepository;
 
   @Mock
-  private ApplicationEventPublisher eventPublisher;
+  private ApplicationEventPublisher publisher;
 
   private UUID userAId;
   private UUID userBId;
@@ -92,6 +93,7 @@ public class DirectMessageServiceTest {
       Instant messageCreatedAt = Instant.now();
 
       given(userA.getId()).willReturn(userAId);
+      given(userA.getName()).willReturn("userA");
       given(userB.getId()).willReturn(userBId);
       given(conversation.getUserA()).willReturn(userA);
       given(conversation.getPartnerOf(userAId)).willReturn(userB);
@@ -119,8 +121,9 @@ public class DirectMessageServiceTest {
       // 가장 최근(마지막) 메시지 및 발신자 워터마크 갱신 메서드가 호출되었는지 검증
       verify(conversation).updateLastMessage(mockSavedMessage);
       verify(conversation).updateLastReadAt(userAId, messageCreatedAt);
+      verify(publisher).publishEvent(any(DirectMessageReceivedEvent.class));
 
-      verify(eventPublisher).publishEvent(new DirectMessageCreatedEvent(userBId, messageId));
+      verify(publisher).publishEvent(new DirectMessageCreatedEvent(userBId, messageId));
     }
 
     @Test
@@ -135,7 +138,7 @@ public class DirectMessageServiceTest {
           .isInstanceOf(ConversationException.class)
           .hasMessageContaining(ConversationErrorCode.CONVERSATION_NOT_FOUND.getMessage());
 
-      verifyNoInteractions(eventPublisher);
+      verifyNoInteractions(publisher);
     }
 
     @Test
@@ -155,7 +158,7 @@ public class DirectMessageServiceTest {
       assertThatThrownBy(() -> directMessageService.sendMessage(conversationId, strangerId, "테스트 메시지"))
           .isInstanceOf(ConversationException.class);
 
-      verifyNoInteractions(eventPublisher);
+      verifyNoInteractions(publisher);
     }
   }
 

@@ -40,6 +40,9 @@ public class SecurityConfig {
             .csrfTokenRequestHandler(csrfTokenRequestHandler)
             .ignoringRequestMatchers("/api/auth/**", "/api/users") // (POST, 회원가입)는 "아직 로그인하기 전" 상태에서 호출되는 API라서, CSRF 검증에서 예외 처리
         )
+        // OAuth2 authorization code flow의 state는 Spring Security 기본 구현인 HttpSessionOAuth2AuthorizationRequestRepository가 HttpSession에 저장
+        // 아래의 STATELESS는 SecurityContext 저장 방식에만 적용되며, 이 저장소는 세션에 의존함
+        // 인스턴스를 다중화(sticky session 없이)하면 콜백이 다른 인스턴스로 갈 때, authorization_request_not_found로 실패할 수 있음
         .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .exceptionHandling(exception -> exception
             .authenticationEntryPoint(new JsonAuthenticationEntryPoint(objectMapper))

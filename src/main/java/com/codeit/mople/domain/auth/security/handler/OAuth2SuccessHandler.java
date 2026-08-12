@@ -1,6 +1,8 @@
 package com.codeit.mople.domain.auth.security.handler;
 
+import com.codeit.mople.domain.auth.dto.response.RefreshToken;
 import com.codeit.mople.domain.auth.security.CustomOAuth2User;
+import com.codeit.mople.domain.auth.service.AuthService;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.global.jwt.JwtProvider;
@@ -22,8 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
-  private final JwtProvider jwtProvider;
-  private final UserRepository userRepository;
+  private final AuthService authService;
 
   @Value("${oauth2.redirect.success-uri}")
   private String successUri;
@@ -31,24 +32,19 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
   @Value("${cookie.secure:true}")
   private boolean cookieSecure;
 
-  @Transactional
+  @Override
   public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
       Authentication authentication) throws IOException {
     CustomOAuth2User principal = (CustomOAuth2User) authentication.getPrincipal();
-    User user = userRepository.findById(principal.getUserId())
-        .orElseThrow(() -> new IllegalStateException("OAuth 로그인 후 사용자를 찾을 수 없습니다."));
 
-    long sessionVersion = user.increaseSessionVersion();
-    String refreshToken = jwtProvider.createRefreshToken(user.getId());
-    Instant refreshExpiresAt = Instant.now().plusMillis(jwtProvider.getRefreshTokenExpiration());
-    user.updateRefreshToken(refreshToken, refreshExpiresAt);
+    RefreshToken issuance = authService.issueOAuthRefreshToken(principal.getUserId());
 
-    ResponseCookie cookie = ResponseCookie.from("refreshToken", refreshToken)
+    ResponseCookie cookie = ResponseCookie.from("refreshToken", issuance.refreshToken())
         .httpOnly(true)
         .secure(cookieSecure)
         .sameSite("Lax")
         .path("/api/auth")
-        .maxAge(Duration.between(Instant.now(), refreshExpiresAt).getSeconds())
+        .maxAge(Duration.between(Instant.now(), issuance.refreshTokenExpiredAt()).getSeconds())
         .build();
     response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
 
