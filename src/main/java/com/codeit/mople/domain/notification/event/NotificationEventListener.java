@@ -4,12 +4,12 @@ import com.codeit.mople.domain.directmessage.event.DirectMessageReceivedEvent;
 import com.codeit.mople.domain.follow.event.FollowCreatedEvent;
 import com.codeit.mople.domain.follow.service.FollowService;
 import com.codeit.mople.domain.notification.entity.NotificationType;
-import com.codeit.mople.domain.notification.service.NotificationService;
+import com.codeit.mople.domain.notification.service.NotificationCreator;
 import com.codeit.mople.domain.playlist.event.PlaylistContentAddedEvent;
 import com.codeit.mople.domain.playlist.event.PlaylistCreatedEvent;
 import com.codeit.mople.domain.playlist.event.PlaylistSubscribedEvent;
 import com.codeit.mople.domain.review.event.ReviewWrittenEvent;
-import com.codeit.mople.global.event.UserForceLogoutEvent;
+import com.codeit.mople.global.event.UserAccountStatusChangedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -22,13 +22,13 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @RequiredArgsConstructor
 public class NotificationEventListener {
 
-    private final NotificationService notificationService;
+    private final NotificationCreator notificationCreator;
     private final FollowService followService;
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void handleUserForceLogout(UserForceLogoutEvent event) {
-        log.debug("강제 로그아웃 알림 처리 시작 - userId: {}, reason: {}", event.userId(), event.reason());
+    public void handleUserAccountStatusChanged(UserAccountStatusChangedEvent event) {
+        log.debug("계정 상태 변경 알림 처리 시작 - userId: {}, reason: {}", event.userId(), event.reason());
 
         ForceLogoutNotification notification = switch (event.reason()) {
             case ROLE_CHANGE -> new ForceLogoutNotification(
@@ -45,7 +45,7 @@ public class NotificationEventListener {
                 NotificationType.ACCOUNT_UNLOCKED);
         };
 
-        notificationService.createNotification(
+        notificationCreator.createNotification(
             event.userId(), notification.title(), notification.content(), notification.type());
     }
 
@@ -57,7 +57,7 @@ public class NotificationEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handlePlaylistContentAdded(PlaylistContentAddedEvent event) {
         log.debug("플레이리스트 콘텐츠 추가 알림 처리 시작 - subscriberId: {}", event.subscriberId());
-        notificationService.createNotification(
+        notificationCreator.createNotification(
             event.subscriberId(),
             "구독한 플레이리스트에 새 콘텐츠가 추가되었습니다.",
             event.playlistTitle() + "에 새 콘텐츠가 추가되었습니다.",
@@ -69,7 +69,7 @@ public class NotificationEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handlePlaylistSubscribed(PlaylistSubscribedEvent event) {
         log.debug("플레이리스트 구독 알림 처리 시작 - ownerId: {}", event.ownerId());
-        notificationService.createNotification(
+        notificationCreator.createNotification(
             event.ownerId(),
             "플레이리스트에 새 구독자가 생겼습니다.",
             event.subscriberName() + "님이 " + event.playlistTitle() + "을(를) 구독했습니다.",
@@ -81,7 +81,7 @@ public class NotificationEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleDirectMessageReceived(DirectMessageReceivedEvent event) {
         log.debug("DM 수신 알림 처리 시작 - receiverId: {}", event.receiverId());
-        notificationService.createNotification(
+        notificationCreator.createNotification(
             event.receiverId(),
             "새로운 메시지가 도착했습니다.",
             event.senderName() + ": " + event.messageContent(),
@@ -93,7 +93,7 @@ public class NotificationEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleFollowCreated(FollowCreatedEvent event) {
         log.debug("신규 팔로워 알림 처리 시작 - followeeId: {}", event.followeeId());
-        notificationService.createNotification(
+        notificationCreator.createNotification(
             event.followeeId(),
             "새로운 팔로워가 생겼습니다.",
             event.followerName() + "님이 팔로우했습니다.",
@@ -106,7 +106,7 @@ public class NotificationEventListener {
     public void handlePlaylistCreated(PlaylistCreatedEvent event) {
         log.debug("플레이리스트 생성 팔로워 알림 처리 시작 - ownerId: {}", event.ownerId());
         followService.getFollowerIds(event.ownerId())
-            .forEach(followerId -> notificationService.createNotification(
+            .forEach(followerId -> notificationCreator.createNotification(
                 followerId,
                 event.ownerName() + "님의 새로운 활동이 있습니다.",
                 "새 플레이리스트를 만들었습니다.",
@@ -119,7 +119,7 @@ public class NotificationEventListener {
     public void handleReviewWritten(ReviewWrittenEvent event) {
         log.debug("리뷰 작성 팔로워 알림 처리 시작 - authorId: {}", event.authorId());
         followService.getFollowerIds(event.authorId())
-            .forEach(followerId -> notificationService.createNotification(
+            .forEach(followerId -> notificationCreator.createNotification(
                 followerId,
                 event.authorName() + "님의 새로운 활동이 있습니다.",
                 "리뷰를 작성했습니다.",
