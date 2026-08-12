@@ -38,7 +38,7 @@ public class NotificationEventListener {
         String content = switch (event.reason()) {
             case ROLE_CHANGE -> "관리자에 의해 권한이 변경되었습니다. 다시 로그인해주세요.";
             case ACCOUNT_LOCKED -> "관리자에 의해 계정이 잠금되었습니다.";
-            case ACCOUNT_UNLOCKED -> "관리자에 의해 계정 잠금이 해제되었습니다. 다시 로그인해주세요.";
+            case ACCOUNT_UNLOCKED -> "관리자에 의해 계정 잠금이 해제되었습니다.";
         };
         NotificationType type = switch (event.reason()) {
             case ROLE_CHANGE -> NotificationType.ROLE_CHANGE;
