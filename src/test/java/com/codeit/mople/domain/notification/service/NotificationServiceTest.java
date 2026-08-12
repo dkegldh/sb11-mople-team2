@@ -209,7 +209,9 @@ class NotificationServiceTest {
 
             // when & then — parseCursorToInstant()에서 예외 발생, Repository는 호출되지 않음
             assertThatThrownBy(() -> notificationService.getNotifications(receiverId, request))
-                .isInstanceOf(NotificationException.class);
+                .isInstanceOf(NotificationException.class)
+                .satisfies(e -> assertThat(((NotificationException) e).getErrorCode())
+                    .isEqualTo(NotificationErrorCode.NOTIFICATION_INVALID_CURSOR));
         }
 
         @Test
@@ -221,7 +223,9 @@ class NotificationServiceTest {
 
             // when & then — validateCursorPair()에서 예외 발생, Repository는 호출되지 않음
             assertThatThrownBy(() -> notificationService.getNotifications(receiverId, request))
-                .isInstanceOf(NotificationException.class);
+                .isInstanceOf(NotificationException.class)
+                .satisfies(e -> assertThat(((NotificationException) e).getErrorCode())
+                    .isEqualTo(NotificationErrorCode.NOTIFICATION_INVALID_CURSOR_PAIR));
             then(notificationRepository).should(never())
                 .findNotificationByCursor(any(), any(), any(), anyInt());
         }
@@ -235,7 +239,9 @@ class NotificationServiceTest {
 
             // when & then — validateCursorPair()에서 예외 발생, Repository는 호출되지 않음
             assertThatThrownBy(() -> notificationService.getNotifications(receiverId, request))
-                .isInstanceOf(NotificationException.class);
+                .isInstanceOf(NotificationException.class)
+                .satisfies(e -> assertThat(((NotificationException) e).getErrorCode())
+                    .isEqualTo(NotificationErrorCode.NOTIFICATION_INVALID_CURSOR_PAIR));
             then(notificationRepository).should(never())
                 .findNotificationByCursor(any(), any(), any(), anyInt());
         }
