@@ -74,6 +74,11 @@ public interface NotificationApi {
             responseCode = "404",
             description = "알림을 찾을 수 없음",
             content = @Content(schema = @Schema(implementation = com.codeit.mople.global.response.ApiResponse.class))
+        ),
+        @ApiResponse(
+            responseCode = "500",
+            description = "서버 오류",
+            content = @Content(schema = @Schema(implementation = com.codeit.mople.global.response.ApiResponse.class))
         )
     })
     ResponseEntity<Void> deleteNotification(
