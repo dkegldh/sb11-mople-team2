@@ -33,7 +33,7 @@ import com.codeit.mople.domain.user.entity.Role;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.global.event.ForceLogoutReason;
-import com.codeit.mople.global.event.UserForceLogoutEvent;
+import com.codeit.mople.global.event.UserAccountStatusChangedEvent;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -304,7 +304,7 @@ class NotificationEventListenerIntegrationTest {
     void 이벤트_발행_후_트랜잭션_롤백_시_알림이_저장되지_않는다() {
         transactionTemplate.execute(status -> {
             status.setRollbackOnly();
-            eventPublisher.publishEvent(new UserForceLogoutEvent(targetUserId, ForceLogoutReason.ROLE_CHANGE, true));
+            eventPublisher.publishEvent(new UserAccountStatusChangedEvent(targetUserId, ForceLogoutReason.ROLE_CHANGE, true));
             return null;
         });
 
