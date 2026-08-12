@@ -1,7 +1,7 @@
 package com.codeit.mople.domain.notification.dto.request;
 
+import com.codeit.mople.domain.notification.exception.NotificationErrorCode;
 import com.codeit.mople.domain.notification.exception.NotificationException;
-import com.codeit.mople.global.error.CommonErrorCode;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.time.Instant;
@@ -32,7 +32,8 @@ public record NotificationCursorRequest(
 
         if (hasCursor != hasIdAfter) {
             throw new NotificationException(
-                CommonErrorCode.INVALID_INPUT, Map.of("message", "커서 페이징 시 cursor와 idAfter는 함께 제공해야 합니다."));
+                NotificationErrorCode.NOTIFICATION_INVALID_CURSOR_PAIR,
+                Map.of("message", "커서 페이징 시 cursor와 idAfter는 함께 제공해야 합니다."));
         }
     }
 
@@ -43,7 +44,7 @@ public record NotificationCursorRequest(
         try {
             return Instant.parse(cursor);
         } catch (Exception e) {
-            throw new NotificationException(CommonErrorCode.INVALID_INPUT,
+            throw new NotificationException(NotificationErrorCode.NOTIFICATION_INVALID_CURSOR,
                 Map.of("invalidCursor", cursor));
         }
     }
