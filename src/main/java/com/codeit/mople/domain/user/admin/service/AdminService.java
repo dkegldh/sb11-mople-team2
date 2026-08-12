@@ -7,7 +7,7 @@ import com.codeit.mople.domain.user.exception.UserErrorCode;
 import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.domain.user.exception.UserException;
 import com.codeit.mople.global.event.ForceLogoutReason;
-import com.codeit.mople.global.event.UserForceLogoutEvent;
+import com.codeit.mople.global.event.UserAccountStatusChangedEvent;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,7 +37,7 @@ public class AdminService {
     if (previousRole != role) {
       user.changeRole(role);
       user.increaseSessionVersion();
-      eventPublisher.publishEvent(new UserForceLogoutEvent(userId, ForceLogoutReason.ROLE_CHANGE, true));
+      eventPublisher.publishEvent(new UserAccountStatusChangedEvent(userId, ForceLogoutReason.ROLE_CHANGE, true));
     }
     log.info("권한 변경 완료 - userId: {}, role: {}", userId, role);
   }
@@ -60,7 +60,7 @@ public class AdminService {
       }
       ForceLogoutReason reason = locked ? ForceLogoutReason.ACCOUNT_LOCKED : ForceLogoutReason.ACCOUNT_UNLOCKED;
       // locked일 때만 위에서 increaseSessionVersion()을 호출했으므로 sessionInvalidated도 locked와 동일하다.
-      eventPublisher.publishEvent(new UserForceLogoutEvent(userId, reason, locked));
+      eventPublisher.publishEvent(new UserAccountStatusChangedEvent(userId, reason, locked));
     }
     log.info("계정 잠금 변경 완료 - userId: {}, locked: {}", userId, locked);
   }
