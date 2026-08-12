@@ -1,4 +1,4 @@
-package com.codeit.mople.domain.auth.security;
+package com.codeit.mople.domain.auth.security.handler;
 
 import com.codeit.mople.global.error.CommonErrorCode;
 import com.codeit.mople.global.response.ApiResponse;

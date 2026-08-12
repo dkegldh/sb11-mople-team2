@@ -3,9 +3,11 @@ package com.codeit.mople.domain.playlist.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -24,7 +26,9 @@ import com.codeit.mople.domain.playlist.entity.Playlist;
 import com.codeit.mople.domain.playlist.entity.PlaylistContent;
 import com.codeit.mople.domain.playlist.entity.PlaylistSubscription;
 import com.codeit.mople.domain.playlist.event.PlaylistContentAddedEvent;
+import com.codeit.mople.domain.playlist.event.PlaylistCreatedEvent;
 import com.codeit.mople.domain.playlist.event.PlaylistSubscribedEvent;
+import com.codeit.mople.domain.playlist.event.PlaylistUnsubscribedEvent;
 import com.codeit.mople.domain.playlist.exception.PlaylistErrorCode;
 import com.codeit.mople.domain.playlist.exception.PlaylistException;
 import com.codeit.mople.domain.playlist.repository.PlaylistContentRepository;
@@ -45,6 +49,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -70,6 +76,15 @@ public class PlaylistServiceTest {
 
   @Mock
   private ApplicationEventPublisher publisher;
+
+  @Captor
+  private ArgumentCaptor<PlaylistSubscribedEvent> subscribedEventCaptor;
+
+  @Captor
+  private ArgumentCaptor<PlaylistUnsubscribedEvent> unsubscribedEventCaptor;
+
+  @Captor
+  private ArgumentCaptor<PlaylistContentAddedEvent> contentAddedEventCaptor;
 
   @InjectMocks
   private PlaylistService playlistService;
@@ -156,6 +171,7 @@ public class PlaylistServiceTest {
       // 행위 중심(given(...) 메서드가 호출됐는지 검증)
       verify(userRepository).findById(ownerId);
       verify(playlistRepository).save(any(Playlist.class));
+      verify(publisher).publishEvent(new PlaylistCreatedEvent(ownerId, "test", title));
     }
 
     @Test
@@ -695,9 +711,6 @@ public class PlaylistServiceTest {
       given(playlistRepository.findById(playlistId))
           .willReturn(Optional.of(mockPlaylist));
 
-      given(mockPlaylist.getId())
-          .willReturn(playlistId);
-
       given(mockPlaylist.getOwner())
           .willReturn(owner);
 
@@ -782,9 +795,6 @@ public class PlaylistServiceTest {
 
       // BeforeEach에서 playlist, playlistId 초기화
 
-      given(mockPlaylist.getId())
-          .willReturn(playlistId);
-
       given(mockPlaylist.getOwner())
           .willReturn(owner);
 
@@ -825,6 +835,7 @@ public class PlaylistServiceTest {
 
       Playlist playlist = Playlist.create(owner, title, description);
       User subscriber = mock(User.class);
+      given(subscriber.getName()).willReturn("구독자");
 
       given(playlistSubscriptionRepository.existsByPlaylistIdAndSubscriberId(playlistId,
           subscriberId)).willReturn(false);
@@ -838,8 +849,14 @@ public class PlaylistServiceTest {
 
       // then
       verify(playlistSubscriptionRepository).save(any(PlaylistSubscription.class));
-      verify(publisher).publishEvent(any(PlaylistSubscribedEvent.class));
-      verify(playlistRepository).increaseSubscriberCount(playlistId);
+      verify(publisher).publishEvent(subscribedEventCaptor.capture());
+
+      PlaylistSubscribedEvent event = subscribedEventCaptor.getValue();
+
+      assertThat(event.playlistId()).isEqualTo(playlistId);
+      assertThat(event.subscriberId()).isEqualTo(subscriberId);
+      assertThat(event.subscriberName()).isEqualTo("구독자");
+      assertThat(event.playlistTitle()).isEqualTo(title);
     }
 
     @Test
@@ -929,7 +946,6 @@ public class PlaylistServiceTest {
 
       given(playlistSubscriptionRepository.deleteByPlaylistIdAndSubscriberId(playlistId,
           subscriberId)).willReturn(1);
-      given(playlistRepository.decreaseSubscriberCount(playlistId)).willReturn(1);
 
       // when
       playlistService.unSubscribe(playlistId, subscriberId);
@@ -937,7 +953,12 @@ public class PlaylistServiceTest {
       // then
       verify(playlistSubscriptionRepository).deleteByPlaylistIdAndSubscriberId(playlistId,
           subscriberId);
-      verify(playlistRepository).decreaseSubscriberCount(playlistId);
+      verify(publisher).publishEvent(unsubscribedEventCaptor.capture());
+
+      PlaylistUnsubscribedEvent event = unsubscribedEventCaptor.getValue();
+
+      assertThat(event.playlistId()).isEqualTo(playlistId);
+      assertThat(event.subscriberId()).isEqualTo(subscriberId);
     }
 
     @Test
@@ -973,13 +994,54 @@ public class PlaylistServiceTest {
       given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
       given(contentRepository.findById(contentId)).willReturn(Optional.of(content));
       given(owner.getId()).willReturn(ownerId);
+      given(playlistSubscriptionRepository.findSubscriberIdsByPlaylistId(playlistId))
+          .willReturn(List.of(UUID.randomUUID()));
 
       // when
       playlistService.addContent(playlistId, contentId, ownerId);
 
       // then
-      verify(publisher).publishEvent(any(PlaylistContentAddedEvent.class));
       verify(playlistContentRepository).save(any(PlaylistContent.class));
+      verify(publisher).publishEvent(contentAddedEventCaptor.capture());
+
+      PlaylistContentAddedEvent event = contentAddedEventCaptor.getValue();
+
+      assertThat(event.playlistId()).isEqualTo(playlistId);
+      assertThat(event.contentId()).isEqualTo(contentId);
+      assertThat(event.playlistTitle()).isEqualTo(title);
+    }
+
+    @Test
+    @DisplayName("플레이리스트 콘텐츠 추가 시 구독자 수만큼 이벤트가 발행된다")
+    void addContent_publishes_event_per_subscriber() {
+      UUID playlistId = UUID.randomUUID();
+      UUID contentId = UUID.randomUUID();
+      UUID subscriber1 = UUID.randomUUID();
+      UUID subscriber2 = UUID.randomUUID();
+
+      Playlist playlist = Playlist.create(owner, title, description);
+      Content content = mock(Content.class);
+
+      given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
+      given(contentRepository.findById(contentId)).willReturn(Optional.of(content));
+      given(owner.getId()).willReturn(ownerId);
+      given(playlistSubscriptionRepository.findSubscriberIdsByPlaylistId(playlistId))
+          .willReturn(List.of(subscriber1, subscriber2));
+
+      // when
+      playlistService.addContent(playlistId, contentId, ownerId);
+
+      // then
+      verify(publisher, times(2)).publishEvent(contentAddedEventCaptor.capture());
+
+      List<PlaylistContentAddedEvent> events = contentAddedEventCaptor.getAllValues();
+      assertThat(events).extracting(PlaylistContentAddedEvent::subscriberId)
+          .containsExactlyInAnyOrder(subscriber1, subscriber2);
+      assertThat(events).allSatisfy(event -> {
+        assertThat(event.playlistId()).isEqualTo(playlistId);
+        assertThat(event.contentId()).isEqualTo(contentId);
+        assertThat(event.playlistTitle()).isEqualTo(title);
+      });
     }
 
     @Test
@@ -1049,7 +1111,6 @@ public class PlaylistServiceTest {
       Playlist playlist = mock(Playlist.class);
 
       given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
-      given(playlist.getId()).willReturn(playlistId);
       given(playlist.getOwner()).willReturn(owner);
       given(owner.getId()).willReturn(ownerId);
 
@@ -1116,7 +1177,6 @@ public class PlaylistServiceTest {
       Playlist playlist = mock(Playlist.class);
 
       given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
-      given(playlist.getId()).willReturn(playlistId);
       given(playlist.getOwner()).willReturn(owner);
       given(owner.getId()).willReturn(ownerId);
 

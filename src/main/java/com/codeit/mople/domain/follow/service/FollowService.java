@@ -9,6 +9,7 @@ import com.codeit.mople.domain.follow.exception.FollowException;
 import com.codeit.mople.domain.follow.repository.FollowRepository;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.repository.UserRepository;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -88,5 +89,10 @@ public class FollowService {
   public long getFollowCount(UUID followeeId) {
     log.debug("팔로우 수 조회: followeeId={}", followeeId);
     return followRepository.countByFolloweeId(followeeId);
+  }
+
+  public List<UUID> getFollowerIds(UUID followeeId) {
+    log.debug("팔로워 id 목록 조회: followeeId={}", followeeId);
+    return followRepository.findFollowerIdsByFolloweeId(followeeId);
   }
 }

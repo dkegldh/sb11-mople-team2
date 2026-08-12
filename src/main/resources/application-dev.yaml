@@ -3,11 +3,39 @@ spring:
     url: jdbc:postgresql://localhost:5432/mople_db
     username: mople
     password: mople1234
+  data:
+    redis:
+      host: localhost
+      port: 6379
 
   jpa:
     hibernate:
       ddl-auto: update
     show-sql: true
+
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            scope: email, profile
+          kakao:
+            client-id: ${KAKAO_CLIENT_ID}
+            client-secret: ${KAKAO_CLIENT_SECRET}
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            authorization-grant-type: authorization_code
+            client-authentication-method: client_secret_post
+            client-name: Kakao
+            scope:
+              - profile_nickname
+              - profile_image
+
+  batch:
+    jdbc:
+      initialize-schema: always
 
 logging:
   level:
@@ -28,4 +56,14 @@ external-api:
     api-key: ${TMDB_API_KEY:}
   sportsdb:
     base-url: https://www.thesportsdb.com/api/v1/json
-    api-key: ${SPORTSDB_API_KEY:}
+    api-key: ${SPORTSDB_API_KEY:3}
+
+batch:
+  tmdb:
+    collect:
+      cron: "-"
+
+oauth2:
+  redirect:
+    success-uri: http://localhost:8080/
+    failure-uri: http://localhost:8080/

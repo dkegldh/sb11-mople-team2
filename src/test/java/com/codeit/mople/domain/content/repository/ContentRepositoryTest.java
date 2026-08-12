@@ -49,4 +49,29 @@ public class ContentRepositoryTest {
     assertThat(foundContent.getCreatedAt()).isNotNull();
     assertThat(foundContent.getUpdatedAt()).isNotNull();
   }
+
+  @Test
+  @DisplayName("외부 ID 리스트로 콘텐츠 일괄 조회 테스트")
+  void findByExternalIdIn_Success() {
+    Content content1 = new Content(
+        ContentType.MOVIE, "영화1", "설명1",
+        "http://example.com/1.png", new ArrayList<>(), "ext-001"
+    );
+    Content content2 = new Content(
+        ContentType.MOVIE, "영화2", "설명2",
+        "http://example.com/2.png", new ArrayList<>(), "ext-002"
+    );
+
+    contentRepository.saveAll(List.of(content1, content2));
+    entityManager.flush();
+    entityManager.clear();
+
+    //존재하는 externalId("ext-001")와 존재하지 않는 ID("ext-999")로 조회
+    List<String> searchExternalIds = List.of("ext-001", "ext-999");
+    List<Content> foundContents = contentRepository.findByTypeAndExternalIdIn(ContentType.MOVIE, searchExternalIds);
+    //일치하는 1개의 콘텐츠만 정상적으로 조회되는지 검증
+    assertThat(foundContents).isNotNull();
+    assertThat(foundContents).hasSize(1);
+    assertThat(foundContents.get(0).getExternalId()).isEqualTo("ext-001");
+  }
 }

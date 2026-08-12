@@ -15,6 +15,11 @@ public record TmdbTvResponse(
     String overview,              // 영화 소개 줄거리
     String posterPath,            // 포스터 이미지 경로
     List<Integer> genreIds        // 장르 번호 예: [28, 12, 16, 10751]
-) {
+) implements TmdbContentItem {
 
+  // 한 곳에 모으려고 하는데 movie,tv 받아오는 제목의 이름이 다르니까 구현체 작성
+  @Override
+  public String contentTitle() {
+    return name;
+  }
 }

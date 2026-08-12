@@ -7,7 +7,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.codeit.mople.domain.conversation.entity.Conversation;
 import com.codeit.mople.domain.conversation.exception.ConversationErrorCode;
@@ -17,6 +19,7 @@ import com.codeit.mople.domain.directmessage.dto.request.DirectMessageCursorRequ
 import com.codeit.mople.domain.directmessage.dto.response.CursorResponseDirectMessageDto;
 import com.codeit.mople.domain.directmessage.dto.response.DirectMessageDto;
 import com.codeit.mople.domain.directmessage.entity.DirectMessage;
+import com.codeit.mople.domain.directmessage.event.DirectMessageCreatedEvent;
 import com.codeit.mople.domain.directmessage.exception.DirectMessageErrorCode;
 import com.codeit.mople.domain.directmessage.exception.DirectMessageException;
 import com.codeit.mople.domain.directmessage.repository.DirectMessageRepository;
@@ -30,9 +33,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import com.codeit.mople.domain.directmessage.event.DirectMessageReceivedEvent;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 public class DirectMessageServiceTest {
@@ -45,6 +50,9 @@ public class DirectMessageServiceTest {
 
   @Mock
   private ConversationRepository conversationRepository;
+
+  @Mock
+  private ApplicationEventPublisher publisher;
 
   private UUID userAId;
   private UUID userBId;
@@ -85,11 +93,13 @@ public class DirectMessageServiceTest {
       Instant messageCreatedAt = Instant.now();
 
       given(userA.getId()).willReturn(userAId);
+      given(userA.getName()).willReturn("userA");
+      given(userB.getId()).willReturn(userBId);
       given(conversation.getUserA()).willReturn(userA);
       given(conversation.getPartnerOf(userAId)).willReturn(userB);
 
       DirectMessage mockSavedMessage = mock(DirectMessage.class);
-      given(mockSavedMessage.getId()).willReturn(UUID.randomUUID());
+      given(mockSavedMessage.getId()).willReturn(messageId);
       given(mockSavedMessage.getConversation()).willReturn(conversation);
       given(mockSavedMessage.getSender()).willReturn(userA);
       given(mockSavedMessage.getReceiver()).willReturn(userB);
@@ -111,6 +121,9 @@ public class DirectMessageServiceTest {
       // 가장 최근(마지막) 메시지 및 발신자 워터마크 갱신 메서드가 호출되었는지 검증
       verify(conversation).updateLastMessage(mockSavedMessage);
       verify(conversation).updateLastReadAt(userAId, messageCreatedAt);
+      verify(publisher).publishEvent(any(DirectMessageReceivedEvent.class));
+
+      verify(publisher).publishEvent(new DirectMessageCreatedEvent(userBId, messageId));
     }
 
     @Test
@@ -124,6 +137,8 @@ public class DirectMessageServiceTest {
       assertThatThrownBy(() -> directMessageService.sendMessage(conversationId, userAId, "테스트 메시지"))
           .isInstanceOf(ConversationException.class)
           .hasMessageContaining(ConversationErrorCode.CONVERSATION_NOT_FOUND.getMessage());
+
+      verifyNoInteractions(publisher);
     }
 
     @Test
@@ -142,6 +157,8 @@ public class DirectMessageServiceTest {
       //when & then
       assertThatThrownBy(() -> directMessageService.sendMessage(conversationId, strangerId, "테스트 메시지"))
           .isInstanceOf(ConversationException.class);
+
+      verifyNoInteractions(publisher);
     }
   }
 
@@ -231,6 +248,8 @@ public class DirectMessageServiceTest {
       given(directMessageRepository.findById(messageId)).willReturn(Optional.of(message));
       given(message.getConversation()).willReturn(conversation);
       given(conversation.getId()).willReturn(conversationId);
+      given(message.getSender()).willReturn(userA);
+      given(userA.getId()).willReturn(userAId);
       given(message.getReceiver()).willReturn(userB);
       given(userB.getId()).willReturn(userBId);
       given(message.getCreatedAt()).willReturn(messageTime);
@@ -242,6 +261,23 @@ public class DirectMessageServiceTest {
 
       //then
       verify(conversation).updateLastReadAt(userBId, messageTime);
+    }
+
+    @Test
+    @DisplayName("성공: 발신자 본인이 자기가 보낸 메시지 읽음을 시도하면 예외 없이 조기 종료(Early Return)된다.")
+    void success_read_message_by_sender_is_ignored() {
+      //given
+      given(directMessageRepository.findById(messageId)).willReturn(Optional.of(message));
+      given(message.getConversation()).willReturn(conversation);
+      given(conversation.getId()).willReturn(conversationId);
+      given(message.getSender()).willReturn(userA);
+      given(userA.getId()).willReturn(userAId);
+
+      // when
+      directMessageService.readMessage(conversationId, messageId, userAId);
+
+      // then
+      verify(conversation, never()).updateLastReadAt(any(), any());
     }
 
     @Test
@@ -279,11 +315,13 @@ public class DirectMessageServiceTest {
       given(directMessageRepository.findById(messageId)).willReturn(Optional.of(message));
       given(message.getConversation()).willReturn(conversation);
       given(conversation.getId()).willReturn(conversationId);
+      given(message.getSender()).willReturn(userA);
+      given(userA.getId()).willReturn(userAId);
       given(message.getReceiver()).willReturn(userB);
       given(userB.getId()).willReturn(userBId);
 
-      // when & then: UserA(발신자)가 자기가 보낸 메시지를 읽음 처리하려고 시도
-      assertThatThrownBy(() -> directMessageService.readMessage(conversationId, messageId, userAId))
+      // when & then: stranger가 자기가 보낸 메시지를 읽음 처리하려고 시도
+      assertThatThrownBy(() -> directMessageService.readMessage(conversationId, messageId, strangerId))
           .isInstanceOf(DirectMessageException.class)
           .hasMessageContaining(DirectMessageErrorCode.UNAUTHORIZED_RECEIVER.getMessage());
     }

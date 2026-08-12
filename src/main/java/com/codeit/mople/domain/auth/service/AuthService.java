@@ -3,9 +3,11 @@ package com.codeit.mople.domain.auth.service;
 import com.codeit.mople.domain.auth.dto.request.ResetPasswordRequest;
 import com.codeit.mople.domain.auth.dto.request.SignInRequest;
 import com.codeit.mople.domain.auth.dto.response.AuthTokens;
+import com.codeit.mople.domain.auth.dto.response.RefreshToken;
 import com.codeit.mople.domain.auth.exception.AuthErrorCode;
 import com.codeit.mople.domain.auth.exception.AuthException;
 import com.codeit.mople.domain.user.dto.response.UserDto;
+import com.codeit.mople.domain.user.entity.AuthProvider;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.global.jwt.JwtProvider;
@@ -13,6 +15,7 @@ import io.jsonwebtoken.JwtException;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -35,7 +38,7 @@ public class AuthService {
 
   @Transactional
   public AuthTokens signIn(SignInRequest request) {
-    User user = userRepository.findByEmail(request.username())
+    User user = userRepository.findByEmail(request.username().toLowerCase(Locale.ROOT))
         .orElseThrow(() -> new AuthException(AuthErrorCode.INVALID_CREDENTIALS));
 
     if(!isPasswordValid(request.password(), user)) {
@@ -52,7 +55,24 @@ public class AuthService {
     return issueRefreshToken(user, accessToken);
   }
 
+  @Transactional
+  public RefreshToken issueOAuthRefreshToken(UUID userId) {
+    User user = userRepository.findById(userId)
+        .orElseThrow(() -> new IllegalStateException("OAuth 로그인 후 사용자를 찾을 수 없습니다."));
+
+    user.increaseSessionVersion();
+    String refreshToken = jwtProvider.createRefreshToken(user.getId());
+    Instant refreshExpiresAt = Instant.now().plusMillis(jwtProvider.getRefreshTokenExpiration());
+    user.updateRefreshToken(refreshToken, refreshExpiresAt);
+
+    return new RefreshToken(refreshToken, refreshExpiresAt);
+  }
+
   private boolean isPasswordValid(String rawPassword, User user) {
+    // 소셜 계정은 password가 null이라 matches 호출 자체가 위험
+    if(user.getProvider() != AuthProvider.LOCAL) {
+      return false;
+    }
     if(passwordEncoder.matches(rawPassword, user.getPassword())) {
       return true;
     }
@@ -62,7 +82,8 @@ public class AuthService {
 
   @Transactional
   public void resetPassword(ResetPasswordRequest request) {
-    userRepository.findByEmail(request.email())
+    userRepository.findByEmail(request.email().toLowerCase(Locale.ROOT))
+        .filter(user -> user.getProvider() == AuthProvider.LOCAL)
         .ifPresent(user -> {
           String temporaryPassword = generateTemporaryPassword();
           Instant expiresAt = Instant.now().plus(TEMPORARY_PASSWORD_EXPIRATION_MINUTES, ChronoUnit.MINUTES);

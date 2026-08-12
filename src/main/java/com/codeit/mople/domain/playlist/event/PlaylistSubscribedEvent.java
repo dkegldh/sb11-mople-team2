@@ -5,7 +5,9 @@ import java.util.UUID;
 public record PlaylistSubscribedEvent(
     UUID ownerId,
     UUID playlistId,
-    UUID subscriberId
+    UUID subscriberId,
+    String subscriberName,
+    String playlistTitle
 ) {
 
 }
