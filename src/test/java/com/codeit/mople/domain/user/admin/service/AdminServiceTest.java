@@ -91,6 +91,7 @@ class AdminServiceTest {
       assertThat(user.getRefreshToken()).isNull();
       verify(eventPublisher).publishEvent(eventCaptor.capture());
       assertThat(eventCaptor.getValue().userId()).isEqualTo(userId);
+      assertThat(eventCaptor.getValue().reason()).isEqualTo(ForceLogoutReason.ROLE_CHANGE);
       assertThat(eventCaptor.getValue().sessionInvalidated()).isTrue();
     }
 
@@ -110,6 +111,7 @@ class AdminServiceTest {
       assertThat(admin.getRefreshToken()).isNull();
       verify(eventPublisher).publishEvent(eventCaptor.capture());
       assertThat(eventCaptor.getValue().userId()).isEqualTo(userId);
+      assertThat(eventCaptor.getValue().reason()).isEqualTo(ForceLogoutReason.ROLE_CHANGE);
       assertThat(eventCaptor.getValue().sessionInvalidated()).isTrue();
     }
 
