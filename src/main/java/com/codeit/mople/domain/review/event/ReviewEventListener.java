@@ -1,11 +1,6 @@
 package com.codeit.mople.domain.review.event;
 
-import com.codeit.mople.domain.content.entity.Content;
-import com.codeit.mople.domain.content.exception.ContentErrorCode;
-import com.codeit.mople.domain.content.exception.ContentException;
 import com.codeit.mople.domain.content.repository.ContentRepository;
-import com.codeit.mople.domain.review.repository.ReviewRepository;
-import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
@@ -17,7 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ReviewEventListener {
 
-  private final ReviewRepository reviewRepository;
   private final ContentRepository contentRepository;
 
   // TODO 김명근: 추후 Kafka 도입하여 Topic 만들어서 비동기로 처리를 통해 동시성 문제 해결
@@ -26,64 +20,38 @@ public class ReviewEventListener {
   @EventListener
   @Transactional
   public void handle(ReviewCreatedEvent event) {
-
-    Content content = contentRepository.findById(event.contentId()).orElseThrow(() ->
-        new ContentException(
-            ContentErrorCode.CONTENT_NOT_FOUND,
-            Map.of("contentId", event.contentId())
-        )
+    contentRepository.increaseRating(
+        event.contentId(),
+        event.rating()
     );
 
-    long reviewCount = reviewRepository.countByContentId(content.getId());
-    Double averageRating = reviewRepository.findAverageRatingByContentId(content.getId());
-
-    content.updateRatingStats(averageRating, (int) reviewCount);
-
-    log.info("리뷰 생성 후 콘텐츠 통계 업데이트 완료: contentId={}, averageRating={}, reviewCount={}",
-        content.getId(), averageRating, reviewCount);
+    log.info("리뷰 생성 후 콘텐츠 통계 업데이트 완료: contentId={}, rating={}",
+        event.contentId(), event.rating());
   }
 
   @EventListener
   @Transactional
   public void handle(ReviewUpdatedEvent event) {
-    Content content = contentRepository.findById(event.contentId()).orElseThrow(() ->
-        new ContentException(
-            ContentErrorCode.CONTENT_NOT_FOUND,
-            Map.of("contentId", event.contentId())
-        )
+    contentRepository.updateRating(
+        event.contentId(),
+        event.oldRating(),
+        event.newRating()
     );
 
-    Double averageRating = reviewRepository.findAverageRatingByContentId(content.getId());
-
-    content.updateRatingStats(averageRating, content.getReviewCount());
-
-    log.info("리뷰 수정 후 콘텐츠 통계 업데이트 완료: contentId={}, averageRating={}",
-        content.getId(), averageRating);
+    log.info("리뷰 수정 후 콘텐츠 통계 업데이트 완료: contentId={}, oldRating={}, newRating={}",
+        event.contentId(), event.oldRating(), event.newRating());
   }
 
   @EventListener
   @Transactional
   public void handle(ReviewDeletedEvent event) {
-    Content content = contentRepository.findById(event.contentId()).orElseThrow(() ->
-        new ContentException(
-            ContentErrorCode.CONTENT_NOT_FOUND,
-            Map.of("contentId", event.contentId())
-        )
+    contentRepository.decreaseRating(
+        event.contentId(),
+        event.rating()
     );
 
-    long reviewCount = reviewRepository.countByContentId(content.getId());
-    Double averageRating = reviewRepository.findAverageRatingByContentId(content.getId());
-
-    Double updateAverageRating = reviewCount == 0 ? 0.0 : averageRating;
-
-    // 리뷰 삭제 후 리뷰가 0개일 때 평균 평점을 0점으로(averageRating null 방지)
-    content.updateRatingStats(
-        updateAverageRating,
-        (int) reviewCount
-    );
-
-    log.info("리뷰 삭제 후 콘텐츠 통계 업데이트 완료: contentId={}, averageRating={}, reviewCount={}",
-        content.getId(), updateAverageRating, reviewCount);
+    log.info("리뷰 삭제 후 콘텐츠 통계 업데이트 완료: contentId={}, rating={}",
+        event.contentId(), event.rating());
   }
 
 

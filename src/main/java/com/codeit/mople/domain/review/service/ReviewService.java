@@ -38,9 +38,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class ReviewService {
 
   private final ReviewRepository reviewRepository;
+
   private final UserRepository userRepository;
   private final ContentRepository contentRepository;
-  private final ApplicationEventPublisher publisher;
+
+  private final ApplicationEventPublisher eventPublisher;
 
   @Transactional
   public ReviewResponse create(UUID authorId, ReviewCreateRequest request) {
@@ -66,9 +68,12 @@ public class ReviewService {
 
     Review savedReview = reviewRepository.save(review);
 
-    publisher.publishEvent(new ReviewWrittenEvent(authorId, author.getName()));
+    eventPublisher.publishEvent(new ReviewWrittenEvent(authorId, author.getName()));
 
-    publisher.publishEvent(new ReviewCreatedEvent(content.getId()));
+    eventPublisher.publishEvent(new ReviewCreatedEvent(
+        content.getId(),
+        savedReview.getRating()
+    ));
 
     ReviewResponse response = ReviewResponse.from(savedReview);
     log.info("리뷰 생성 완료: reviewId={}, authorId={}, contentId={}",
@@ -153,6 +158,9 @@ public class ReviewService {
 
     validateRequesterIsAuthor(review, requesterId);
 
+    // 이벤트 객체가 리뷰 수정 이전 별점을 알아야 함
+    double oldRating = review.getRating();
+
     if (request.text() != null) {
       review.updateText(request.text());
     }
@@ -163,13 +171,16 @@ public class ReviewService {
 
     Content content = review.getContent();
 
-    // 콘텐츠의 평균 평점을 조회
+    ReviewResponse response = ReviewResponse.from(review);
+
     // 리뷰 내용만 변경 된 경우 계산하지 않음
     if (request.rating() != null) {
-      publisher.publishEvent(new ReviewUpdatedEvent(content.getId()));
+      eventPublisher.publishEvent(new ReviewUpdatedEvent(
+          content.getId(),
+          oldRating,
+          review.getRating()
+      ));
     }
-
-    ReviewResponse response = ReviewResponse.from(review);
 
     log.info("리뷰 수정 완료: reviewId={}, requesterId={}, contentId={}, rating={}",
         reviewId, requesterId, content.getId(), request.rating());
@@ -194,9 +205,15 @@ public class ReviewService {
 
     Content content = review.getContent();
 
+    // 이벤트 처리를 위해 Review 삭제 전 미리 별점 정보를 가져옴
+    double rating = review.getRating();
+
     reviewRepository.delete(review);
 
-    publisher.publishEvent(new ReviewDeletedEvent(content.getId()));
+    eventPublisher.publishEvent(new ReviewDeletedEvent(
+        content.getId(),
+        rating
+    ));
 
     log.info(
         "리뷰 삭제 완료: reviewId={}, requesterId={}, contentId={}",

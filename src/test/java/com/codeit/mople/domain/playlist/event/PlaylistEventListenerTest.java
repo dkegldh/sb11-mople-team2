@@ -70,8 +70,6 @@ public class PlaylistEventListenerTest {
 
       PlaylistUnsubscribedEvent event =
           new PlaylistUnsubscribedEvent(playlistId, subscriberId);
-      given(playlistRepository.decreaseSubscriberCount(playlistId))
-          .willReturn(1);
 
       // when
       eventListener.handle(event);

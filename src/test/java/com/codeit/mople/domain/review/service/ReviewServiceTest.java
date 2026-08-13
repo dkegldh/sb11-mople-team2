@@ -42,6 +42,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 public class ReviewServiceTest {
@@ -56,7 +57,7 @@ public class ReviewServiceTest {
   private ContentRepository contentRepository;
 
   @Mock
-  private ApplicationEventPublisher publisher;
+  private ApplicationEventPublisher eventPublisher;
 
   @InjectMocks
   private ReviewService reviewService;
@@ -70,6 +71,7 @@ public class ReviewServiceTest {
   private ReviewCreateRequest createRequest;
 
   private UUID review1Id;
+  private UUID reviewId;
   private Review review1;
   private Review review2;
   private Review review3;
@@ -87,8 +89,11 @@ public class ReviewServiceTest {
     reviewRating = 5.0;
     createRequest = new ReviewCreateRequest(contentId, reviewText, reviewRating);
 
+    reviewId = UUID.randomUUID();
     review1Id = UUID.randomUUID();
     review1 = Review.create(content, author, reviewText, reviewRating);
+    ReflectionTestUtils.setField(review1, "id", review1Id);
+
     updateRequest = new ReviewUpdateRequest("수정된 내용", 3.0);
   }
 
@@ -116,6 +121,7 @@ public class ReviewServiceTest {
           .willReturn("profile.png");
 
       Review review = Review.create(content, author, createRequest.text(), createRequest.rating());
+      ReflectionTestUtils.setField(review, "id", reviewId);
 
       ReviewResponse response = ReviewResponse.from(review);
 
@@ -137,13 +143,17 @@ public class ReviewServiceTest {
 
       // then
       assertThat(result).isEqualTo(response);
+      assertThat(review.getId()).isEqualTo(reviewId);
 
       verify(userRepository).findById(authorId);
       verify(contentRepository).findById(contentId);
       verify(reviewRepository).save(any(Review.class));
 
-      verify(publisher).publishEvent(new ReviewWrittenEvent(authorId, "test"));
-      verify(publisher).publishEvent(new ReviewCreatedEvent(contentId));
+      verify(eventPublisher).publishEvent(new ReviewWrittenEvent(authorId, "test"));
+      verify(eventPublisher).publishEvent(new ReviewCreatedEvent(
+          contentId,
+          reviewRating
+      ));
     }
 
     @Test
@@ -201,6 +211,10 @@ public class ReviewServiceTest {
       review2 = Review.create(content, author, "리뷰 내용 2", 5.0);
       review3 = Review.create(content, author, "리뷰 내용 3", 2.0);
       review4 = Review.create(content, author, "리뷰 내용 4", 5.0);
+
+      ReflectionTestUtils.setField(review2, "id", UUID.randomUUID());
+      ReflectionTestUtils.setField(review3, "id", UUID.randomUUID());
+      ReflectionTestUtils.setField(review4, "id", UUID.randomUUID());
     }
 
     @Test
@@ -443,7 +457,11 @@ public class ReviewServiceTest {
 
       verify(reviewRepository).findById(review1Id);
 
-      verify(publisher).publishEvent(new ReviewUpdatedEvent(contentId));
+      verify(eventPublisher).publishEvent(new ReviewUpdatedEvent(
+          contentId,
+          5.0,
+          3.0
+      ));
     }
 
     @Test
@@ -513,7 +531,6 @@ public class ReviewServiceTest {
 
       given(content.getId())
           .willReturn(contentId);
-
       // reviewRepository.delete() 메서드는 void이기 때문에 값을 반환하지 않음
 
       // when
@@ -523,7 +540,10 @@ public class ReviewServiceTest {
       verify(reviewRepository).findById(review1Id);
       verify(reviewRepository).delete(review1);
 
-      verify(publisher).publishEvent(new ReviewDeletedEvent(contentId));
+      verify(eventPublisher).publishEvent(new ReviewDeletedEvent(
+          contentId,
+          reviewRating
+      ));
     }
 
     @Test

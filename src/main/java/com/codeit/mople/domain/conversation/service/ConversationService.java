@@ -101,6 +101,7 @@ public class ConversationService {
     userRepository.findById(requesterId)
         .orElseThrow(() -> new ConversationException(UserErrorCode.USER_NOT_FOUND, Map.of("userId", requesterId)));
 
+    long totalCount = conversationRepository.countByParticipantId(requesterId);
     Instant cursorTime = request.parseCursorToInstant();
 
     List<Conversation> conversations = conversationRepository.findConversationByCursor(requesterId, request, cursorTime);
@@ -132,7 +133,7 @@ public class ConversationService {
         nextCursor,
         nextIdAfter,
         hasNext,
-        conversationDtos.size(),
+        totalCount,
         request.sortBy(),
         request.sortDirection()
     );

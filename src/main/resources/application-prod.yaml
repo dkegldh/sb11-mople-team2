@@ -48,3 +48,4 @@ batch:
   tmdb:
     collect:
       cron: "0 0 3 * * *"
+      enabled: ${TMDB_COLLECT_ENABLED:false}

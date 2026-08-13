@@ -5,7 +5,6 @@ import com.codeit.mople.domain.conversation.exception.ConversationErrorCode;
 import com.codeit.mople.domain.conversation.exception.ConversationException;
 import com.codeit.mople.domain.conversation.repository.ConversationRepository;
 import com.codeit.mople.domain.directmessage.dto.request.DirectMessageCursorRequest;
-import com.codeit.mople.domain.directmessage.dto.response.CursorResponseDirectMessageDto;
 import com.codeit.mople.domain.directmessage.dto.response.DirectMessageDto;
 import com.codeit.mople.domain.directmessage.entity.DirectMessage;
 import com.codeit.mople.domain.directmessage.event.DirectMessageCreatedEvent;
@@ -14,6 +13,7 @@ import com.codeit.mople.domain.directmessage.exception.DirectMessageException;
 import com.codeit.mople.domain.directmessage.event.DirectMessageReceivedEvent;
 import com.codeit.mople.domain.directmessage.repository.DirectMessageRepository;
 import com.codeit.mople.domain.user.entity.User;
+import com.codeit.mople.global.dto.CursorResponse;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -68,7 +68,7 @@ public class DirectMessageService {
 
   // 특정 대화방의 메시지 목록 조회
   @Transactional
-  public CursorResponseDirectMessageDto getDirectMessages(UUID conversationId, UUID requesterId,
+  public CursorResponse<DirectMessageDto> getDirectMessages(UUID conversationId, UUID requesterId,
       DirectMessageCursorRequest request) {
     log.debug("특정 DM 목록 조회 요청 - conversationId: {}, requesterId: {}", conversationId, requesterId);
     Conversation conversation = conversationRepository.findById(conversationId)
@@ -77,42 +77,32 @@ public class DirectMessageService {
 
     validateConversationParticipant(conversation, requesterId);
 
+    long totalCount = directMessageRepository.countByConversationId(conversationId);
+
     Instant cursorTime = request.parseCursorToInstant();
     List<DirectMessage> messages = directMessageRepository.findDirectMessageByCursor(conversationId,
         request, cursorTime);
 
-    boolean hasNext = messages.size() > request.limit();
-    List<DirectMessage> slicedMessages = hasNext ? messages.subList(0, request.limit()) : messages;
-
     // 스크롤 시마다 발생하는 UPDATE 오버헤드를 방지하기 위해 처음 채팅 방에 들어왔을 때 유저의 읽은 시각을 가장 최근 메시지의 생성 시각으로 업데이트
-    if (cursorTime == null && !slicedMessages.isEmpty()) {
-      conversation.updateLastReadAt(requesterId, slicedMessages.get(0).getCreatedAt());
+    if (cursorTime == null && !messages.isEmpty()) {
+      conversation.updateLastReadAt(requesterId, messages.get(0).getCreatedAt());
       log.debug("대화방 최초 진입 감지, lastReadAt 워터마크 갱신 완료 - conversationId: {}", conversationId);
     }
 
-    List<DirectMessageDto> directMessageDtos = slicedMessages.stream()
+    List<DirectMessageDto> directMessageDtos = messages.stream()
         .map(DirectMessageDto::from)
         .toList();
 
-    String nextCursor = null;
-    UUID nextIdAfter = null;
-
-    if (hasNext && !slicedMessages.isEmpty()) {
-      DirectMessage lastItem = slicedMessages.get(slicedMessages.size() - 1);
-      nextCursor = lastItem.getCreatedAt().toString();
-      nextIdAfter = lastItem.getId();
-    }
-
     log.info("특정 DM 목록 조회 완료 - conversationId: {}", conversationId);
 
-    return new CursorResponseDirectMessageDto(
+    return CursorResponse.of(
         directMessageDtos,
-        nextCursor,
-        nextIdAfter,
-        hasNext,
-        directMessageDtos.size(),
+        request.limit(),
+        totalCount,
         request.sortBy(),
-        request.sortDirection()
+        request.sortDirection(),
+        dto -> dto.createdAt().toString(),
+        DirectMessageDto::id
     );
   }
 

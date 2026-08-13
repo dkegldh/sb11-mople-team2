@@ -31,4 +31,12 @@ public interface ConversationRepository extends JpaRepository<Conversation, UUID
       + "WHERE c.userA = :userA AND c.userB = :userB")
   Optional<Conversation> findWithDetailsByUserAAndUserB(@Param("userA") User userA,
       @Param("userB") User userB);
+
+  @Query("SELECT COUNT(c) FROM Conversation c "
+      + "WHERE  c.userA.id = :participantId OR c.userB.id = :participantId")
+  long countByParticipantId(@Param("participantId") UUID participantId);
+
+  @Query("SELECT COUNT(c) > 0 FROM Conversation c "
+      + "WHERE c.id = :conversationId AND (c.userA.id = :userId OR c.userB.id = :userId)")
+  boolean existsByIdAndParticipantId(@Param("conversationId") UUID conversationId, @Param("userId") UUID userId);
 }

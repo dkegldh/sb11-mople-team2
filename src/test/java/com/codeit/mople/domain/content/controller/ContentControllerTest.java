@@ -200,7 +200,7 @@ public class ContentControllerTest {
         "http://example.com/test1.png", List.of("액션"),
         0.0, 0, 0L);
     ContentResponse content2 = new ContentResponse(
-        UUID.randomUUID(), "DRAMA", "테스트 영화2", "설명 2",
+        UUID.randomUUID(), "tvSeries", "테스트 영화2", "설명 2",
         "http://example.com/test2.png", List.of("로맨스"),
         0.0, 0, 0L);
 

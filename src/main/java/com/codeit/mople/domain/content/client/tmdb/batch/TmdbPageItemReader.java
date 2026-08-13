@@ -22,6 +22,8 @@ public class TmdbPageItemReader extends ItemStreamSupport
 
   private static final String CURSOR_KEY = "nextPage";
 
+  public static final int PAGE_SIZE = 20;
+
   // movie, tv 구분할 필요 없게끔 IntFunction 사용
   private final IntFunction<TmdbPageResponse<? extends TmdbContentItem>> fetcher;
 
@@ -68,6 +70,11 @@ public class TmdbPageItemReader extends ItemStreamSupport
 
   @Override
   public void update(ExecutionContext executionContext) {
+    if (!buffer.isEmpty()) {
+      throw new IllegalStateException(
+          "chunk 경계와 TMDB 페이지 경계가 어긋났습니다. buffer 잔여=%d건, nextPage=%d"
+          .formatted(buffer.size(), nextPage));
+    }
     executionContext.putInt(getExecutionContextKey(CURSOR_KEY), nextPage);
   }
 

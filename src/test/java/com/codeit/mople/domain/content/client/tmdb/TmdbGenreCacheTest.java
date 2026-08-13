@@ -8,12 +8,13 @@ import static org.mockito.Mockito.verify;
 
 import com.codeit.mople.domain.content.client.tmdb.dto.TmdbGenreListResponse;
 import com.codeit.mople.domain.content.client.tmdb.dto.TmdbGenreListResponse.Genre;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -24,8 +25,12 @@ public class TmdbGenreCacheTest {
   @Mock
   private TmdbClient tmdbClient;
 
-  @InjectMocks
   private TmdbGenreCache genreCache;
+
+  @BeforeEach
+  void setUp() {
+    genreCache = new TmdbGenreCache(tmdbClient, new SimpleMeterRegistry());
+  }
 
   @Nested
   @DisplayName("장르 적재 성공")

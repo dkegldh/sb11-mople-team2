@@ -16,7 +16,6 @@ import com.codeit.mople.domain.conversation.exception.ConversationErrorCode;
 import com.codeit.mople.domain.conversation.exception.ConversationException;
 import com.codeit.mople.domain.conversation.repository.ConversationRepository;
 import com.codeit.mople.domain.directmessage.dto.request.DirectMessageCursorRequest;
-import com.codeit.mople.domain.directmessage.dto.response.CursorResponseDirectMessageDto;
 import com.codeit.mople.domain.directmessage.dto.response.DirectMessageDto;
 import com.codeit.mople.domain.directmessage.entity.DirectMessage;
 import com.codeit.mople.domain.directmessage.event.DirectMessageCreatedEvent;
@@ -24,6 +23,7 @@ import com.codeit.mople.domain.directmessage.exception.DirectMessageErrorCode;
 import com.codeit.mople.domain.directmessage.exception.DirectMessageException;
 import com.codeit.mople.domain.directmessage.repository.DirectMessageRepository;
 import com.codeit.mople.domain.user.entity.User;
+import com.codeit.mople.global.dto.CursorResponse;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -181,6 +181,9 @@ public class DirectMessageServiceTest {
       given(mockRequest.sortDirection()).willReturn("DESCENDING");
       given(mockRequest.parseCursorToInstant()).willReturn(null);
 
+      long totalCount = 1L;
+      given(directMessageRepository.countByConversationId(conversationId)).willReturn(totalCount);
+
       given(directMessageRepository.findDirectMessageByCursor(eq(conversationId), eq(mockRequest), any()))
           .willReturn(List.of(message));
 
@@ -196,11 +199,12 @@ public class DirectMessageServiceTest {
       given(userB.getId()).willReturn(userBId);
 
       //when
-      CursorResponseDirectMessageDto result = directMessageService.getDirectMessages(conversationId, userAId, mockRequest);
+      CursorResponse<DirectMessageDto> result = directMessageService.getDirectMessages(conversationId, userAId, mockRequest);
 
       //then
       assertThat(result.data()).hasSize(1);
       assertThat(result.data().get(0).content()).isEqualTo("안녕하세요!");
+      assertThat(result.hasNext()).isFalse();
       verify(conversation).updateLastReadAt(userAId, messageTime);
     }
 

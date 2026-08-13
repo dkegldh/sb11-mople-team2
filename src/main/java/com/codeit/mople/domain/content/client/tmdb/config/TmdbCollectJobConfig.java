@@ -25,13 +25,14 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.PlatformTransactionManager;
 
 @Configuration
 @RequiredArgsConstructor
 public class TmdbCollectJobConfig {
 
-  private static final int CHUNK_SIZE = 20;
+  private static final int CHUNK_SIZE = TmdbPageItemReader.PAGE_SIZE;
 
   private final TmdbClient tmdbClient;
   private final TmdbGenreCache tmdbGenreCache;
@@ -62,12 +63,17 @@ public class TmdbCollectJobConfig {
   public Step tmdbMovieStep(
       JobRepository jobRepository,
       PlatformTransactionManager transactionManager,
-      @Qualifier("tmdbMovieReader") TmdbPageItemReader tmdbMovieReader) {
+      @Qualifier("tmdbMovieReader") TmdbPageItemReader tmdbMovieReader,
+      @Value("${batch.tmdb.collect.skip-limit}") int skipLimit) {
     return new StepBuilder("tmdbMovieStep", jobRepository)
         .<TmdbContentItem, Content>chunk(CHUNK_SIZE, transactionManager)
         .reader(tmdbMovieReader)
         .processor(processor(ContentType.MOVIE))
         .writer(writer(ContentType.MOVIE))
+        // DB제약 위반 예외는 건너뜀(지금은 최대 10번 까지 건너띌 수 있도록 설정)
+        .faultTolerant()
+        .skip(DataIntegrityViolationException.class)
+        .skipLimit(skipLimit)
         .build();
   }
 
@@ -75,12 +81,17 @@ public class TmdbCollectJobConfig {
   public Step tmdbTvStep(
       JobRepository jobRepository,
       PlatformTransactionManager transactionManager,
-      @Qualifier("tmdbTvReader") TmdbPageItemReader tmdbTvReader) {
+      @Qualifier("tmdbTvReader") TmdbPageItemReader tmdbTvReader,
+      @Value("${batch.tmdb.collect.skip-limit}") int skipLimit) {
     return new StepBuilder("tmdbTvStep", jobRepository)
         .<TmdbContentItem, Content>chunk(CHUNK_SIZE, transactionManager)
         .reader(tmdbTvReader)
         .processor(processor(ContentType.TV_SERIES))
         .writer(writer(ContentType.TV_SERIES))
+        // DB제약 위반 예외는 건너뜀(지금은 최대 10번 까지 건너띌 수 있도록 설정)
+        .faultTolerant()
+        .skip(DataIntegrityViolationException.class)
+        .skipLimit(skipLimit)
         .build();
   }
 

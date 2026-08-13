@@ -6,9 +6,9 @@ import com.codeit.mople.domain.auth.security.CustomUserDetails;
 import com.codeit.mople.domain.directmessage.controller.api.DirectMessageApi;
 import com.codeit.mople.domain.directmessage.dto.request.DirectMessageCursorRequest;
 import com.codeit.mople.domain.directmessage.dto.request.DirectMessageSendRequest;
-import com.codeit.mople.domain.directmessage.dto.response.CursorResponseDirectMessageDto;
 import com.codeit.mople.domain.directmessage.dto.response.DirectMessageDto;
 import com.codeit.mople.domain.directmessage.service.DirectMessageService;
+import com.codeit.mople.global.dto.CursorResponse;
 import jakarta.validation.Valid;
 import java.security.Principal;
 import java.util.Map;
@@ -39,7 +39,7 @@ public class DirectMessageController implements DirectMessageApi {
   @MessageMapping("/conversations/{conversationId}/direct-messages")
   public void sendDirectMessage(
       @DestinationVariable UUID conversationId,
-      DirectMessageSendRequest request,
+      @Valid DirectMessageSendRequest request,
       Principal principal
   ) {
     if (principal == null) {
@@ -60,13 +60,12 @@ public class DirectMessageController implements DirectMessageApi {
 
   @Override
   @GetMapping
-  public ResponseEntity<CursorResponseDirectMessageDto> getDirectMessages(
+  public ResponseEntity<CursorResponse<DirectMessageDto>> getDirectMessages(
       @PathVariable UUID conversationId,
       @AuthenticationPrincipal CustomUserDetails userDetails,
       @Valid DirectMessageCursorRequest request
   ) {
-    CursorResponseDirectMessageDto response = directMessageService.getDirectMessages(conversationId,
-        userDetails.getUserId(), request);
+    CursorResponse<DirectMessageDto> response = directMessageService.getDirectMessages(conversationId, userDetails.getUserId(), request);
     return ResponseEntity.ok(response);
   }
 

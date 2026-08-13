@@ -250,10 +250,9 @@ public class ReviewIntegrationTest {
     void update_success() throws Exception {
       // given
       savedReview = reviewRepository.save(review);
-      
-      // 리뷰 생성 후 savedContent의 평균 평점, 리뷰 개수 설정
-      savedContent.updateRatingStats(reviewRating, 1);
-      contentRepository.save(savedContent);
+
+      // 기존 리뷰의 별점 통계 설정
+      contentRepository.increaseRating(savedContent.getId(), reviewRating);
 
       // BeforeEach에서 updateRequest, userDetails를 초기화
 
@@ -282,7 +281,8 @@ public class ReviewIntegrationTest {
       Content content = contentRepository.findById(savedContent.getId()).orElseThrow();
 
       assertThat(content.getReviewCount()).isEqualTo(1);
-      assertThat(content.getAverageRating()).isEqualTo(newRating);
+      assertThat(content.getRatingSum()).isEqualTo(newRating);
+      assertThat(content.calculateAverageRating()).isEqualTo(newRating);
     }
 
     @Test
@@ -336,6 +336,12 @@ public class ReviewIntegrationTest {
       // given
       savedReview = reviewRepository.save(review);
 
+      // 리뷰가 존재하는 상태의 콘텐츠 통계 구성
+      contentRepository.increaseRating(
+          savedContent.getId(),
+          review.getRating()
+      );
+
       // BeforeEach에서 userDetails 초기화
 
       // when & then
@@ -351,7 +357,7 @@ public class ReviewIntegrationTest {
       // 컨텐츠의 리뷰 개수와 평균 평점 검증
       Content content = contentRepository.findById(savedContent.getId()).orElseThrow();
       assertThat(content.getReviewCount()).isEqualTo(0); // == isZero()
-      assertThat(content.getAverageRating()).isEqualTo(0.0);
+      assertThat(content.calculateAverageRating()).isEqualTo(0.0);
     }
 
     @Test
