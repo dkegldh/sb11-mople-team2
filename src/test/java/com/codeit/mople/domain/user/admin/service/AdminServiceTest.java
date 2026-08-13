@@ -15,6 +15,7 @@ import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.global.error.CustomException;
 import com.codeit.mople.global.event.ForceLogoutReason;
 import com.codeit.mople.global.event.UserAccountStatusChangedEvent;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -77,6 +78,7 @@ class AdminServiceTest {
     @DisplayName("USER을 ADMIN으로 권한 변경 할 수 있고 강제 로그아웃 이벤트를 발행한다")
     void USER을_ADMIN으로_권한_변경_할_수_있고_강제_로그아웃_이벤트를_발행한다() {
       // given
+      user.updateRefreshToken("old-refresh-token", Instant.now().plusSeconds(3600));
       given(userRepository.findById(userId)).willReturn(Optional.of(user));
 
       // when
@@ -84,6 +86,9 @@ class AdminServiceTest {
 
       // then
       assertThat(user.getRole()).isEqualTo(Role.ADMIN);
+      // sessionVersion만 올리고 refresh token을 안 지우면, 유저가 /refresh로 최신
+      // sessionVersion이 박힌 새 access token을 받아 강제 로그아웃을 우회할 수 있다.
+      assertThat(user.getRefreshToken()).isNull();
       verify(eventPublisher).publishEvent(eventCaptor.capture());
       assertThat(eventCaptor.getValue().userId()).isEqualTo(userId);
       assertThat(eventCaptor.getValue().sessionInvalidated()).isTrue();
@@ -94,6 +99,7 @@ class AdminServiceTest {
     void ADMIN을_USER로_강등할_수_있고_강제_로그아웃_이벤트를_발행한다() {
       // given
       User admin = User.createAdmin("admin@test.com", "encoded", "어드민");
+      admin.updateRefreshToken("old-refresh-token", Instant.now().plusSeconds(3600));
       given(userRepository.findById(userId)).willReturn(Optional.of(admin));
 
       // when
@@ -101,6 +107,7 @@ class AdminServiceTest {
 
       // then
       assertThat(admin.getRole()).isEqualTo(Role.USER);
+      assertThat(admin.getRefreshToken()).isNull();
       verify(eventPublisher).publishEvent(eventCaptor.capture());
       assertThat(eventCaptor.getValue().userId()).isEqualTo(userId);
       assertThat(eventCaptor.getValue().sessionInvalidated()).isTrue();
@@ -110,6 +117,7 @@ class AdminServiceTest {
     @DisplayName("같은 권한으로 변경하면 강제 로그아웃 이벤트를 발행하지 않는다")
     void 같은_권한으로_변경하면_강제_로그아웃_이벤트를_발행하지_않는다() {
       // given - user는 기본 USER 역할
+      user.updateRefreshToken("old-refresh-token", Instant.now().plusSeconds(3600));
       given(userRepository.findById(userId)).willReturn(Optional.of(user));
 
       // when
@@ -117,6 +125,8 @@ class AdminServiceTest {
 
       // then
       assertThat(user.getRole()).isEqualTo(Role.USER);
+      // 실제로 권한이 바뀐 게 없으므로 refresh token도 그대로 유지돼야 한다.
+      assertThat(user.getRefreshToken()).isEqualTo("old-refresh-token");
       verify(eventPublisher, never()).publishEvent(any());
     }
 
@@ -165,6 +175,7 @@ class AdminServiceTest {
     @DisplayName("locked(true)이면 계정을 잠금하고 sessionVersion을 올리며 강제 로그아웃 이벤트를 발행한다")
     void locked_true이면_계정을_잠금하고_sessionVersion을_올리며_강제_로그아웃_이벤트를_발행한다() {
       // given
+      user.updateRefreshToken("old-refresh-token", Instant.now().plusSeconds(3600));
       given(userRepository.findById(userId)).willReturn(Optional.of(user));
 
       // when
@@ -173,6 +184,7 @@ class AdminServiceTest {
       // then
       assertThat(user.isLocked()).isTrue();
       assertThat(user.getSessionVersion()).isEqualTo(1);
+      assertThat(user.getRefreshToken()).isNull();
       verify(eventPublisher).publishEvent(eventCaptor.capture());
       assertThat(eventCaptor.getValue().userId()).isEqualTo(userId);
       assertThat(eventCaptor.getValue().reason()).isEqualTo(ForceLogoutReason.ACCOUNT_LOCKED);
@@ -184,6 +196,7 @@ class AdminServiceTest {
     void locked_false이면_계정_잠금을_해제하고_알림_이벤트를_발행하지만_sessionVersion은_변경하지_않는다() {
       // given
       user.lock();
+      user.updateRefreshToken("old-refresh-token", Instant.now().plusSeconds(3600));
       given(userRepository.findById(userId)).willReturn(Optional.of(user));
 
       // when
@@ -192,6 +205,8 @@ class AdminServiceTest {
       // then
       assertThat(user.isLocked()).isFalse();
       assertThat(user.getSessionVersion()).isEqualTo(0);
+      // 세션을 안 끊었으니 refresh token도 그대로 살아있어야 한다.
+      assertThat(user.getRefreshToken()).isEqualTo("old-refresh-token");
       verify(eventPublisher).publishEvent(eventCaptor.capture());
       assertThat(eventCaptor.getValue().userId()).isEqualTo(userId);
       assertThat(eventCaptor.getValue().reason()).isEqualTo(ForceLogoutReason.ACCOUNT_UNLOCKED);
@@ -210,6 +225,21 @@ class AdminServiceTest {
 
       // then
       assertThat(user.isLocked()).isTrue();
+      assertThat(user.getSessionVersion()).isEqualTo(0);
+      verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    @DisplayName("이미 잠금 해제 상태인 계정에 잠금 해제 요청 시 이벤트를 발행하지 않는다")
+    void 이미_잠금_해제_상태인_계정에_잠금_해제_요청_시_이벤트를_발행하지_않는다() {
+      // given - user는 기본적으로 잠금 해제(unlocked) 상태
+      given(userRepository.findById(userId)).willReturn(Optional.of(user));
+
+      // when
+      adminService.changeUserLocked(userId, false);
+
+      // then
+      assertThat(user.isLocked()).isFalse();
       assertThat(user.getSessionVersion()).isEqualTo(0);
       verify(eventPublisher, never()).publishEvent(any());
     }
