@@ -322,7 +322,14 @@ public class PlaylistService {
     log.info("플레이리스트 구독 성공: playlistSubscriptionId={}, playlistId={}, subscriberId={}",
         saved.getId(), playlistId, subscriberId);
 
-    publisher.publishEvent(new PlaylistSubscribedEvent(ownerId, playlistId, subscriberId, subscriber.getName(), playlist.getTitle()));
+    publisher.publishEvent(new PlaylistSubscribedEvent(
+        UUID.randomUUID(),
+        ownerId,
+        playlistId,
+        subscriberId,
+        subscriber.getName(),
+        playlist.getTitle()
+    ));
   }
 
   @Transactional
@@ -338,7 +345,11 @@ public class PlaylistService {
           Map.of("playlistId", playlistId, "subscriberId", subscriberId));
     }
 
-    publisher.publishEvent(new PlaylistUnsubscribedEvent(playlistId, subscriberId));
+    publisher.publishEvent(new PlaylistUnsubscribedEvent(
+        UUID.randomUUID(),
+        playlistId,
+        subscriberId
+    ));
 
     log.info("플레이리스트 구독 취소 성공: playlist={}, subscriberId={}",
         playlistId, subscriberId);
@@ -367,15 +378,13 @@ public class PlaylistService {
           Map.of("playlistId", playlistId, "contentId", contentId));
     }
 
-    PlaylistContent playlistContent = PlaylistContent.create(playlist, content);
-    playlistContentRepository.save(playlistContent);
+    PlaylistContent saved = playlistContentRepository.save(
+        PlaylistContent.create(playlist, content));
 
     log.info("플레이리스트에 콘텐츠 추가 성공: playlistContentId={}, playlistId={}, contentId={}, requesterId={}",
-        playlistContent.getId(), playlistId, contentId, requesterId);
+        saved.getId(), playlistId, contentId, requesterId);
 
-    playlistSubscriptionRepository.findSubscriberIdsByPlaylistId(playlistId)
-        .forEach(subscriberId ->
-            publisher.publishEvent(new PlaylistContentAddedEvent(subscriberId, playlistId, contentId, playlist.getTitle())));
+    publisher.publishEvent(new PlaylistContentAddedEvent(saved.getId(), playlistId, contentId, playlist.getTitle()));
   }
 
   @Transactional
@@ -399,6 +408,11 @@ public class PlaylistService {
     log.info("플레이리스트에 콘텐츠 삭제 성공: playlistContentId={}, playlistId={}, contentId={}, requesterId={}",
         playlistContent.getId(), playlistId, contentId, requesterId);
     playlistContentRepository.delete(playlistContent);
+  }
+
+  public List<UUID> getSubscriberIds(UUID playlistId) {
+    log.debug("구독자 id 목록 조회: playlistId={}", playlistId);
+    return playlistSubscriptionRepository.findSubscriberIdsByPlaylistId(playlistId);
   }
 
   private UserSummary toUserSummary(User user) {

@@ -1,25 +1,33 @@
 package com.codeit.mople.domain.review.event;
 
 import com.codeit.mople.domain.content.repository.ContentRepository;
+import com.codeit.mople.global.event.processed.ProcessedEvent;
+import com.codeit.mople.global.event.processed.ProcessedEventRepository;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.event.EventListener;
+import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class ReviewEventListener {
+public class ReviewEventConsumer {
 
   private final ContentRepository contentRepository;
 
-  // TODO 김명근: 추후 Kafka 도입하여 Topic 만들어서 비동기로 처리를 통해 동시성 문제 해결
-  // 현재로서는 데이터 정합성을 생각하여 @TransactionEventListener 미사용
+  private final ProcessedEventRepository processedEventRepository;
+
+
   // 기본 전파레벨은 REQUIRED(트랜잭션 내에서 이 메서드가 호출되면 트랜잭션 새로 생성하지 않고 그 트랜잭션에 참여)
-  @EventListener
   @Transactional
+  @KafkaListener(topics = "review-created")
   public void handle(ReviewCreatedEvent event) {
+    if (checkAndRecordProcessedEvent(event.eventId())) {
+      return;
+    }
+    
     contentRepository.increaseRating(
         event.contentId(),
         event.rating()
@@ -29,9 +37,13 @@ public class ReviewEventListener {
         event.contentId(), event.rating());
   }
 
-  @EventListener
   @Transactional
+  @KafkaListener(topics = "review-updated")
   public void handle(ReviewUpdatedEvent event) {
+    if (checkAndRecordProcessedEvent(event.eventId())) {
+      return;
+    }
+
     contentRepository.updateRating(
         event.contentId(),
         event.oldRating(),
@@ -42,9 +54,13 @@ public class ReviewEventListener {
         event.contentId(), event.oldRating(), event.newRating());
   }
 
-  @EventListener
   @Transactional
+  @KafkaListener(topics = "review-deleted")
   public void handle(ReviewDeletedEvent event) {
+    if (checkAndRecordProcessedEvent(event.eventId())) {
+      return;
+    }
+
     contentRepository.decreaseRating(
         event.contentId(),
         event.rating()
@@ -54,5 +70,17 @@ public class ReviewEventListener {
         event.contentId(), event.rating());
   }
 
+
+  private boolean checkAndRecordProcessedEvent(UUID eventId) {
+    // 이미 해당 eventId가 존재하면 스킵
+    int inserted = processedEventRepository.insertIfAbsent(eventId);
+
+    if (inserted == 0) {
+      log.info("이미 처리된 이벤트입니다: eventId={}", eventId);
+      return true;
+    }
+
+    return false;
+  }
 
 }

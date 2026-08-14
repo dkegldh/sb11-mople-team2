@@ -4,6 +4,18 @@ spring:
     username: sa
     password:
 
+  kafka:
+    bootstrap-servers: localhost:9093
+    topics:
+      follow-created: mople.follow.created.v1
+      playlist-content-added: mople.playlist.content-added.v1
+    enabled: false
+
+  data:
+    redis:
+      host: localhost
+      port: 6380
+
   jpa:
     hibernate:
       ddl-auto: create-drop

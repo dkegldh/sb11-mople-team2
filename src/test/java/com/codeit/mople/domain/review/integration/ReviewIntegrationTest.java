@@ -276,13 +276,6 @@ public class ReviewIntegrationTest {
 
       assertThat(updatedReview.getText()).isEqualTo(newText);
       assertThat(updatedReview.getRating()).isEqualTo(newRating);
-
-      // Content 검증
-      Content content = contentRepository.findById(savedContent.getId()).orElseThrow();
-
-      assertThat(content.getReviewCount()).isEqualTo(1);
-      assertThat(content.getRatingSum()).isEqualTo(newRating);
-      assertThat(content.calculateAverageRating()).isEqualTo(newRating);
     }
 
     @Test
@@ -353,11 +346,6 @@ public class ReviewIntegrationTest {
 
       // DB에 리뷰 검증(행이 하나도 없어야 함)
       assertThat(reviewRepository.findById(savedReview.getId())).isEmpty();
-
-      // 컨텐츠의 리뷰 개수와 평균 평점 검증
-      Content content = contentRepository.findById(savedContent.getId()).orElseThrow();
-      assertThat(content.getReviewCount()).isEqualTo(0); // == isZero()
-      assertThat(content.calculateAverageRating()).isEqualTo(0.0);
     }
 
     @Test

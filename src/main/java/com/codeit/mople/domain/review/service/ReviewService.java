@@ -71,6 +71,7 @@ public class ReviewService {
     eventPublisher.publishEvent(new ReviewWrittenEvent(authorId, author.getName()));
 
     eventPublisher.publishEvent(new ReviewCreatedEvent(
+        UUID.randomUUID(),
         content.getId(),
         savedReview.getRating()
     ));
@@ -176,6 +177,7 @@ public class ReviewService {
     // 리뷰 내용만 변경 된 경우 계산하지 않음
     if (request.rating() != null) {
       eventPublisher.publishEvent(new ReviewUpdatedEvent(
+          UUID.randomUUID(),
           content.getId(),
           oldRating,
           review.getRating()
@@ -211,6 +213,7 @@ public class ReviewService {
     reviewRepository.delete(review);
 
     eventPublisher.publishEvent(new ReviewDeletedEvent(
+        UUID.randomUUID(),
         content.getId(),
         rating
     ));

@@ -38,7 +38,6 @@ import com.codeit.mople.domain.user.exception.UserErrorCode;
 import com.codeit.mople.domain.user.exception.UserException;
 import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.global.dto.UserSummary;
-import com.codeit.mople.global.error.CustomException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -872,7 +871,7 @@ public class PlaylistServiceTest {
           subscriberId)).willReturn(true);
 
       assertThatThrownBy(() -> playlistService.subscribe(playlistId, subscriberId))
-          .isInstanceOf(CustomException.class)
+          .isInstanceOf(PlaylistException.class)
           .hasFieldOrPropertyWithValue("errorCode", PlaylistErrorCode.SUBSCRIBE_DUPLICATE);
 
       verify(playlistSubscriptionRepository, never()).save(any());
@@ -888,7 +887,7 @@ public class PlaylistServiceTest {
       given(playlistRepository.findById(playlistId)).willReturn(Optional.empty());
 
       assertThatThrownBy(() -> playlistService.subscribe(playlistId, subscriberId))
-          .isInstanceOf(CustomException.class)
+          .isInstanceOf(PlaylistException.class)
           .hasFieldOrPropertyWithValue("errorCode", PlaylistErrorCode.SUBSCRIBE_NOT_FOUND);
 
       verify(playlistSubscriptionRepository, never()).save(any());
@@ -906,7 +905,7 @@ public class PlaylistServiceTest {
       given(userRepository.findById(subscriberId)).willReturn(Optional.empty());
 
       assertThatThrownBy(() -> playlistService.subscribe(playlistId, subscriberId))
-          .isInstanceOf(CustomException.class)
+          .isInstanceOf(PlaylistException.class)
           .hasFieldOrPropertyWithValue("errorCode", PlaylistErrorCode.SUBSCRIBE_USER_NOT_FOUND);
 
       verify(playlistSubscriptionRepository, never()).save(any());
@@ -923,7 +922,7 @@ public class PlaylistServiceTest {
       given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
 
       assertThatThrownBy(() -> playlistService.subscribe(playlistId, ownerId))
-          .isInstanceOf(CustomException.class)
+          .isInstanceOf(PlaylistException.class)
           .hasFieldOrPropertyWithValue("errorCode", PlaylistErrorCode.SUBSCRIBE_NOT_ALLOWED);
 
       verify(userRepository, never()).findById(any());
@@ -993,8 +992,11 @@ public class PlaylistServiceTest {
       given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
       given(contentRepository.findById(contentId)).willReturn(Optional.of(content));
       given(owner.getId()).willReturn(ownerId);
-      given(playlistSubscriptionRepository.findSubscriberIdsByPlaylistId(playlistId))
-          .willReturn(List.of(UUID.randomUUID()));
+
+      UUID playlistContentId = UUID.randomUUID();
+      PlaylistContent saved = mock(PlaylistContent.class);
+      given(saved.getId()).willReturn(playlistContentId);
+      given(playlistContentRepository.save(any(PlaylistContent.class))).willReturn(saved);
 
       // when
       playlistService.addContent(playlistId, contentId, ownerId);
@@ -1005,18 +1007,17 @@ public class PlaylistServiceTest {
 
       PlaylistContentAddedEvent event = contentAddedEventCaptor.getValue();
 
+      assertThat(event.playlistContentId()).isEqualTo(playlistContentId);
       assertThat(event.playlistId()).isEqualTo(playlistId);
       assertThat(event.contentId()).isEqualTo(contentId);
       assertThat(event.playlistTitle()).isEqualTo(title);
     }
 
     @Test
-    @DisplayName("플레이리스트 콘텐츠 추가 시 구독자 수만큼 이벤트가 발행된다")
-    void addContent_publishes_event_per_subscriber() {
+    @DisplayName("플레이리스트 콘텐츠 추가 시 구독자 확산 없이 이벤트가 1건만 발행된다")
+    void addContent_publishes_single_event() {
       UUID playlistId = UUID.randomUUID();
       UUID contentId = UUID.randomUUID();
-      UUID subscriber1 = UUID.randomUUID();
-      UUID subscriber2 = UUID.randomUUID();
 
       Playlist playlist = Playlist.create(owner, title, description);
       Content content = mock(Content.class);
@@ -1024,23 +1025,26 @@ public class PlaylistServiceTest {
       given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
       given(contentRepository.findById(contentId)).willReturn(Optional.of(content));
       given(owner.getId()).willReturn(ownerId);
-      given(playlistSubscriptionRepository.findSubscriberIdsByPlaylistId(playlistId))
-          .willReturn(List.of(subscriber1, subscriber2));
+
+      UUID playlistContentId = UUID.randomUUID();
+      PlaylistContent saved = mock(PlaylistContent.class);
+      given(saved.getId()).willReturn(playlistContentId);
+      given(playlistContentRepository.save(any(PlaylistContent.class))).willReturn(saved);
 
       // when
       playlistService.addContent(playlistId, contentId, ownerId);
 
       // then
-      verify(eventPublisher, times(2)).publishEvent(contentAddedEventCaptor.capture());
+      // 수신자 확산은 알림 리스너의 책임이므로 서비스는 구독자를 조회하지 않는다
+      verify(playlistSubscriptionRepository, never()).findSubscriberIdsByPlaylistId(any());
+      verify(eventPublisher, times(1)).publishEvent(contentAddedEventCaptor.capture());
 
-      List<PlaylistContentAddedEvent> events = contentAddedEventCaptor.getAllValues();
-      assertThat(events).extracting(PlaylistContentAddedEvent::subscriberId)
-          .containsExactlyInAnyOrder(subscriber1, subscriber2);
-      assertThat(events).allSatisfy(event -> {
-        assertThat(event.playlistId()).isEqualTo(playlistId);
-        assertThat(event.contentId()).isEqualTo(contentId);
-        assertThat(event.playlistTitle()).isEqualTo(title);
-      });
+      PlaylistContentAddedEvent event = contentAddedEventCaptor.getValue();
+
+      assertThat(event.playlistContentId()).isEqualTo(playlistContentId);
+      assertThat(event.playlistId()).isEqualTo(playlistId);
+      assertThat(event.contentId()).isEqualTo(contentId);
+      assertThat(event.playlistTitle()).isEqualTo(title);
     }
 
     @Test

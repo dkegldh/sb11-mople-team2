@@ -24,9 +24,27 @@ spring:
             token-uri: https://kauth.kakao.com/oauth/token
             user-info-uri: https://kapi.kakao.com/v2/user/me
             user-name-attribute: id
+  kafka:
+    topics:
+      follow-created: mople.follow.created.v1
+      playlist-content-added: mople.playlist.content-added.v1
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        retries: 3
+        retry.backoff.ms: 1000
+        retry.backoff.max.ms: 4000
+    consumer:
+      group-id: mople
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.codeit.mople.domain.*"
 
 server:
   port: 8080
+  shutdown: graceful
 
 springdoc:
   swagger-ui:

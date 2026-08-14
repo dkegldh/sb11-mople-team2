@@ -51,9 +51,15 @@ dependencies {
     // SSE는 starter-web의 SseEmitter로 처리 — 별도 의존성 불필요
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 
+    // Kafka
+    implementation 'org.springframework.kafka:spring-kafka'
+
     // Batch & 모니터링
     implementation 'org.springframework.boot:spring-boot-starter-batch'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+    // Kafka
+    implementation 'org.springframework.kafka:spring-kafka'
 
     // External API (TMDB / SportsDB)
     implementation 'org.springframework.cloud:spring-cloud-starter-openfeign'
@@ -76,9 +82,11 @@ dependencies {
     // WebSocket 강제 종료 통합 테스트에서 실제 Redis(pub/sub)를 띄우기 위함
     testImplementation 'org.testcontainers:testcontainers'
     testImplementation 'org.testcontainers:junit-jupiter'
+    testImplementation 'org.springframework.kafka:spring-kafka-test'
     testCompileOnly 'org.projectlombok:lombok'
     testAnnotationProcessor 'org.projectlombok:lombok'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testImplementation 'org.springframework.kafka:spring-kafka-test'
 }
 
 dependencyManagement {

@@ -1,13 +1,10 @@
 package com.codeit.mople.domain.review.event;
 
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.codeit.mople.domain.content.repository.ContentRepository;
-import com.codeit.mople.domain.review.entity.Review;
-import java.util.Optional;
+import com.codeit.mople.global.event.processed.ProcessedEventRepository;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -19,23 +16,22 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-public class ReviewListenerTest {
+public class ReviewConsumerTest {
 
   @Mock
   private ContentRepository contentRepository;
 
+  @Mock
+  private ProcessedEventRepository processedEventRepository;
+
   @InjectMocks
-  private ReviewEventListener eventListener;
+  private ReviewEventConsumer eventConsumer;
 
   private UUID contentId;
-  private UUID reviewId;
-  private Review review;
 
   @BeforeEach
   void setUp() {
     contentId = UUID.randomUUID();
-    reviewId = UUID.randomUUID();
-    review = mock(Review.class);
   }
 
   @Nested
@@ -46,12 +42,21 @@ public class ReviewListenerTest {
     @DisplayName("리뷰 생성 이벤트 성공")
     void handle_success() {
       // given
-      ReviewCreatedEvent event = new ReviewCreatedEvent(contentId, 4.0);
+
+      // BeforeEach에서 contentId를 초기화
+
+      UUID eventId = UUID.randomUUID();
+
+      ReviewCreatedEvent event = new ReviewCreatedEvent(eventId, contentId, 4.0);
+
+      given(processedEventRepository.insertIfAbsent(eventId))
+          .willReturn(1);
 
       // when
-      eventListener.handle(event);
+      eventConsumer.handle(event);
 
       // then
+      verify(processedEventRepository).insertIfAbsent(eventId);
       verify(contentRepository).increaseRating(contentId, 4.0);
     }
 
@@ -65,17 +70,25 @@ public class ReviewListenerTest {
     @DisplayName("리뷰 수정 이벤트 성공")
     void handle_success() {
       // given
-      ReviewUpdatedEvent event = new ReviewUpdatedEvent(contentId, 4.0, 5.0);
+
+      // BeforeEach에서 contentId를 초기화
+
+      UUID eventId = UUID.randomUUID();
+
+      ReviewUpdatedEvent event = new ReviewUpdatedEvent(eventId, contentId, 4.0, 5.0);
+
+      given(processedEventRepository.insertIfAbsent(eventId))
+          .willReturn(1);
 
       // when
-      eventListener.handle(event);
+      eventConsumer.handle(event);
 
       // then
+      verify(processedEventRepository).insertIfAbsent(eventId);
       verify(contentRepository).updateRating(contentId, 4.0, 5.0);
     }
 
   }
-
 
   @Nested
   @DisplayName("리뷰 삭제 이벤트(콘텐츠 개수, 평균 평점 업데이트)")
@@ -85,12 +98,21 @@ public class ReviewListenerTest {
     @DisplayName("리뷰 삭제 이벤트 성공")
     void handle_success() {
       // given
-      ReviewDeletedEvent event = new ReviewDeletedEvent(contentId, 4.0);
+
+      // BeforeEach에서 contentId를 초기화
+
+      UUID eventId = UUID.randomUUID();
+
+      ReviewDeletedEvent event = new ReviewDeletedEvent(eventId, contentId, 4.0);
+
+      given(processedEventRepository.insertIfAbsent(eventId))
+          .willReturn(1);
 
       // when
-      eventListener.handle(event);
+      eventConsumer.handle(event);
 
       // then
+      verify(processedEventRepository).insertIfAbsent(eventId);
       verify(contentRepository).decreaseRating(contentId, 4.0);
     }
 

@@ -4,6 +4,7 @@ import com.codeit.mople.global.entity.BaseEntity;
 import com.codeit.mople.domain.user.entity.User;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -17,7 +18,8 @@ import lombok.NoArgsConstructor;
 @Table(name = "follows",
     uniqueConstraints = @UniqueConstraint(
         name = "uk_follows_followee_follower",
-        columnNames = {"followee_id", "follower_id"}))
+        columnNames = {"followee_id", "follower_id"}),
+    indexes = @Index(name = "idx_follows_follower_id", columnList = "follower_id"))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Follow extends BaseEntity {
