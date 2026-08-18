@@ -25,6 +25,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.messaging.converter.MappingJackson2MessageConverter;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.stomp.StompFrameHandler;
 import org.springframework.messaging.simp.stomp.StompHeaders;
 import org.springframework.messaging.simp.stomp.StompSession;
@@ -77,6 +78,9 @@ class WebSocketForceLogoutIntegrationTest {
   @Autowired
   private NotificationRepository notificationRepository;
 
+  @Autowired
+  private SimpMessagingTemplate messagingTemplate;
+
   private User targetUser;
   private WebSocketStompClient stompClient;
 
@@ -102,8 +106,8 @@ class WebSocketForceLogoutIntegrationTest {
     // 저장한다. 그 저장이 끝나기 전에 유저를 지우면 FK 제약 위반이 나므로 먼저 기다린다.
     await().atMost(5, TimeUnit.SECONDS)
         .until(() -> notificationRepository.countByReceiver_Id(targetUser.getId()) >= 1);
-    notificationRepository.deleteAll();
-    userRepository.deleteAll();
+    notificationRepository.deleteAll(notificationRepository.findAllByReceiver_Id(targetUser.getId()));
+    userRepository.delete(targetUser);
   }
 
   @Test
@@ -131,6 +135,7 @@ class WebSocketForceLogoutIntegrationTest {
     ).get(5, TimeUnit.SECONDS);
 
     CompletableFuture<Map<String, String>> errorMessageFuture = new CompletableFuture<>();
+    CompletableFuture<Void> subscriptionReadyFuture = new CompletableFuture<>();
     session.subscribe("/user/queue/errors", new StompFrameHandler() {
       @Override
       public Type getPayloadType(StompHeaders headers) {
@@ -141,11 +146,21 @@ class WebSocketForceLogoutIntegrationTest {
       public void handleFrame(StompHeaders headers, Object payload) {
         @SuppressWarnings("unchecked")
         Map<String, String> body = (Map<String, String>) payload;
-        errorMessageFuture.complete(body);
+        if ("PROBE".equals(body.get("reason"))) {
+          subscriptionReadyFuture.complete(null);
+        } else {
+          errorMessageFuture.complete(body);
+        }
       }
     });
-    // SUBSCRIBE 프레임이 서버에 반영될 시간 확보
-    Thread.sleep(300);
+    // 고정 시간 대기 대신, SUBSCRIBE가 실제로 반영됐는지 같은 경로(convertAndSendToUser →
+    // /queue/errors)로 프로브 메시지를 보내 확인한다. 아직 반영 전이면 프로브가 유실되므로,
+    // 반영될 때까지 재전송한다.
+    await().atMost(5, TimeUnit.SECONDS).until(() -> {
+      messagingTemplate.convertAndSendToUser(
+          targetUser.getId().toString(), "/queue/errors", Map.of("reason", "PROBE"));
+      return subscriptionReadyFuture.isDone();
+    });
 
     // when
     adminService.changeUserLocked(targetUser.getId(), true);
