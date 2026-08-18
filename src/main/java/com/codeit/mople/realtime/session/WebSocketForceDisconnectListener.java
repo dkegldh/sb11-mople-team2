@@ -41,7 +41,9 @@ public class WebSocketForceDisconnectListener implements MessageListener {
     Object payload = redisTemplate.getValueSerializer().deserialize(message.getBody());
 
     if (!(payload instanceof ForceDisconnectMessage forceDisconnectMessage)) {
-      log.warn("알 수 없는 강제 종료 메시지 형식 수신 - payload: {}", payload);
+      log.error("강제 종료 메시지 역직렬화 실패(강제 로그아웃이 조용히 무시됩니다) - "
+          + "payloadType: {}, payload: {}",
+          payload == null ? "null" : payload.getClass().getName(), payload);
       return;
     }
 
