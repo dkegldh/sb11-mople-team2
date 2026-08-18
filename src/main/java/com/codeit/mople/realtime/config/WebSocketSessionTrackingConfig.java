@@ -5,6 +5,8 @@ import com.codeit.mople.realtime.session.WebSocketForceDisconnectListener;
 import com.codeit.mople.realtime.session.WebSocketSessionRegistryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.actuate.health.Health;
+import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Bean;
@@ -78,5 +80,17 @@ public class WebSocketSessionTrackingConfig {
             + "비활성화됩니다 (나머지 애플리케이션은 정상 동작)", e);
       }
     };
+  }
+
+  // 기동 시점 로그만으로는 이후 이 인스턴스가 계속 강제 종료 불능 상태인지 알 수 없어,
+  // /actuator/health로 지속적으로 상태를 노출한다.
+  @Bean
+  public HealthIndicator webSocketForceDisconnectHealthIndicator(
+      RedisMessageListenerContainer webSocketForceDisconnectListenerContainer) {
+    return () -> webSocketForceDisconnectListenerContainer.isRunning()
+        ? Health.up().build()
+        : Health.down()
+            .withDetail("reason", "강제 로그아웃 Redis 리스너가 실행 중이 아님(이 인스턴스는 실시간 강제 종료 불가)")
+            .build();
   }
 }
