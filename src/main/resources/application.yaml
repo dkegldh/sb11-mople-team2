@@ -57,6 +57,10 @@ jwt:
 password-reset:
   expiration-minutes: 3
 
+ws:
+  session:
+    heartbeat-interval-ms: 30000  # 세션 생존 TTL = 이 값의 3배 (WebSocketSessionRegistryService 참고)
+
 admin:
   email: "admin@mople.com"
   password: ${ADMIN_PASSWORD}
