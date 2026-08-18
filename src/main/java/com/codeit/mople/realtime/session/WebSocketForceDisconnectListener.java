@@ -1,7 +1,9 @@
 package com.codeit.mople.realtime.session;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -16,7 +18,7 @@ import org.springframework.web.socket.WebSocketSession;
 
 // WebSocketSessionRegistryService.FORCE_DISCONNECT_CHANNEL 구독자.
 // 모든 인스턴스가 동일한 메시지를 받지만, 실제 종료는 각자 로컬에 해당 세션을
-// 들고 있는 인스턴스에서만 일어난다(closeLocalSessions 내부에서 필터링).
+// 들고 있는 인스턴스에서만 일어난다
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -30,10 +32,8 @@ public class WebSocketForceDisconnectListener implements MessageListener {
 
   // convertAndSendToUser는 아웃바운드 채널(기본적으로 비동기 스레드풀)에 전달을 위임하고
   // 바로 리턴하므로, 리턴 시점에 메시지가 실제로 소켓에 다 쓰였다는 보장이 없다. close()를
-  // 곧바로 이어 붙이면 사유 메시지가 도착하기 전에 연결이 끊길 수 있어(경쟁 상태 실측 확인),
-  // 짧은 지연을 두어 전송이 끝날 시간을 확보한다. 100% 결정론적 보장은 아니지만, 이 메시지가
-  // 작고(수백 바이트) 이 경로가 핫패스가 아니라 pub/sub 리스너 스레드에서만 도는 관리자 액션
-  // 이라 실무적으로 충분히 안전하다고 판단했다.
+  // 곧바로 이어 붙이면 사유 메시지가 도착하기 전에 연결이 끊길 수 있어,
+  // 짧은 지연을 두어 전송이 끝날 시간을 확보한다.
   private static final long NOTIFY_BEFORE_CLOSE_DELAY_MS = 100;
 
   @Override
@@ -52,24 +52,33 @@ public class WebSocketForceDisconnectListener implements MessageListener {
   // 이 인스턴스가 실제로 들고 있는 세션에 대해서만 알림 후 종료를 수행
   private void closeLocalSessions(UUID userId, String reason) {
     Set<String> sessionIds = localRegistry.getSessionIdsForUser(userId);
-    for (String sessionId : sessionIds) {
-      localRegistry.getSession(sessionId)
-          .ifPresent(session -> closeSession(userId, session, reason));
+    List<WebSocketSession> targets = sessionIds.stream()
+        .map(localRegistry::getSession)
+        .flatMap(Optional::stream)
+        .toList();
+    if (targets.isEmpty()) {
+      return;
     }
+
+    messagingTemplate.convertAndSendToUser(userId.toString(), ERROR_DESTINATION,
+        Map.of("reason", reason));
+
+    try {
+      Thread.sleep(NOTIFY_BEFORE_CLOSE_DELAY_MS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      log.warn("WebSocket 강제 종료 대기 중 인터럽트 발생 - userId: {}", userId);
+    }
+
+    targets.forEach(session -> closeSession(userId, session));
   }
 
-  private void closeSession(UUID userId, WebSocketSession session, String reason) {
+  private void closeSession(UUID userId, WebSocketSession session) {
     try {
-      messagingTemplate.convertAndSendToUser(userId.toString(), ERROR_DESTINATION,
-          Map.of("reason", reason));
-      Thread.sleep(NOTIFY_BEFORE_CLOSE_DELAY_MS);
       session.close(new CloseStatus(4001, "FORCE_LOGOUT"));
       log.info("WebSocket 강제 종료 완료 - userId: {}, sessionId: {}", userId, session.getId());
     } catch (IOException e) {
       log.warn("WebSocket 강제 종료 중 오류 발생 - userId: {}, sessionId: {}", userId, session.getId(), e);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      log.warn("WebSocket 강제 종료 대기 중 인터럽트 발생 - userId: {}, sessionId: {}", userId, session.getId());
     }
   }
 }

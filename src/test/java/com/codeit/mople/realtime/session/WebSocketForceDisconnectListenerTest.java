@@ -7,6 +7,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -88,6 +89,24 @@ class WebSocketForceDisconnectListenerTest {
 
     verify(localRegistry, never()).getSession(any());
     verifyNoInteractions(messagingTemplate);
+  }
+
+  @Test
+  @DisplayName("세션이 여러 개여도 알림은 1번만 보내고 모든 세션을 닫는다")
+  void validPayload_multipleSessions_notifiesOnceAndClosesAll() throws IOException {
+    WebSocketSession session1 = mock(WebSocketSession.class);
+    WebSocketSession session2 = mock(WebSocketSession.class);
+    givenPayload(new ForceDisconnectMessage(userId, "테스트 사유"));
+    given(localRegistry.getSessionIdsForUser(userId)).willReturn(Set.of("session-1", "session-2"));
+    given(localRegistry.getSession("session-1")).willReturn(Optional.of(session1));
+    given(localRegistry.getSession("session-2")).willReturn(Optional.of(session2));
+
+    listener.onMessage(message, null);
+
+    verify(messagingTemplate, times(1)).convertAndSendToUser(
+        userId.toString(), "/queue/errors", Map.of("reason", "테스트 사유"));
+    verify(session1).close(any());
+    verify(session2).close(any());
   }
 
   @Test
