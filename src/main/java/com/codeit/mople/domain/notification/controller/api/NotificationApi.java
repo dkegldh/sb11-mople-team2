@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 @Tag(
     name = "알림 관리",
@@ -54,8 +55,8 @@ public interface NotificationApi {
         )
     })
     ResponseEntity<CursorResponseNotificationDto> getNotifications(
-        @Parameter(hidden = true) @org.springframework.security.core.annotation.AuthenticationPrincipal CustomUserDetails userDetails,
-        NotificationCursorRequest request);
+      @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
+      NotificationCursorRequest request);
 
     @Operation(summary = "알림 삭제", description = "알림을 삭제합니다. 본인 알림만 삭제할 수 있습니다.")
     @ApiResponses({
@@ -82,6 +83,6 @@ public interface NotificationApi {
         )
     })
     ResponseEntity<Void> deleteNotification(
-        @Parameter(hidden = true) @org.springframework.security.core.annotation.AuthenticationPrincipal CustomUserDetails userDetails,
-        UUID notificationId);
+      @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
+      UUID notificationId);
 }
