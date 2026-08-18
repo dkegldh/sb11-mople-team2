@@ -15,7 +15,6 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class FollowCreatedEventRelay {
 
   private final KafkaEventPublisher publisher;
-  @Value("${}")
   private final String topic;
 
   // 생성자, kafka템플릿과 topic이름을 받아서 넣음

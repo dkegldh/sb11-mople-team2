@@ -2,15 +2,19 @@ package com.codeit.mople.global.sse.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.codeit.mople.global.sse.model.SseEvent;
+import com.codeit.mople.global.sse.repository.SseConnectionRepository;
 import com.codeit.mople.global.sse.repository.SseEmitterRepository;
 import com.codeit.mople.global.sse.repository.SseEventRepository;
+import com.codeit.mople.global.sse.repository.SseStreamRepository;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
@@ -22,6 +26,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @ExtendWith(MockitoExtension.class)
@@ -31,7 +36,13 @@ public class SseServiceTest {
   private SseEmitterRepository emitterRepository;
 
   @Mock
-  private SseEventRepository sseEventRepository;
+  private SseEventRepository eventRepository;
+
+  @Mock
+  private SseConnectionRepository connectionRepository;
+
+  @Mock
+  private SseStreamRepository streamRepository;
 
   @InjectMocks
   private SseService sseService;
@@ -45,6 +56,14 @@ public class SseServiceTest {
 
   @BeforeEach
   void setUp() {
+
+    // @Value("${sse.server-id}")
+    ReflectionTestUtils.setField(
+        sseService,
+        "serverId",
+        "server-1"
+    );
+
     receiverId = UUID.randomUUID();
     sseEmitter = mock(SseEmitter.class);
 
@@ -85,7 +104,9 @@ public class SseServiceTest {
       verify(emitterRepository).save(receiverId, result);
 
       // resendEvents() 메서드 검증(내부에 sseEventRepository.findAfter 메서드 검증)
-      verify(sseEventRepository, never()).findAfter(any(), any());
+      verify(eventRepository, never()).findAfter(any(), any());
+
+      verify(connectionRepository).save(receiverId, "server-1");
     }
 
     @Test
@@ -95,7 +116,7 @@ public class SseServiceTest {
 
       // BeforeEach에서 receiverId, lastEventId, sseEvent1, sseEvent2를 초기화
 
-      when(sseEventRepository.findAfter(receiverId, lastEventId))
+      when(eventRepository.findAfter(receiverId, lastEventId))
           .thenReturn(List.of(sseEvent1, sseEvent2));
 
       // when
@@ -105,7 +126,8 @@ public class SseServiceTest {
       assertThat(result).isNotNull();
 
       verify(emitterRepository).save(receiverId, result);
-      verify(sseEventRepository).findAfter(receiverId, lastEventId);
+      verify(eventRepository).findAfter(receiverId, lastEventId);
+      verify(connectionRepository).save(receiverId, "server-1");
     }
 
   }
@@ -121,6 +143,9 @@ public class SseServiceTest {
 
       // BeforeEach에서 receiverId, sseEmitter를 초기화
 
+      when(connectionRepository.findServerId(receiverId))
+          .thenReturn("server-1");
+
       when(emitterRepository.find(receiverId))
           .thenReturn(sseEmitter);
 
@@ -130,15 +155,22 @@ public class SseServiceTest {
       // then
       verify(sseEmitter).send(any(SseEmitter.SseEventBuilder.class));
 
-      verify(sseEventRepository).save(any(SseEvent.class));
+      verify(eventRepository).save(any(SseEvent.class));
+      verify(connectionRepository).findServerId(receiverId);
+      verify(emitterRepository).find(receiverId);
+
+      verifyNoInteractions(streamRepository);
     }
 
     @Test
     @DisplayName("SSE 이벤트 전송 무시 - 사용자의 연결이 없는 경우")
     void send_ignore_noEmitter() {
       // given
-      
+
       // BeforeEach에서 receiverId를 초기화
+
+      when(connectionRepository.findServerId(receiverId))
+          .thenReturn("server-1");
 
       when(emitterRepository.find(receiverId))
           .thenReturn(null);
@@ -147,8 +179,55 @@ public class SseServiceTest {
       sseService.send(receiverId, "eventName", "data");
 
       // then
+      verify(eventRepository).save(any(SseEvent.class));
+      verify(connectionRepository).findServerId(receiverId);
       verify(emitterRepository).find(receiverId);
-      verify(sseEventRepository).save(any(SseEvent.class));
+
+      verifyNoInteractions(streamRepository);
+    }
+
+    @Test
+    @DisplayName("SSE 이벤트 전송 성공 - 다른 서버에 연결")
+    void send_success_otherServer() {
+      // given
+
+      // BeforeEach에서 receiverId를 초기화
+
+      when(connectionRepository.findServerId(receiverId))
+          .thenReturn("server-2");
+
+      // when
+      sseService.send(receiverId, "eventName", "data");
+
+      // then
+      verify(eventRepository).save(any(SseEvent.class));
+      verify(connectionRepository).findServerId(receiverId);
+
+      // 다른 서버에 연결 될 경우 SSEEvent send가 스킵되고 Redis Stream에 저장되어야 함
+      verify(streamRepository).save(any(SseEvent.class), eq("server-2"));
+
+      verifyNoInteractions(emitterRepository);
+    }
+
+    @Test
+    @DisplayName("SSE 이벤트 전송 성공 - 연결 정보가 없는 경우")
+    void send_success_noConnection() {
+      // given
+
+      // BeforeEach에서 receiverId를 초기화
+
+      when(connectionRepository.findServerId(receiverId))
+          .thenReturn(null);
+
+      // when
+      sseService.send(receiverId, "eventName", "data");
+
+      // then
+      verify(eventRepository).save(any(SseEvent.class));
+      verify(connectionRepository).findServerId(receiverId);
+
+      verifyNoInteractions(emitterRepository);
+      verifyNoInteractions(streamRepository);
     }
 
     @Test
@@ -157,6 +236,9 @@ public class SseServiceTest {
       // given
 
       // BeforeEach에서 receiverId, sseEmitter를 초기화
+
+      when(connectionRepository.findServerId(receiverId))
+          .thenReturn("server-1");
 
       when(emitterRepository.find(receiverId))
           .thenReturn(sseEmitter);
@@ -170,6 +252,12 @@ public class SseServiceTest {
 
       // then
       verify(sseEmitter).completeWithError(any(IOException.class));
+
+      verify(eventRepository).save(any(SseEvent.class));
+      verify(connectionRepository).findServerId(receiverId);
+      verify(emitterRepository).find(receiverId);
+
+      verifyNoInteractions(streamRepository);
     }
 
   }

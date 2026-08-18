@@ -103,13 +103,19 @@ public interface AuthApi {
           content = @Content(schema = @Schema(implementation = com.codeit.mople.global.response.ApiResponse.class))
       ),
       @ApiResponse(
+          responseCode = "429",
+          description = "요청 한도 초과 (이메일/IP/전체 발송 한도 중 하나에 도달)",
+          content = @Content(schema = @Schema(implementation = com.codeit.mople.global.response.ApiResponse.class))
+      ),
+      @ApiResponse(
           responseCode = "500",
           description = "서버 오류",
           content = @Content(schema = @Schema(implementation = com.codeit.mople.global.response.ApiResponse.class))
       )
   })
   void resetPassword(
-      @Valid @RequestBody ResetPasswordRequest request
+      @Valid @RequestBody ResetPasswordRequest request,
+      @Parameter(hidden = true) HttpServletRequest servletRequest
   );
 
   @Operation(

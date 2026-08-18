@@ -14,6 +14,8 @@ public record KafkaProperties(
 ) {
   public record Topics(
       @NotBlank String followCreated,
-      @NotBlank String playlistContentAdded
+      @NotBlank String playlistContentAdded,
+      @NotBlank String directMessageCreated,
+      @NotBlank String notificationCreated
   ) {}
 }

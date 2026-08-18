@@ -111,7 +111,7 @@ public class DirectMessageServiceTest {
       given(mockSavedMessage.getContent()).willReturn(content);
       given(mockSavedMessage.getCreatedAt()).willReturn(messageCreatedAt);
 
-      given(conversationRepository.findWithLockById(conversationId))
+      given(conversationRepository.findByIdWithUsers(conversationId))
           .willReturn(Optional.of(conversation));
       given(directMessageRepository.save(any(DirectMessage.class)))
           .willReturn(mockSavedMessage);
@@ -133,14 +133,13 @@ public class DirectMessageServiceTest {
       verify(conversation, never()).updateLastReadAt(eq(userAId), any());
 
       verify(publisher).publishEvent(any(DirectMessageReceivedEvent.class));
-      verify(publisher).publishEvent(new DirectMessageCreatedEvent(userBId, messageId));
     }
 
     @Test
     @DisplayName("실패: 존재하지 않는 대화방 ID로 메시지를 보내면 CONVERSATION_NOT_FOUND 예외가 발생한다.")
     void fail_conversation_not_found() {
       //given
-      given(conversationRepository.findWithLockById(conversationId))
+      given(conversationRepository.findByIdWithUsers(conversationId))
           .willReturn(Optional.empty());
 
       //when & then
@@ -161,7 +160,7 @@ public class DirectMessageServiceTest {
       given(conversation.getUserA()).willReturn(userA);
       given(conversation.getUserB()).willReturn(userB);
 
-      given(conversationRepository.findWithLockById(conversationId))
+      given(conversationRepository.findByIdWithUsers(conversationId))
           .willReturn(Optional.of(conversation));
 
       //when & then

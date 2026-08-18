@@ -1,11 +1,12 @@
 package com.codeit.mople.domain.content.client.tmdb.batch;
 
-import com.codeit.mople.domain.content.client.tmdb.TmdbGenreCache;
 import com.codeit.mople.domain.content.client.tmdb.config.TmdbProperties;
 import com.codeit.mople.domain.content.client.tmdb.dto.TmdbContentItem;
 import com.codeit.mople.domain.content.entity.Content;
 import com.codeit.mople.domain.content.entity.ContentType;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
@@ -17,7 +18,7 @@ import org.springframework.batch.item.ItemProcessor;
 public class TmdbContentItemProcessor implements ItemProcessor<TmdbContentItem, Content> {
 
   private final ContentType contentType;
-  private final TmdbGenreCache genreCache;
+  private final Map<Integer, String> genreNames;
   private final TmdbProperties properties;
 
   // tmdb가 준 데이터를 Content로 바꿈
@@ -32,7 +33,7 @@ public class TmdbContentItemProcessor implements ItemProcessor<TmdbContentItem, 
 
     // 도메인 + 이미지이름
     String thumbnailUrl = resolveThumbnailUrl(item.posterPath());
-    List<String> tags = genreCache.getNames(item.genreIds());
+    List<String> tags = resolveTags(item.genreIds());
     if (item.id() == null) {
       log.warn("Id값이 없습니다 title={}", title);
       return null;
@@ -46,6 +47,16 @@ public class TmdbContentItemProcessor implements ItemProcessor<TmdbContentItem, 
         thumbnailUrl,
         tags,
         externalId);
+  }
+  
+  private List<String> resolveTags(List<Integer> genreIds) {
+    if (genreIds == null || genreIds.isEmpty() || genreNames.isEmpty()) {
+      return List.of();
+    }
+    return genreIds.stream()
+        .map(genreNames::get)
+        .filter(Objects::nonNull)
+        .toList();
   }
 
   private String resolveThumbnailUrl(String posterPath) {

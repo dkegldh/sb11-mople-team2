@@ -42,12 +42,12 @@ public interface DirectMessageApi {
    *
    * @param conversationId 메시지를 발송할 대화방의 고유 ID
    * @param request        메시지 내용
-   * @param principal      인증 객체
+   * @param userDetails      인증 객체
    */
   void sendDirectMessage(
       @Parameter(hidden = true) @DestinationVariable UUID conversationId,
       @Valid DirectMessageSendRequest request,
-      @Parameter(hidden = true) Principal principal
+      @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
   );
 
   @Operation(

@@ -6,6 +6,7 @@ import com.codeit.mople.domain.auth.dto.response.AuthTokens;
 import com.codeit.mople.domain.auth.dto.response.RefreshToken;
 import com.codeit.mople.domain.auth.exception.AuthErrorCode;
 import com.codeit.mople.domain.auth.exception.AuthException;
+import com.codeit.mople.domain.auth.repository.PasswordResetRateLimiterRepository;
 import com.codeit.mople.domain.auth.repository.RefreshTokenRepository;
 import com.codeit.mople.domain.auth.repository.SessionTokenRepository;
 import com.codeit.mople.domain.user.dto.response.UserDto;
@@ -21,10 +22,13 @@ import java.time.temporal.ChronoUnit;
 import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -40,6 +44,20 @@ public class AuthService {
   private final JwtProvider jwtProvider;
   private final SessionTokenRepository sessionTokenRepository;
   private final RefreshTokenRepository refreshTokenRepository;
+  private final AuthMailService authMailService;
+  private final PasswordResetRateLimiterRepository passwordResetRateLimiterRepository;
+
+  @Value("${password-reset.rate-limit.ip.max-requests:5}")
+  private int ipMaxRequests;
+
+  @Value("${password-reset.rate-limit.ip.window-minutes:60}")
+  private long ipWindowMinutes;
+
+  @Value("${password-reset.rate-limit.global.max-requests:200}")
+  private int globalMaxRequests;
+
+  @Value("${password-reset.rate-limit.global.window-minutes:1440}")
+  private long globalWindowMinutes;
 
   @Transactional
   public AuthTokens signIn(SignInRequest request) {
@@ -86,14 +104,32 @@ public class AuthService {
   }
 
   @Transactional
-  public void resetPassword(ResetPasswordRequest request) {
-    userRepository.findByEmail(request.email().toLowerCase(Locale.ROOT))
+  public void resetPassword(ResetPasswordRequest request, String clientIp) {
+    String email = request.email().toLowerCase(Locale.ROOT);
+
+    if(!passwordResetRateLimiterRepository.tryAcquireGlobal(
+        globalMaxRequests, Duration.ofMinutes(globalWindowMinutes))) {
+      log.warn("비밀번호 재설정 전체 발송 한도 초과");
+      throw new AuthException(AuthErrorCode.TOO_MANY_RESET_PASSWORD_REQUEST);
+    }
+
+    if(!passwordResetRateLimiterRepository.tryAcquireByIp(
+        clientIp, ipMaxRequests, Duration.ofMinutes(ipWindowMinutes))) {
+      log.warn("비밀번호 재설정 IP 기준 요청 한도 초과 : {}", clientIp);
+      throw new AuthException(AuthErrorCode.TOO_MANY_RESET_PASSWORD_REQUEST);
+    }
+
+    if(!passwordResetRateLimiterRepository.tryAcquireByEmail(email, Duration.ofMinutes(TEMPORARY_PASSWORD_EXPIRATION_MINUTES))) {
+      throw new AuthException(AuthErrorCode.TOO_MANY_RESET_PASSWORD_REQUEST);
+    }
+
+    userRepository.findByEmail(email)
         .filter(user -> user.getProvider() == AuthProvider.LOCAL)
         .ifPresent(user -> {
           String temporaryPassword = generateTemporaryPassword();
           Instant expiresAt = Instant.now().plus(TEMPORARY_PASSWORD_EXPIRATION_MINUTES, ChronoUnit.MINUTES);
           user.issueTemporaryPassword(passwordEncoder.encode(temporaryPassword), expiresAt);
-          // TODO: 이메일 발송
+          authMailService.sendTemporaryPassword(user.getEmail(), temporaryPassword);
         });
     // 이메일이 있든 없든 항상 204 반환(가입 여부를 노출하지 않음)
   }

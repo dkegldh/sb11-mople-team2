@@ -2,7 +2,7 @@ package com.codeit.mople.domain.content.client.tmdb.config;
 
 
 import com.codeit.mople.domain.content.client.tmdb.TmdbClient;
-import com.codeit.mople.domain.content.client.tmdb.TmdbGenreCache;
+import com.codeit.mople.domain.content.client.tmdb.TmdbGenreProvider;
 import com.codeit.mople.domain.content.client.tmdb.batch.TmdbContentItemProcessor;
 import com.codeit.mople.domain.content.client.tmdb.batch.TmdbContentItemWriter;
 import com.codeit.mople.domain.content.client.tmdb.batch.TmdbPageItemReader;
@@ -19,7 +19,6 @@ import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
-import org.springframework.batch.item.ItemProcessor;
 import org.springframework.batch.item.ItemWriter;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,7 +34,7 @@ public class TmdbCollectJobConfig {
   private static final int CHUNK_SIZE = TmdbPageItemReader.PAGE_SIZE;
 
   private final TmdbClient tmdbClient;
-  private final TmdbGenreCache tmdbGenreCache;
+  private final TmdbGenreProvider tmdbGenreProvider;
   private final TmdbProperties tmdbProperties;
   private final ContentRepository contentRepository;
   private final MeterRegistry meterRegistry;
@@ -56,7 +55,7 @@ public class TmdbCollectJobConfig {
 
   @Bean
   public TmdbCollectJobListener tmdbCollectJobListener() {
-    return new TmdbCollectJobListener(tmdbGenreCache, meterRegistry);
+    return new TmdbCollectJobListener(meterRegistry);
   }
 
   @Bean
@@ -64,11 +63,12 @@ public class TmdbCollectJobConfig {
       JobRepository jobRepository,
       PlatformTransactionManager transactionManager,
       @Qualifier("tmdbMovieReader") TmdbPageItemReader tmdbMovieReader,
+      @Qualifier("tmdbMovieProcessor") TmdbContentItemProcessor tmdbMovieProcessor,
       @Value("${batch.tmdb.collect.skip-limit}") int skipLimit) {
     return new StepBuilder("tmdbMovieStep", jobRepository)
         .<TmdbContentItem, Content>chunk(CHUNK_SIZE, transactionManager)
         .reader(tmdbMovieReader)
-        .processor(processor(ContentType.MOVIE))
+        .processor(tmdbMovieProcessor)
         .writer(writer(ContentType.MOVIE))
         // DB제약 위반 예외는 건너뜀(지금은 최대 10번 까지 건너띌 수 있도록 설정)
         .faultTolerant()
@@ -82,11 +82,12 @@ public class TmdbCollectJobConfig {
       JobRepository jobRepository,
       PlatformTransactionManager transactionManager,
       @Qualifier("tmdbTvReader") TmdbPageItemReader tmdbTvReader,
+      @Qualifier("tmdbTvProcessor") TmdbContentItemProcessor tmdbTvProcessor,
       @Value("${batch.tmdb.collect.skip-limit}") int skipLimit) {
     return new StepBuilder("tmdbTvStep", jobRepository)
         .<TmdbContentItem, Content>chunk(CHUNK_SIZE, transactionManager)
         .reader(tmdbTvReader)
-        .processor(processor(ContentType.TV_SERIES))
+        .processor(tmdbTvProcessor)
         .writer(writer(ContentType.TV_SERIES))
         // DB제약 위반 예외는 건너뜀(지금은 최대 10번 까지 건너띌 수 있도록 설정)
         .faultTolerant()
@@ -109,8 +110,21 @@ public class TmdbCollectJobConfig {
     return new TmdbPageItemReader("tmdbTvReader", tmdbClient::getPopularTvSeries, maxPages);
   }
 
-  private ItemProcessor<TmdbContentItem, Content> processor(ContentType contentType) {
-    return new TmdbContentItemProcessor(contentType, tmdbGenreCache, tmdbProperties);
+  @Bean
+  @StepScope
+  public TmdbContentItemProcessor tmdbMovieProcessor() {
+    return processor(ContentType.MOVIE);
+  }
+
+  @Bean
+  @StepScope
+  public TmdbContentItemProcessor tmdbTvProcessor() {
+    return processor(ContentType.TV_SERIES);
+  }
+  
+  private TmdbContentItemProcessor processor(ContentType contentType) {
+    return new TmdbContentItemProcessor(
+        contentType, tmdbGenreProvider.get().toMap(), tmdbProperties);
   }
 
   private ItemWriter<Content> writer(ContentType contentType) {

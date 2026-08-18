@@ -2,6 +2,7 @@ package com.codeit.mople.global.config;
 
 import com.codeit.mople.domain.auth.security.JwtChannelInterceptor;
 import com.codeit.mople.global.error.CustomStompErrorHandler;
+import com.codeit.mople.global.websocket.WebSocketAuthenticationPrincipalResolver;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.List;
@@ -15,6 +16,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.converter.DefaultContentTypeResolver;
 import org.springframework.messaging.converter.MappingJackson2MessageConverter;
 import org.springframework.messaging.converter.MessageConverter;
+import org.springframework.messaging.handler.invocation.HandlerMethodArgumentResolver;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.util.MimeTypeUtils;
@@ -78,6 +80,13 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     messageConverters.add(0, converter);
     return false;
+  }
+
+  @Override
+  public void addArgumentResolvers(
+      List<HandlerMethodArgumentResolver> resolvers
+  ) {
+    resolvers.add(new WebSocketAuthenticationPrincipalResolver());
   }
 
   // yaml 파일에 값이 없을 때 사용할 디폴트 값 설정

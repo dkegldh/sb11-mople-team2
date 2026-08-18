@@ -72,12 +72,12 @@ public class AuthController implements AuthApi {
   @Override
   @PostMapping("/reset-password")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  public void resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+  public void resetPassword(@Valid @RequestBody ResetPasswordRequest request, HttpServletRequest servletRequest) {
     if(!passwordResetEnabled) {
       // 이메일 발송이 검증되기 전까지 비활성화. 엔드포인트 존재 자체를 숨기기 위해 404로 응답.
       throw new CustomException(CommonErrorCode.NOT_FOUND);
     }
-    authService.resetPassword(request);
+    authService.resetPassword(request, resolveClientIp(servletRequest));
   }
 
   @Override
@@ -124,5 +124,13 @@ public class AuthController implements AuthApi {
         .path("/api/auth")
         .maxAge(0)
         .build();
+  }
+
+  private String resolveClientIp(HttpServletRequest request) {
+    String forwardedFor = request.getHeader("X-Forwarded-For");
+    if(forwardedFor != null && !forwardedFor.isBlank()) {
+      return forwardedFor.split(",")[0].trim();
+    }
+    return request.getRemoteAddr();
   }
 }

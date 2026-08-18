@@ -10,17 +10,6 @@ services:
       - POSTGRES_PASSWORD=mople1234
       - POSTGRES_DB=mople_db
 
-  # 로컬 테스트용 DB
-  postgres-test:
-    image: postgres:16-alpine
-    container_name: mople-postgres-test
-    ports:
-      - "5433:5432"
-    environment:
-      - POSTGRES_USER=mople
-      - POSTGRES_PASSWORD=mople1234
-      - POSTGRES_DB=mople_db
-
   # 로컬 개발 및 테스트용 Redis
   redis:
     image: redis:7-alpine

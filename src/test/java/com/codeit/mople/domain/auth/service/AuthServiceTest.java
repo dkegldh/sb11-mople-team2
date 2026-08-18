@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
@@ -17,6 +18,7 @@ import com.codeit.mople.domain.auth.dto.request.SignInRequest;
 import com.codeit.mople.domain.auth.dto.response.AuthTokens;
 import com.codeit.mople.domain.auth.exception.AuthErrorCode;
 import com.codeit.mople.domain.auth.exception.AuthException;
+import com.codeit.mople.domain.auth.repository.PasswordResetRateLimiterRepository;
 import com.codeit.mople.domain.auth.repository.RefreshTokenRepository;
 import com.codeit.mople.domain.auth.repository.SessionTokenRepository;
 import com.codeit.mople.domain.user.entity.AuthProvider;
@@ -56,6 +58,12 @@ public class AuthServiceTest {
   @Mock
   private RefreshTokenRepository refreshTokenRepository;
 
+  @Mock
+  private AuthMailService authMailService;
+
+  @Mock
+  private PasswordResetRateLimiterRepository passwordResetRateLimiterRepository;
+
   @InjectMocks
   private AuthService authService;
 
@@ -68,6 +76,9 @@ public class AuthServiceTest {
   void setUp() {
     user = User.createUser("test@test.com", "encodedPassword", "testUser");
     lenient().when(jwtProvider.getRefreshTokenExpiration()).thenReturn(REFRESH_TOKEN_EXPIRATION_MS);
+    lenient().when(passwordResetRateLimiterRepository.tryAcquireGlobal(anyInt(), any())).thenReturn(true);
+    lenient().when(passwordResetRateLimiterRepository.tryAcquireByIp(anyString(), anyInt(), any())).thenReturn(true);
+    lenient().when(passwordResetRateLimiterRepository.tryAcquireByEmail(anyString(), any())).thenReturn(true);
   }
 
   @Test
@@ -203,9 +214,10 @@ public class AuthServiceTest {
     when(userRepository.findByEmail(request.email())).thenReturn(Optional.of(user));
     when(passwordEncoder.encode(any())).thenReturn("encodedTempPw");
 
-    authService.resetPassword(request);
+    authService.resetPassword(request, "127.0.0.1");
 
     assertThat(user.hasValidTemporaryPassword(Instant.now())).isTrue();
+    verify(authMailService).sendTemporaryPassword(eq("test@test.com"), anyString());
   }
 
   @Test
@@ -214,9 +226,51 @@ public class AuthServiceTest {
     ResetPasswordRequest request = new ResetPasswordRequest("nobody@test.com");
     when(userRepository.findByEmail(request.email())).thenReturn(Optional.empty());
 
-    assertThatCode(() -> authService.resetPassword(request)).doesNotThrowAnyException();
+    assertThatCode(() -> authService.resetPassword(request, "127.0.0.1")).doesNotThrowAnyException();
 
     verify(passwordEncoder, never()).encode(any());
+  }
+
+  @Test
+  @DisplayName("동일 이메일로 유효시간 내 재요청 시 예외가 발생하고 메일이 발송되지 않음")
+  void resetPassword_throwsException_whenRateLimited() {
+    ResetPasswordRequest request = new ResetPasswordRequest("test@test.com");
+    when(passwordResetRateLimiterRepository.tryAcquireByEmail(eq("test@test.com"), any())).thenReturn(false);
+
+    assertThatThrownBy(() -> authService.resetPassword(request, "127.0.0.1"))
+        .isInstanceOf(AuthException.class)
+        .hasFieldOrPropertyWithValue("errorCode", AuthErrorCode.TOO_MANY_RESET_PASSWORD_REQUEST);
+
+    verify(userRepository, never()).findByEmail(any());
+    verify(authMailService, never()).sendTemporaryPassword(any(), any());
+  }
+
+  @Test
+  @DisplayName("같은 IP에서 한도를 초과해 요청하면 예외가 발생하고 메일이 전송되지 않음")
+  void resetPassword_throwsException_whenIpRateLimited() {
+    ResetPasswordRequest request = new ResetPasswordRequest("test@test.com");
+    when(passwordResetRateLimiterRepository.tryAcquireByIp(eq("127.0.0.1"), anyInt(), any())).thenReturn(false);
+
+    assertThatThrownBy(() -> authService.resetPassword(request, "127.0.0.1"))
+        .isInstanceOf(AuthException.class)
+        .hasFieldOrPropertyWithValue("errorCode", AuthErrorCode.TOO_MANY_RESET_PASSWORD_REQUEST);
+
+    verify(userRepository, never()).findByEmail(any());
+    verify(authMailService, never()).sendTemporaryPassword(any(), any());
+  }
+
+  @Test
+  @DisplayName("전체 발송 한도를 초과하면 예외가 발생하고 메일이 발송되지 않음")
+  void resetPassword_throwsException_whenGlobalRateLimited() {
+    ResetPasswordRequest request = new ResetPasswordRequest("test@test.com");
+    when(passwordResetRateLimiterRepository.tryAcquireGlobal(anyInt(), any())).thenReturn(false);
+
+    assertThatThrownBy(() -> authService.resetPassword(request, "127.0.0.1"))
+        .isInstanceOf(AuthException.class)
+        .hasFieldOrPropertyWithValue("errorCode", AuthErrorCode.TOO_MANY_RESET_PASSWORD_REQUEST);
+
+    verify(userRepository, never()).findByEmail(any());
+    verify(authMailService, never()).sendTemporaryPassword(any(), any());
   }
 
   @Test

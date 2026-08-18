@@ -9,7 +9,8 @@ import com.codeit.mople.domain.content.entity.Content;
 import com.codeit.mople.domain.content.entity.ContentType;
 import com.codeit.mople.domain.content.repository.ContentRepository;
 import feign.FeignException;
-import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.Job;
@@ -36,16 +37,45 @@ public class SportsContentBatchConfig {
 
   //수집 작업을 총괄하는 Spring Batch Job 구성
   @Bean
-  public Job sportsContentJob(JobRepository jobRepository, Step sportsContentStep, Step deleteOldSportsDataStep) {
+  public Job sportsContentJob(
+      JobRepository jobRepository,
+      Step backupOldSportsDataStep,
+      Step sportsContentStep,
+      Step deleteOldSportsDataStep) {
+
     return new JobBuilder("sportsContentJob", jobRepository)
-        .preventRestart() //실패 시 재시작 방지(항상 처음부터 다시 실행되도록 강제)
-        .start(sportsContentStep)        //먼저 새로운 데이터 수집 스텝(Chunk)을 먼저 실행하여 안전하게 적재
-        .next(deleteOldSportsDataStep) //수집 성공 후 기존 구버전 데이터 삭제 스텝 실행
+        .start(backupOldSportsDataStep) //기존 데이터 사전 백업
+        .next(sportsContentStep)        //신규 데이터 수집 및 저장(실패 시 여기서 중단되어 기존 데이터 보존)
+        .next(deleteOldSportsDataStep)  //삭제 완료 후 이전 만료 데이터를 정리
         .listener(jobListener)
         .build();
   }
 
-  //Chunk  기반 Spring Batch Step 구성(read -> process -> write)
+  //기존 스포츠 데이터를 백업하는 Tasklet Step 추가
+  @Bean
+  public Step backupOldSportsDataStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
+    return new StepBuilder("backupOldSportsDataStep", jobRepository)
+        .tasklet((contribution, chunkContext) -> {
+          //기존 데이터의 ID 리스트 조회
+          List<UUID> oldIds = contentRepository.findAll().stream()
+              .filter(c -> c.getType() == ContentType.SPORT)
+              .map(Content::getId)
+              .toList();
+
+          //Job Execution Context에 백업 ID 목록 저장
+          chunkContext.getStepContext()
+              .getStepExecution()
+              .getJobExecution()
+              .getExecutionContext()
+              .put("oldSportsIds", oldIds);
+
+          log.info("기존 스포츠 데이터 {}건을 백업 목록에 등록했습니다.", oldIds.size());
+          return RepeatStatus.FINISHED;
+        }, transactionManager)
+        .build();
+  }
+
+  //Chunk 기반 Spring Batch Step 구성(read -> process -> write)
   @Bean
   public Step sportsContentStep(JobRepository jobRepository,
       PlatformTransactionManager transactionManager) {
@@ -71,13 +101,23 @@ public class SportsContentBatchConfig {
 
   // 기존 스포츠 데이터를 일괄 삭제하는 Tasklet Step 추가
   @Bean
+  @SuppressWarnings("unchecked")
   public Step deleteOldSportsDataStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
     return new StepBuilder("deleteOldSportsDataStep", jobRepository)
         .tasklet((contribution, chunkContext) -> {
           log.info("새로운 스포츠 데이터 수집 완료 후, 이전 만료 데이터를 정리합니다.");
 
           // 안전하게 신규 데이터를 먼저 적재한 뒤 구버전 데이터를 정리하도록 순서 변경
-          contentRepository.deleteAllByType(ContentType.SPORT); //기존 데이터 초기화
+          List<UUID> oldIds = (List<UUID>) chunkContext.getStepContext()
+              .getStepExecution()
+              .getJobExecution()
+              .getExecutionContext()
+              .get("oldSportsIds");
+
+          if (oldIds != null && !oldIds.isEmpty()) {
+            contentRepository.deleteAllById(oldIds); //기존 데이터 초기화
+            log.info("신규 수집 완료 후 이전 구버전 데이터 {}건을 삭제 정리했습니다.", oldIds.size());
+          }
 
           return RepeatStatus.FINISHED;
         }, transactionManager)

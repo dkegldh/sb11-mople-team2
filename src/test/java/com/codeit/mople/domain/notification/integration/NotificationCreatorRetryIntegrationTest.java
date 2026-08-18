@@ -22,9 +22,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.TransientDataAccessResourceException;
 import org.springframework.retry.ExhaustedRetryException;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @SpringBootTest
+@ActiveProfiles("test")
 @DisplayName("NotificationCreator 재시도/복구 통합 테스트")
 class NotificationCreatorRetryIntegrationTest {
 

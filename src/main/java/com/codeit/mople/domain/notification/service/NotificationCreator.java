@@ -2,6 +2,7 @@ package com.codeit.mople.domain.notification.service;
 
 import com.codeit.mople.domain.notification.entity.Notification;
 import com.codeit.mople.domain.notification.entity.NotificationType;
+import com.codeit.mople.domain.notification.event.NotificationCreatedEvent;
 import com.codeit.mople.domain.notification.repository.NotificationRepository;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.exception.UserErrorCode;
@@ -10,6 +11,7 @@ import com.codeit.mople.domain.user.repository.UserRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.TransientDataAccessException;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Recover;
@@ -34,6 +36,8 @@ public class NotificationCreator {
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
 
+    private final ApplicationEventPublisher eventPublisher;
+
     // DataAccessException 전체가 아닌 TransientDataAccessException(일시적 장애 계열)만 재시도 대상으로 삼는다.
     // DataIntegrityViolationException 같은 비일시적 실패는 재시도해도 결과가 같아 async 스레드만 낭비된다.
     @Retryable(retryFor = TransientDataAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 1000, multiplier = 2))
@@ -42,7 +46,10 @@ public class NotificationCreator {
         log.debug("알림 생성 요청 - receiverId: {}, type: {}", receiverId, type);
         User receiver = userRepository.findById(receiverId)
             .orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
-        notificationRepository.save(Notification.create(receiver, title, content, type));
+        Notification notification =
+            notificationRepository.save(Notification.create(receiver, title, content, type));
+
+        eventPublisher.publishEvent(new NotificationCreatedEvent(UUID.randomUUID(), receiverId, notification.getId()));
         log.info("알림 생성 완료 - receiverId: {}, type: {}", receiverId, type);
     }
 

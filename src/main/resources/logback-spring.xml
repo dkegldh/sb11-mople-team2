@@ -1,19 +1,25 @@
 <configuration>
-  <property name="LOG_PATTERN"
-    value="%d{yy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%X{requestId:--} | %X{method:--} | %X{url:--}] - %msg%n"/>
+
+  <!-- 콘솔 출력용 로그 패턴 (색상 적용 O) -->
+  <property name="CONSOLE_LOG_PATTERN"
+    value="%d{yy-MM-dd HH:mm:ss.SSS} %magenta([%thread]) %highlight(%-5level) %cyan(%logger{36}) %green([%X{requestId:-SYSTEM} | %X{method:-SYS} | %X{url:-INTERNAL}]) - %msg%n"/>
+
+  <!-- 파일 저장용 로그 패턴 (색상 적용 X) -->
+  <property name="FILE_LOG_PATTERN"
+    value="%d{yy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%X{requestId:-SYSTEM} | %X{method:-SYS} | %X{url:-INTERNAL}] - %msg%n"/>
 
   <property name="LOG_PATH" value=".logs"/>
 
   <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
     <encoder>
-      <pattern>${LOG_PATTERN}</pattern>
+      <pattern>${CONSOLE_LOG_PATTERN}</pattern>
     </encoder>
   </appender>
 
   <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
     <file>${LOG_PATH}/application.log</file>
     <encoder>
-      <pattern>${LOG_PATTERN}</pattern>
+      <pattern>${FILE_LOG_PATTERN}</pattern>
     </encoder>
     <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
       <fileNamePattern>${LOG_PATH}/application-%d{yyyy-MM-dd}.log</fileNamePattern>

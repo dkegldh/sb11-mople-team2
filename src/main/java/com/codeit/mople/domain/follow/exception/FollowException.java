@@ -6,11 +6,11 @@ import java.util.Map;
 
 public class FollowException extends CustomException {
 
-  public FollowException(ErrorCode errorCode) {
+  public FollowException(FollowErrorCode errorCode) {
     super(errorCode);
   }
 
-  public FollowException(ErrorCode errorCode, Map<String, Object> details) {
+  public FollowException(FollowErrorCode errorCode, Map<String, Object> details) {
     super(errorCode, details);
   }
 }

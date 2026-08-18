@@ -24,6 +24,7 @@ import com.codeit.mople.domain.watchingsession.dto.ContentChatDto;
 import com.codeit.mople.domain.watchingsession.dto.ContentChatSendRequest;
 import com.codeit.mople.domain.watchingsession.dto.CursorResponseWatchingSessionDto;
 import com.codeit.mople.domain.watchingsession.dto.WatchingSessionChange;
+import com.codeit.mople.global.sse.service.SseService;
 import java.security.Principal;
 import java.util.List;
 import java.util.Optional;
@@ -66,6 +67,9 @@ public class WatchingSessionServiceTest {
 
   @Mock
   private SetOperations<String, Object> setOperations;
+
+  @Mock
+  private SseService sseService;
 
   @BeforeEach
   void setUp() {
@@ -331,5 +335,64 @@ public class WatchingSessionServiceTest {
     //올바른 채팅 구독 경로로 메시지가 전송되었는지 검증
     verify(messagingTemplate).convertAndSend(
         eq("/sub/contents/" + contentIdStr + "/chat"), any(ContentChatDto.class));
+  }
+
+  @Test
+  @DisplayName("유저 입장 성공 - 기존 세션 UUID 재사용 및 SSE 브로드캐스팅 확인")
+  void enterSession_Success_ReusesSessionIdAndSendsSse() {
+    UUID userId = UUID.randomUUID();
+    UUID contentId = UUID.randomUUID();
+
+    //userKey는 해당 테스트에서 호출되지 않으므로 제거 가능
+    String contentKey = "content:watchers:" + contentId;
+    String sessionIdKey = "user:session:id:" + userId;
+    String existingSessionUuid = UUID.randomUUID().toString();
+
+    Content mockContent = mock(Content.class);
+    lenient().when(mockContent.getType()).thenReturn(ContentType.MOVIE);
+    given(contentRepository.findById(contentId)).willReturn(Optional.of(mockContent));
+
+    //기존 세션 ID가 Redis에 존재하는 상황 모킹
+    given(valueOperations.get(sessionIdKey)).willReturn(existingSessionUuid);
+
+    given(redisTemplate.execute(any(SessionCallback.class))).willAnswer(invocation -> "NULL_PREV");
+
+    given(setOperations.size(contentKey)).willReturn(2L); //방 인원 2명 가정
+
+    //SSE 발송 대상자 모킹(방에 본인 포함 2명이 있다고 가정)
+    UUID otherUserId = UUID.randomUUID();
+    given(setOperations.members(contentKey)).willReturn(Set.of(userId.toString(), otherUserId.toString()));
+
+    watchingSessionService.enterSession(userId, contentId);
+
+    //웹소켓 이벤트 캡처 및 검증
+    org.mockito.ArgumentCaptor<WatchingSessionChange> captor = org.mockito.ArgumentCaptor.forClass(WatchingSessionChange.class);
+    verify(messagingTemplate).convertAndSend(eq("/sub/contents/" + contentId + "/watch"), captor.capture());
+
+    WatchingSessionChange event = captor.getValue();
+    assertEquals("JOIN", event.type());
+    assertEquals(existingSessionUuid, event.watchingSession().id().toString());
+
+    //SSE 전송 검증(본인 및 다른 유저 모두에게 전송되어야 함)
+    verify(sseService).send(eq(userId), eq("watch"), org.mockito.ArgumentMatchers.same(event));
+    verify(sseService).send(eq(otherUserId), eq("watch"), org.mockito.ArgumentMatchers.same(event));
+  }
+
+  @Test
+  @DisplayName("실시간 채팅 브로드캐스팅 무시 - 메시지가 비어있거나 Principal이 null일 때 방어 로직 작동")
+  void broadcastChatMessage_Ignored_EmptyMessageOrNullPrincipal() {
+    String contentIdStr = UUID.randomUUID().toString();
+
+    //Principal(인증 객체)이 null인 경우
+    watchingSessionService.broadcastChatMessage(contentIdStr, new ContentChatSendRequest("안녕"), null);
+
+    //메시지가 비어있는 경우(Principal은 정상)
+    Principal mockPrincipal = mock(Principal.class);
+    watchingSessionService.broadcastChatMessage(contentIdStr, new ContentChatSendRequest(""), mockPrincipal);
+    watchingSessionService.broadcastChatMessage(contentIdStr, new ContentChatSendRequest(null), mockPrincipal);
+
+    //3번의 호출 모두 내부 로직에서 early return 되어 convertAndSend가 단 한 번도 호출되지 않아야 함
+    verify(messagingTemplate, org.mockito.Mockito.never())
+        .convertAndSend(any(String.class), any(ContentChatDto.class));
   }
 }

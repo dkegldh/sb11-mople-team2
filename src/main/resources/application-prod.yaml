@@ -9,6 +9,9 @@ spring:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT}
       password: ${REDIS_PASSWORD}
+      # 커맨드 타임아웃, 이게 없으면 응답 없는 Redis에 요청 스레드가 묶임
+      timeout: 2s
+      connect-timeout: 1s
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:}
@@ -39,12 +42,25 @@ spring:
               - profile_nickname
               - profile_image
 
+  mail:
+    host: smtp-relay.brevo.com
+    port: 587
+    username: ${BREVO_SMTP_USERNAME}
+    password: ${BREVO_SMTP_PASSWORD}
+
 logging:
   level:
     com.codeit.mople: INFO
 
 jwt:
   secret: ${JWT_SECRET}
+
+password-reset:
+  enabled: true
+  rate-limit:
+    global:
+      max-requests: 200
+      window-minutes: 1440
 
 external-api:
   tmdb:
@@ -54,8 +70,15 @@ external-api:
     base-url: https://www.thesportsdb.com/api/v1/json
     api-key: ${SPORTSDB_API_KEY}
 
+redis:
+  # 캐시 키와 락 키, 환경이 섞이지 않게 프로파일마다 문자열로 박아둠
+  namespace: mople:prod
+
 batch:
   tmdb:
     collect:
       cron: "0 0 3 * * *"
       enabled: ${TMDB_COLLECT_ENABLED:false}
+
+sse:
+  server-id: ${SSE_SERVER_ID}
