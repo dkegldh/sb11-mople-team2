@@ -1,4 +1,3 @@
-
 package com.codeit.mople.global.config;
 
 import com.codeit.mople.domain.auth.security.JwtChannelInterceptor;
@@ -9,6 +8,7 @@ import java.util.List;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
@@ -34,6 +34,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
   private final ObjectMapper objectMapper;
   private final CustomStompErrorHandler customStompErrorHandler;
   private final WebSocketProperties webSocketProperties;
+
+  @Qualifier("webSocketSessionTrackingDecoratorFactory")
   private final WebSocketHandlerDecoratorFactory webSocketSessionTrackingDecoratorFactory;
 
   @Override
