@@ -67,6 +67,7 @@ public class WebSocketForceDisconnectListener implements MessageListener {
       Thread.sleep(NOTIFY_BEFORE_CLOSE_DELAY_MS);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
+
       log.warn("WebSocket 강제 종료 대기 중 인터럽트 발생 - userId: {}", userId);
     }
 

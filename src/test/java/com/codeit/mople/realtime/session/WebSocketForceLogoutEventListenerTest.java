@@ -1,8 +1,6 @@
 package com.codeit.mople.realtime.session;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -42,15 +40,16 @@ class WebSocketForceLogoutEventListenerTest {
   }
 
   @Test
-  @DisplayName("살아있는 WebSocket 세션이 없으면 pub/sub을 발행하지 않는다")
-  void sessionInvalidated_noLiveSessions_doesNotPublish() {
+  @DisplayName("Redis에 살아있는 세션 기록이 없어도 pub/sub을 발행한다(하트비트 지연 등으로 로컬엔 세션이 남아있을 수 있음)")
+  void sessionInvalidated_noLiveSessionsInRedis_stillPublishes() {
     UserAccountStatusChangedEvent event =
         new UserAccountStatusChangedEvent(userId, ForceLogoutReason.ACCOUNT_LOCKED, true);
     given(registryService.getLiveSessionIds(userId)).willReturn(Collections.emptySet());
 
     listener.handleUserAccountStatusChanged(event);
 
-    verify(registryService, never()).publishForceDisconnect(any(), any());
+    verify(registryService).publishForceDisconnect(
+        userId, "계정이 잠금 처리되어 연결이 종료되었습니다.");
   }
 
   @Test

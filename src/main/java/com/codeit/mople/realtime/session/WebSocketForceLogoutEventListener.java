@@ -26,10 +26,13 @@ public class WebSocketForceLogoutEventListener {
 
     log.debug("WebSocket 강제 종료 대상 조회 시작 - userId: {}, reason: {}", event.userId(), event.reason());
 
+    // 하트비트 지연/Redis 재시작/시계 차이로 인해 이 조회가 비어 있어도 실제 연결이
+    // 살아있을 수 있다. 그래서 결과가 비어도 발행은 계속 진행하고, 실제 종료 대상은
+    // 각 인스턴스의 LocalWebSocketSessionRegistry가 최종 판단한다.
     Set<String> liveSessionIds = registryService.getLiveSessionIds(event.userId());
     if (liveSessionIds.isEmpty()) {
-      log.debug("강제 종료 대상 WebSocket 세션 없음 - userId: {}", event.userId());
-      return;
+      log.debug("Redis에 살아있는 세션 기록 없음(로컬엔 남아있을 수 있어 발행은 계속 진행) - userId: {}",
+          event.userId());
     }
 
     String reason = switch (event.reason()) {
@@ -39,7 +42,7 @@ public class WebSocketForceLogoutEventListener {
     };
 
     registryService.publishForceDisconnect(event.userId(), reason);
-    log.info("WebSocket 강제 종료 신호 발행 완료 - userId: {}, sessionCount: {}",
+    log.info("WebSocket 강제 종료 신호 발행 완료 - userId: {}, redisLiveSessionCount: {}",
         event.userId(), liveSessionIds.size());
   }
 }
