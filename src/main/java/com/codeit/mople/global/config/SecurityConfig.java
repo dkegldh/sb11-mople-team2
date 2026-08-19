@@ -40,7 +40,11 @@ public class SecurityConfig {
         .csrf(csrf -> csrf
             .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()) // 쿠키명 기본값 XSRF-TOKEN, 헤더명 X-XSRF-TOKEN
             .csrfTokenRequestHandler(csrfTokenRequestHandler)
-            .ignoringRequestMatchers("/api/auth/**", "/api/users") // (POST, 회원가입)는 "아직 로그인하기 전" 상태에서 호출되는 API라서, CSRF 검증에서 예외 처리
+            // 로그인 전(비인증) 상태에서 호출되는 API라서 CSRF 검증에서 예외 처리.
+            // /api/auth/sign-out은 제외: 인증 없이도 처리되므로(만료/무효화된 세션도 로그아웃 가능),
+            // CSRF 토큰 검증으로 강제 로그아웃(CSRF) 공격을 방어한다.
+            .ignoringRequestMatchers(
+                "/api/auth/sign-in", "/api/auth/refresh", "/api/auth/reset-password", "/api/users")
         )
         .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .exceptionHandling(exception -> exception
@@ -51,7 +55,6 @@ public class SecurityConfig {
             .requestMatchers("/", "/index.html", "/favicon.svg", "/assets/**", "/uploads/**").permitAll()
             .requestMatchers("/ws/**").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/users").permitAll()
-            .requestMatchers(HttpMethod.POST, "/api/auth/sign-out").authenticated()
             .requestMatchers("/api/auth/**").permitAll()
             .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
             .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
