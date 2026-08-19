@@ -70,7 +70,7 @@ public class NotificationIntegrationTest {
     }
 
     // 알림마다 1초씩 다른 명시적 timestamp를 사용해 CURRENT_TIMESTAMP 정밀도 문제 방지
-    private void 알림_생성(String title, NotificationType type) {
+    private void createNotification(String title, NotificationType type) {
         alertCounter++;
         Instant createdAt = Instant.EPOCH.plusSeconds(alertCounter);
         entityManager.createNativeQuery(
@@ -84,7 +84,7 @@ public class NotificationIntegrationTest {
         .executeUpdate();
     }
 
-    private UUID 알림_생성_아이디_반환(String title, NotificationType type) {
+    private UUID createNotificationAndReturnId(String title, NotificationType type) {
         UUID id = UUID.randomUUID();
         alertCounter++;
         Instant createdAt = Instant.EPOCH.plusSeconds(alertCounter);
@@ -124,9 +124,9 @@ public class NotificationIntegrationTest {
         @Test
         @DisplayName("성공: 알림이 있으면 200과 최신순 알림 목록이 반환된다.")
         void success_returns_notifications_in_descending_order() throws Exception {
-            알림_생성("오래된 알림", NotificationType.NEW_FOLLOWER);
-            알림_생성("중간 알림", NotificationType.PLAYLIST_SUBSCRIBE);
-            알림_생성("최신 알림", NotificationType.DIRECT_MESSAGE);
+            createNotification("오래된 알림", NotificationType.NEW_FOLLOWER);
+            createNotification("중간 알림", NotificationType.PLAYLIST_SUBSCRIBE);
+            createNotification("최신 알림", NotificationType.DIRECT_MESSAGE);
 
             mockMvc.perform(get("/api/notifications")
                     .param("limit", "20")
@@ -144,9 +144,9 @@ public class NotificationIntegrationTest {
         @Test
         @DisplayName("성공: 알림이 limit+1개 이상이면 hasNext=true이고 nextCursor가 반환된다.")
         void success_has_next_when_more_than_limit() throws Exception {
-            알림_생성("알림1", NotificationType.NEW_FOLLOWER);
-            알림_생성("알림2", NotificationType.NEW_FOLLOWER);
-            알림_생성("알림3", NotificationType.NEW_FOLLOWER);
+            createNotification("알림1", NotificationType.NEW_FOLLOWER);
+            createNotification("알림2", NotificationType.NEW_FOLLOWER);
+            createNotification("알림3", NotificationType.NEW_FOLLOWER);
 
             mockMvc.perform(get("/api/notifications")
                     .param("limit", "2")
@@ -168,7 +168,7 @@ public class NotificationIntegrationTest {
                 "VALUES (:id, 'other@test.com', 'password', '타유저', 'USER', 'LOCAL', false, CURRENT_TIMESTAMP)"
             ).setParameter("id", otherReceiverId).executeUpdate();
 
-            알림_생성("내 알림", NotificationType.NEW_FOLLOWER);
+            createNotification("내 알림", NotificationType.NEW_FOLLOWER);
 
             String otherSql =
                 "INSERT INTO notifications (id, receiver_id, title, content, level, notification_type, created_at) " +
@@ -195,7 +195,7 @@ public class NotificationIntegrationTest {
         @Test
         @DisplayName("성공: 각 알림의 응답 필드가 올바르게 반환된다.")
         void success_notification_fields_are_correct() throws Exception {
-            알림_생성("팔로우 알림", NotificationType.NEW_FOLLOWER);
+            createNotification("팔로우 알림", NotificationType.NEW_FOLLOWER);
 
             mockMvc.perform(get("/api/notifications")
                     .param("limit", "20")
@@ -214,7 +214,7 @@ public class NotificationIntegrationTest {
         @DisplayName("성공: limit을 생략하면 기본값 20이 적용된다.")
         void success_default_limit_when_omitted() throws Exception {
             for (int i = 1; i <= 25; i++) {
-                알림_생성("알림" + i, NotificationType.NEW_FOLLOWER);
+                createNotification("알림" + i, NotificationType.NEW_FOLLOWER);
             }
 
             mockMvc.perform(get("/api/notifications")
@@ -234,7 +234,7 @@ public class NotificationIntegrationTest {
         @DisplayName("성공: 본인 알림을 삭제하면 204가 반환되고 목록에서 사라진다.")
         void success_delete_notification() throws Exception {
             // given
-            UUID notificationId = 알림_생성_아이디_반환("삭제할 알림", NotificationType.NEW_FOLLOWER);
+            UUID notificationId = createNotificationAndReturnId("삭제할 알림", NotificationType.NEW_FOLLOWER);
 
             // when
             mockMvc.perform(delete("/api/notifications/{notificationId}", notificationId)
@@ -307,9 +307,9 @@ public class NotificationIntegrationTest {
         @Test
         @DisplayName("성공: 첫 페이지의 nextCursor로 다음 페이지를 조회하면 이전에 없던 알림이 반환된다.")
         void success_next_page_with_cursor() throws Exception {
-            알림_생성("알림1", NotificationType.NEW_FOLLOWER);
-            알림_생성("알림2", NotificationType.PLAYLIST_SUBSCRIBE);
-            알림_생성("알림3", NotificationType.DIRECT_MESSAGE);
+            createNotification("알림1", NotificationType.NEW_FOLLOWER);
+            createNotification("알림2", NotificationType.PLAYLIST_SUBSCRIBE);
+            createNotification("알림3", NotificationType.DIRECT_MESSAGE);
 
             // 첫 페이지 (limit=2) → 알림3, 알림2 반환
             MvcResult firstResult = mockMvc.perform(get("/api/notifications")
@@ -344,9 +344,9 @@ public class NotificationIntegrationTest {
         @Test
         @DisplayName("성공: 3페이지에 걸친 연속 cursor 페이지네이션이 올바르게 동작한다.")
         void success_three_page_cursor_pagination() throws Exception {
-            알림_생성("알림1", NotificationType.NEW_FOLLOWER);
-            알림_생성("알림2", NotificationType.PLAYLIST_SUBSCRIBE);
-            알림_생성("알림3", NotificationType.DIRECT_MESSAGE);
+            createNotification("알림1", NotificationType.NEW_FOLLOWER);
+            createNotification("알림2", NotificationType.PLAYLIST_SUBSCRIBE);
+            createNotification("알림3", NotificationType.DIRECT_MESSAGE);
 
             // 1페이지: limit=1 → 알림3 반환, hasNext=true
             MvcResult page1 = mockMvc.perform(get("/api/notifications")
