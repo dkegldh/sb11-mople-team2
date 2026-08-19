@@ -271,6 +271,23 @@ public class AuthControllerTest {
   }
 
   @Test
+  @DisplayName("쿠키와 일치하지 않는 CSRF 토큰으로 로그아웃을 요청하면 403을 반환한다")
+  void signOut_returnsForbidden_whenCsrfTokenInvalid() throws Exception {
+    User user = userRepository.save(User.createUser("invalidcsrf@test.com", passwordEncoder.encode("rawPw123"), "testUser"));
+    String accessToken = issueAccessToken(user);
+    Cookie xsrf = mockMvc.perform(get("/api/auth/csrf-token"))
+        .andReturn().getResponse().getCookie("XSRF-TOKEN");
+    assertThat(xsrf).isNotNull();
+
+    mockMvc.perform(post("/api/auth/sign-out")
+            .header("Authorization", "Bearer " + accessToken)
+            .cookie(xsrf)
+            .header("X-XSRF-TOKEN", "invalid-token-value"))
+        .andDo(print())
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
   @DisplayName("계정 잠금 등으로 세션(JTI)이 무효화된 access token으로도 로그아웃 요청은 204를 반환한다")
   void signOut_success_whenSessionAlreadyInvalidated() throws Exception {
     User user = userRepository.save(User.createUser("expiredsession@test.com", passwordEncoder.encode("rawPw123"), "testUser"));
