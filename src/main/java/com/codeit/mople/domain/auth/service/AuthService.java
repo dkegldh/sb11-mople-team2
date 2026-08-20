@@ -180,6 +180,10 @@ public class AuthService {
     User user = userRepository.findById(userId)
         .orElseThrow(() -> new AuthException(AuthErrorCode.INVALID_TOKEN));
 
+    if(user.isLocked()) {
+      throw new AuthException(AuthErrorCode.LOCKED_ACCOUNT);
+    }
+
     String jti = UUID.randomUUID().toString();
     String newAccessToken = jwtProvider.createAccessToken(user.getId(), jti, user.getRole());
     sessionTokenRepository.save(user.getId(), jti, sessionTtl());
