@@ -41,7 +41,7 @@ class NotificationRepositoryTest {
     otherUser = entityManager.persist(User.createUser("other@test.com", "password", "타유저"));
   }
 
-  private Notification 알림_저장(User user, String title, NotificationType type) {
+  private Notification saveNotification(User user, String title, NotificationType type) {
     Notification notification = Notification.create(user, title, "내용", type);
     entityManager.persist(notification);
     entityManager.flush();
@@ -57,7 +57,7 @@ class NotificationRepositoryTest {
 
     @Test
     @DisplayName("저장 후 모든 필드와 createdAt이 조회된다")
-    void 저장_후_필드값_확인() {
+    void save_success_allFieldsAndCreatedAtPersisted() {
       Notification notification =
           Notification.create(receiver, "제목", "내용", NotificationType.NEW_FOLLOWER);
 
@@ -76,7 +76,7 @@ class NotificationRepositoryTest {
 
     @Test
     @DisplayName("존재하지 않는 receiver_id로 저장하면 FK 제약 위반 예외가 발생한다")
-    void 존재하지_않는_receiver_저장시_예외() {
+    void save_fail_whenReceiverNotExists() {
       UUID fakeReceiverId = UUID.randomUUID();
 
       assertThatThrownBy(
@@ -95,7 +95,7 @@ class NotificationRepositoryTest {
 
     @Test
     @DisplayName("content가 null이어도 DB에 저장된다")
-    void content_null_저장_성공() {
+    void save_success_whenContentIsNull() {
       Notification notification =
           Notification.create(receiver, "제목", null, NotificationType.NEW_FOLLOWER);
 
@@ -110,7 +110,7 @@ class NotificationRepositoryTest {
 
     @Test
     @DisplayName("title이 null이면 DB nullable 제약으로 저장에 실패한다")
-    void title_null_저장_실패() {
+    void save_fail_whenTitleIsNull() {
       assertThatThrownBy(
               () -> {
                 entityManager
@@ -132,8 +132,8 @@ class NotificationRepositoryTest {
 
     @Test
     @DisplayName("삭제 후 조회되지 않는다")
-    void 삭제_후_조회_안됨() {
-      Notification saved = 알림_저장(receiver, "팔로우 알림", NotificationType.NEW_FOLLOWER);
+    void delete_success_notFoundAfterDelete() {
+      Notification saved = saveNotification(receiver, "팔로우 알림", NotificationType.NEW_FOLLOWER);
 
       notificationRepository.deleteById(saved.getId());
       entityManager.flush();
@@ -144,9 +144,9 @@ class NotificationRepositoryTest {
 
     @Test
     @DisplayName("내 알림 삭제가 다른 receiver의 알림에 영향을 주지 않는다")
-    void 다른_receiver_알림_영향_없음() {
-      Notification myNotification = 알림_저장(receiver, "내 알림", NotificationType.NEW_FOLLOWER);
-      Notification otherNotification = 알림_저장(otherUser, "타유저 알림", NotificationType.NEW_FOLLOWER);
+    void delete_success_otherReceiverNotAffected() {
+      Notification myNotification = saveNotification(receiver, "내 알림", NotificationType.NEW_FOLLOWER);
+      Notification otherNotification = saveNotification(otherUser, "타유저 알림", NotificationType.NEW_FOLLOWER);
 
       notificationRepository.deleteById(myNotification.getId());
       entityManager.flush();
@@ -162,11 +162,11 @@ class NotificationRepositoryTest {
 
     @Test
     @DisplayName("cursor 없이 조회하면 receiver의 알림만 최신순으로 반환된다.")
-    void 첫_페이지_receiver_알림만_최신순_반환() {
-      알림_저장(receiver, "알림1", NotificationType.NEW_FOLLOWER);
-      알림_저장(receiver, "알림2", NotificationType.PLAYLIST_SUBSCRIBE);
-      알림_저장(receiver, "알림3", NotificationType.DIRECT_MESSAGE);
-      알림_저장(otherUser, "타유저 알림", NotificationType.NEW_FOLLOWER);
+    void findByCursor_success_firstPageReturnsOwnNotificationsDesc() {
+      saveNotification(receiver, "알림1", NotificationType.NEW_FOLLOWER);
+      saveNotification(receiver, "알림2", NotificationType.PLAYLIST_SUBSCRIBE);
+      saveNotification(receiver, "알림3", NotificationType.DIRECT_MESSAGE);
+      saveNotification(otherUser, "타유저 알림", NotificationType.NEW_FOLLOWER);
 
       List<Notification> result =
           notificationRepository.findNotificationByCursor(receiver.getId(), null, null, 20);
@@ -181,7 +181,7 @@ class NotificationRepositoryTest {
 
     @Test
     @DisplayName("알림이 없으면 빈 리스트를 반환한다.")
-    void 알림_없으면_빈_리스트() {
+    void findByCursor_success_emptyListWhenNoNotifications() {
       List<Notification> result =
           notificationRepository.findNotificationByCursor(receiver.getId(), null, null, 20);
 
@@ -190,9 +190,9 @@ class NotificationRepositoryTest {
 
     @Test
     @DisplayName("알림이 limit+1개 초과 존재하면 최대 limit+1개까지만 반환된다.")
-    void 알림이_limit_초과_시_limit_플러스_1개_반환() {
+    void findByCursor_success_returnsLimitPlusOneWhenExceedsLimit() {
       for (int i = 0; i < 5; i++) {
-        알림_저장(receiver, "알림" + i, NotificationType.NEW_FOLLOWER);
+        saveNotification(receiver, "알림" + i, NotificationType.NEW_FOLLOWER);
       }
 
       List<Notification> result =
@@ -204,9 +204,9 @@ class NotificationRepositoryTest {
 
     @Test
     @DisplayName("알림이 limit개 이하이면 전체를 반환한다.")
-    void 알림이_limit_이하이면_전체_반환() {
-      알림_저장(receiver, "알림1", NotificationType.NEW_FOLLOWER);
-      알림_저장(receiver, "알림2", NotificationType.PLAYLIST_SUBSCRIBE);
+    void findByCursor_success_returnsAllWhenUnderLimit() {
+      saveNotification(receiver, "알림1", NotificationType.NEW_FOLLOWER);
+      saveNotification(receiver, "알림2", NotificationType.PLAYLIST_SUBSCRIBE);
 
       List<Notification> result =
           notificationRepository.findNotificationByCursor(receiver.getId(), null, null, 5);
@@ -216,9 +216,9 @@ class NotificationRepositoryTest {
 
     @Test
     @DisplayName("알림이 정확히 limit개이면 limit개를 반환한다.")
-    void 알림이_정확히_limit개이면_limit개_반환() {
+    void findByCursor_success_returnsExactlyLimitWhenEqualsLimit() {
       for (int i = 0; i < 3; i++) {
-        알림_저장(receiver, "알림" + i, NotificationType.NEW_FOLLOWER);
+        saveNotification(receiver, "알림" + i, NotificationType.NEW_FOLLOWER);
       }
 
       List<Notification> result =
@@ -230,10 +230,10 @@ class NotificationRepositoryTest {
 
     @Test
     @DisplayName("cursor 시각보다 오래된 알림만 반환되고 cursor 시각 이후 알림은 제외된다.")
-    void cursor_이전_알림만_반환() throws InterruptedException {
-      Notification older = 알림_저장(receiver, "오래된 알림", NotificationType.NEW_FOLLOWER);
+    void findByCursor_success_returnsOnlyOlderThanCursor() throws InterruptedException {
+      Notification older = saveNotification(receiver, "오래된 알림", NotificationType.NEW_FOLLOWER);
       Thread.sleep(10); // 타임스탬프 차이 보장
-      Notification newer = 알림_저장(receiver, "최신 알림", NotificationType.NEW_FOLLOWER);
+      Notification newer = saveNotification(receiver, "최신 알림", NotificationType.NEW_FOLLOWER);
 
       List<Notification> result =
           notificationRepository.findNotificationByCursor(
@@ -248,13 +248,13 @@ class NotificationRepositoryTest {
 
     @Test
     @DisplayName("cursor 이후에 저장된 알림이 여러 개여도 cursor 이전 알림만 반환된다.")
-    void cursor_이후_알림_여러개_있어도_이전것만_반환() throws InterruptedException {
-      Notification oldest = 알림_저장(receiver, "가장 오래된 알림", NotificationType.NEW_FOLLOWER);
+    void findByCursor_success_returnsOnlyOlderWhenMultipleNewerExist() throws InterruptedException {
+      Notification oldest = saveNotification(receiver, "가장 오래된 알림", NotificationType.NEW_FOLLOWER);
       Thread.sleep(10);
-      Notification middle = 알림_저장(receiver, "중간 알림", NotificationType.PLAYLIST_SUBSCRIBE);
+      Notification middle = saveNotification(receiver, "중간 알림", NotificationType.PLAYLIST_SUBSCRIBE);
       Thread.sleep(10);
-      알림_저장(receiver, "최신 알림1", NotificationType.DIRECT_MESSAGE);
-      알림_저장(receiver, "최신 알림2", NotificationType.ROLE_CHANGE);
+      saveNotification(receiver, "최신 알림1", NotificationType.DIRECT_MESSAGE);
+      saveNotification(receiver, "최신 알림2", NotificationType.ROLE_CHANGE);
 
       List<Notification> result =
           notificationRepository.findNotificationByCursor(
@@ -266,7 +266,7 @@ class NotificationRepositoryTest {
 
     @Test
     @DisplayName("같은 createdAt을 가진 알림은 idAfter 기준으로 이전 알림만 반환된다.")
-    void 같은_createdAt에서_idAfter_기준으로_이전_알림만_반환() {
+    void findByCursor_success_returnsOlderByIdAfterWhenSameCreatedAt() {
       Instant fixedTime = Instant.parse("2024-01-01T00:00:00Z");
       // UUID 대소 관계를 명확히 고정: smallId < largeId (바이트 단위 비교)
       UUID smallId = UUID.fromString("00000000-0000-0000-0000-000000000001");
@@ -309,7 +309,7 @@ class NotificationRepositoryTest {
 
     @Test
     @DisplayName("알림이 없으면 0을 반환한다.")
-    void 알림_없으면_0() {
+    void countByReceiverId_success_returnsZeroWhenNoNotifications() {
       long count = notificationRepository.countByReceiver_Id(receiver.getId());
 
       assertThat(count).isZero();
@@ -317,10 +317,10 @@ class NotificationRepositoryTest {
 
     @Test
     @DisplayName("receiver의 알림 개수를 정확히 반환한다.")
-    void receiver_알림_개수_정확히_반환() {
-      알림_저장(receiver, "알림1", NotificationType.NEW_FOLLOWER);
-      알림_저장(receiver, "알림2", NotificationType.PLAYLIST_SUBSCRIBE);
-      알림_저장(receiver, "알림3", NotificationType.DIRECT_MESSAGE);
+    void countByReceiverId_success_returnsExactCount() {
+      saveNotification(receiver, "알림1", NotificationType.NEW_FOLLOWER);
+      saveNotification(receiver, "알림2", NotificationType.PLAYLIST_SUBSCRIBE);
+      saveNotification(receiver, "알림3", NotificationType.DIRECT_MESSAGE);
 
       long count = notificationRepository.countByReceiver_Id(receiver.getId());
 
@@ -329,10 +329,10 @@ class NotificationRepositoryTest {
 
     @Test
     @DisplayName("다른 receiver의 알림은 개수에 포함되지 않는다.")
-    void 다른_receiver_알림은_개수에_미포함() {
-      알림_저장(receiver, "내 알림", NotificationType.NEW_FOLLOWER);
-      알림_저장(otherUser, "타유저 알림1", NotificationType.NEW_FOLLOWER);
-      알림_저장(otherUser, "타유저 알림2", NotificationType.NEW_FOLLOWER);
+    void countByReceiverId_success_excludesOtherReceiverNotifications() {
+      saveNotification(receiver, "내 알림", NotificationType.NEW_FOLLOWER);
+      saveNotification(otherUser, "타유저 알림1", NotificationType.NEW_FOLLOWER);
+      saveNotification(otherUser, "타유저 알림2", NotificationType.NEW_FOLLOWER);
 
       long count = notificationRepository.countByReceiver_Id(receiver.getId());
 

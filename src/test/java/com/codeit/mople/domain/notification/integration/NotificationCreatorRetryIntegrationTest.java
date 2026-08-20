@@ -41,7 +41,7 @@ class NotificationCreatorRetryIntegrationTest {
 
     @Test
     @DisplayName("존재하지 않는 유저면 재시도 없이 UserException이 흡수되지 않고 전파된다")
-    void 존재하지_않는_유저면_재시도_없이_UserException이_흡수되지_않고_전파된다() {
+    void propagatesUserExceptionWithoutRetryWhenUserNotFound() {
         // given
         UUID receiverId = UUID.randomUUID();
         given(userRepository.findById(receiverId)).willReturn(Optional.empty());
@@ -61,7 +61,7 @@ class NotificationCreatorRetryIntegrationTest {
 
     @Test
     @DisplayName("저장이 계속 TransientDataAccessException을 던지면 3회 재시도 후 예외 없이 recover된다")
-    void 저장이_계속_TransientDataAccessException을_던지면_3회_재시도_후_예외없이_recover된다() {
+    void recoversAfterThreeRetriesWhenSaveThrowsTransientDataAccessException() {
         // given
         UUID receiverId = UUID.randomUUID();
         User receiver = User.createUser("receiver@test.com", "encoded", "수신자");
@@ -80,7 +80,7 @@ class NotificationCreatorRetryIntegrationTest {
 
     @Test
     @DisplayName("저장이 DataIntegrityViolationException(비일시적)을 던지면 재시도 없이 바로 전파된다")
-    void 저장이_비일시적_DataAccessException을_던지면_재시도_없이_바로_전파된다() {
+    void propagatesImmediatelyWithoutRetryWhenSaveThrowsNonTransientDataAccessException() {
         // given
         UUID receiverId = UUID.randomUUID();
         User receiver = User.createUser("receiver@test.com", "encoded", "수신자");
