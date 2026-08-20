@@ -87,10 +87,12 @@ public class WebSocketSessionTrackingConfig {
   @Bean
   public HealthIndicator webSocketForceDisconnectHealthIndicator(
       RedisMessageListenerContainer webSocketForceDisconnectListenerContainer) {
-    return () -> webSocketForceDisconnectListenerContainer.isRunning()
+    // isRunning()은 컨테이너 라이프사이클(start/stop) 여부만 반영해 재연결 중에도 true로 남아있을
+    // 수 있으므로, 실제 Redis 구독이 확정된 상태를 뜻하는 isListening()으로 판단한다.
+    return () -> webSocketForceDisconnectListenerContainer.isListening()
         ? Health.up().build()
         : Health.down()
-            .withDetail("reason", "강제 로그아웃 Redis 리스너가 실행 중이 아님(이 인스턴스는 실시간 강제 종료 불가)")
+            .withDetail("reason", "강제 로그아웃 Redis 리스너가 구독 중이 아님(이 인스턴스는 실시간 강제 종료 불가)")
             .build();
   }
 }
