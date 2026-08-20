@@ -191,8 +191,8 @@ public class AuthControllerTest {
   }
 
   @Test
-  @DisplayName("잠긴 계정으로 로그인하면 403을 반환")
-  void signIn_returnsForbidden_whenAccountIsLocked() throws Exception {
+  @DisplayName("잠긴 계정으로 로그인하면 401을 반환")
+  void signIn_returnsUnauthorized_whenAccountIsLocked() throws Exception {
     User user = userRepository.save(User.createUser("locked@test.com", passwordEncoder.encode("rawPw123"), "lockedUser"));
     user.lock();
     userRepository.save(user);
@@ -202,12 +202,12 @@ public class AuthControllerTest {
         .param("username", "locked@test.com")
         .param("password", "rawPw123"))
         .andDo(print())
-        .andExpect(status().isForbidden())
+        .andExpect(status().isUnauthorized())
         .andExpect(jsonPath("$.error.code").value("AUTH-004"));
   }
 
   @Test
-  @DisplayName("로그인 상태에서 계정이 잠기면 기존 토큰은 403(LOCKED_ACCOUNT)으로 거부됨")
+  @DisplayName("로그인 상태에서 계정이 잠기면 기존 토큰은 401(LOCKED_ACCOUNT)으로 거부됨")
   void existingToken_becomesLocked_whenAccountGetsLockedAfterward() throws Exception {
     User user = userRepository.save(User.createUser("lockAfter@test.com", passwordEncoder.encode("rawPw123"), "tester"));
     String token = issueAccessToken(user);
@@ -224,11 +224,11 @@ public class AuthControllerTest {
     sessionTokenRepository.invalidate(user.getId());
     accountLockRepository.lock(user.getId());
 
-    // 같은 토큰으로 재요청 -> 신원은 확인됐으나 접근이 막힌 상태이므로 401이 아닌 403
+    // 같은 토큰으로 재요청 -> 프론트가 재인증 필요 신호를 401 하나로만 처리하므로 LOCKED_ACCOUNT도 401로 통일
     mockMvc.perform(get("/api/users/{userId}", user.getId())
         .header("Authorization", "Bearer " + token))
         .andDo(print())
-        .andExpect(status().isForbidden())
+        .andExpect(status().isUnauthorized())
         .andExpect(jsonPath("$.error.code").value("AUTH-004"));
   }
 
