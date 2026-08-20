@@ -4,6 +4,7 @@ import com.codeit.mople.domain.notification.entity.NotificationType;
 import com.codeit.mople.domain.notification.service.NotificationCreator;
 import com.codeit.mople.domain.playlist.service.PlaylistService;
 import com.codeit.mople.global.event.processed.ProcessedEventRepository;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,12 +28,13 @@ public class PlaylistContentAddedEventConsumer {
   // dead-letter로 보내버려, 정상 처리됐어야 할 다른 구독자들까지 알림을 못 받게 된다.
   @KafkaListener(topics = "${spring.kafka.topics.playlist-content-added}")
   public void handle(PlaylistContentAddedMessage message) {
+    List<UUID> subscriberIds = playlistService.getSubscriberIds(message.playlistId());
+
     if (checkAndRecordProcessedEvent(message.eventId())) {
       return;
     }
 
-    playlistService.getSubscriberIds(message.playlistId())
-        .forEach(subscriberId -> createNotificationSafely(subscriberId, message));
+    subscriberIds.forEach(subscriberId -> createNotificationSafely(subscriberId, message));
 
     log.info("플레이리스트 콘텐츠 추가 이벤트 처리 완료: playlistId={}", message.playlistId());
   }

@@ -126,13 +126,15 @@ class PlaylistContentAddedEventConsumerTest {
     );
 
     given(processedEventRepository.insertIfAbsent(eventId)).willReturn(0);
+    given(playlistService.getSubscriberIds(playlistId))
+        .willReturn(List.of(subscriberA, subscriberB));
 
     // when
     eventConsumer.handle(message);
 
     // then
+    verify(playlistService).getSubscriberIds(playlistId);
     verify(processedEventRepository).insertIfAbsent(eventId);
-    verifyNoInteractions(playlistService);
     verifyNoInteractions(notificationCreator);
   }
 }
