@@ -22,6 +22,7 @@ import com.codeit.mople.domain.auth.repository.PasswordResetRateLimiterRepositor
 import com.codeit.mople.domain.auth.repository.RefreshTokenRepository;
 import com.codeit.mople.domain.auth.repository.SessionTokenRepository;
 import com.codeit.mople.domain.user.entity.AuthProvider;
+import com.codeit.mople.domain.user.entity.Role;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.global.jwt.JwtProvider;
@@ -87,7 +88,7 @@ public class AuthServiceTest {
     SignInRequest request = new SignInRequest("test@test.com", "rawPassword");
     when(userRepository.findByEmail(request.username())).thenReturn(Optional.of(user));
     when(passwordEncoder.matches(request.password(), user.getPassword())).thenReturn(true);
-    when(jwtProvider.createAccessToken(any(), anyString())).thenReturn("issued-token");
+    when(jwtProvider.createAccessToken(any(), anyString(), any(Role.class))).thenReturn("issued-token");
     when(jwtProvider.createRefreshToken(any())).thenReturn("issued-refresh-token");
 
     AuthTokens response = authService.signIn(request);
@@ -101,7 +102,7 @@ public class AuthServiceTest {
     SignInRequest request = new SignInRequest("TEST@TEST.COM", "rawPassword");
     when(userRepository.findByEmail("test@test.com")).thenReturn(Optional.of(user));
     when(passwordEncoder.matches(request.password(), user.getPassword())).thenReturn(true);
-    when(jwtProvider.createAccessToken(any(), anyString())).thenReturn("issued-token");
+    when(jwtProvider.createAccessToken(any(), anyString(), any(Role.class))).thenReturn("issued-token");
     when(jwtProvider.createRefreshToken(any())).thenReturn("issued-refresh-token");
 
     AuthTokens response = authService.signIn(request);
@@ -115,7 +116,7 @@ public class AuthServiceTest {
     SignInRequest request = new SignInRequest("test@test.com", "rawPassword");
     when(userRepository.findByEmail(request.username())).thenReturn(Optional.of(user));
     when(passwordEncoder.matches(request.password(), user.getPassword())).thenReturn(true);
-    when(jwtProvider.createAccessToken(any(), anyString())).thenReturn("issued-token");
+    when(jwtProvider.createAccessToken(any(), anyString(), any(Role.class))).thenReturn("issued-token");
     when(jwtProvider.createRefreshToken(any())).thenReturn("issued-refresh-token");
 
     authService.signIn(request);
@@ -129,7 +130,7 @@ public class AuthServiceTest {
     SignInRequest request = new SignInRequest("test@test.com", "rawPassword");
     when(userRepository.findByEmail(request.username())).thenReturn(Optional.of(user));
     when(passwordEncoder.matches(request.password(), user.getPassword())).thenReturn(true);
-    when(jwtProvider.createAccessToken(any(), anyString())).thenReturn("token");
+    when(jwtProvider.createAccessToken(any(), anyString(), any(Role.class))).thenReturn("token");
     when(jwtProvider.createRefreshToken(any())).thenReturn("issued-refresh-token");
 
     authService.signIn(request);
@@ -281,7 +282,7 @@ public class AuthServiceTest {
     when(userRepository.findByEmail(request.username())).thenReturn(Optional.of(user));
     when(passwordEncoder.matches("temporary1!!", user.getPassword())).thenReturn(false);
     when(passwordEncoder.matches("temporary1!!", "encodedTempPw")).thenReturn(true);
-    when(jwtProvider.createAccessToken(any(), anyString())).thenReturn("token");
+    when(jwtProvider.createAccessToken(any(), anyString(), any(Role.class))).thenReturn("token");
     when(jwtProvider.createRefreshToken(any())).thenReturn("refreshToken");
 
     AuthTokens response = authService.signIn(request);
@@ -356,7 +357,7 @@ public class AuthServiceTest {
     when(jwtProvider.createRefreshToken(userId)).thenReturn("new-refresh-token");
     when(refreshTokenRepository.rotate(eq(userId), eq("valid-refresh-token"), eq("new-refresh-token"), eq(EXPECTED_TTL))).thenReturn(true);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(jwtProvider.createAccessToken(any(), anyString())).thenReturn("new-access-token");
+    when(jwtProvider.createAccessToken(any(), anyString(), any(Role.class))).thenReturn("new-access-token");
 
     AuthTokens response = authService.refresh("valid-refresh-token");
 
@@ -411,7 +412,7 @@ public class AuthServiceTest {
     when(jwtProvider.createRefreshToken(userId)).thenReturn("new-refresh");
     when(refreshTokenRepository.rotate(eq(userId), eq("old-token"), eq("new-refresh"), eq(EXPECTED_TTL))).thenReturn(true);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(jwtProvider.createAccessToken(any(), anyString())).thenReturn("new-access");
+    when(jwtProvider.createAccessToken(any(), anyString(), any(Role.class))).thenReturn("new-access");
 
     authService.refresh("old-token");
 

@@ -1,5 +1,6 @@
 package com.codeit.mople.domain.review.service;
 
+import com.codeit.mople.domain.auth.security.SecurityUtils;
 import com.codeit.mople.domain.content.entity.Content;
 import com.codeit.mople.domain.content.exception.ContentErrorCode;
 import com.codeit.mople.domain.content.exception.ContentException;
@@ -225,12 +226,11 @@ public class ReviewService {
 
   private void validateRequesterIsAuthor(Review review, UUID requesterId) {
     UUID authorId = review.getAuthor().getId();
-    if (!authorId.equals(requesterId)) {
+    if (!authorId.equals(requesterId) && !SecurityUtils.isAdmin()) {
       throw new ReviewException(
           ReviewErrorCode.REVIEW_FORBIDDEN,
           Map.of("authorId", authorId, "requesterId", requesterId)
       );
     }
   }
-
 }

@@ -16,6 +16,7 @@ public interface FollowRepository extends JpaRepository<Follow, UUID> {
 
   long countByFolloweeId(UUID followeeId);
 
+  // follow 테이블에서 followee 컬럼에 해당 Id를 갖고 있는 row를 전부 조회해서 그 안에 followerId를 뽑아라
   @Query("SELECT f.follower.id FROM Follow f WHERE f.followee.id = :followeeId")
   List<UUID> findFollowerIdsByFolloweeId(@Param("followeeId") UUID followeeId);
 }

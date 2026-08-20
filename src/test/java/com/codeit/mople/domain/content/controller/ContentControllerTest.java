@@ -15,6 +15,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.codeit.mople.domain.auth.repository.AccountLockRepository;
 import com.codeit.mople.domain.auth.security.CustomOAuth2UserService;
 import com.codeit.mople.domain.auth.repository.SessionTokenRepository;
 import com.codeit.mople.domain.auth.security.CustomUserDetails;
@@ -28,7 +29,6 @@ import com.codeit.mople.domain.content.exception.ContentErrorCode;
 import com.codeit.mople.domain.content.exception.ContentException;
 import com.codeit.mople.domain.content.service.ContentService;
 import com.codeit.mople.domain.user.entity.Role;
-import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.domain.watchingsession.service.WatchingSessionService;
 import com.codeit.mople.global.config.SecurityConfig;
 import com.codeit.mople.global.jwt.JwtProvider;
@@ -70,7 +70,7 @@ public class ContentControllerTest {
   private JwtProvider jwtProvider;
 
   @MockitoBean
-  private UserRepository userRepository;
+  private AccountLockRepository accountLockRepository;
 
   @MockitoBean
   private WatchingSessionService watchingSessionService;

@@ -9,6 +9,8 @@ spring:
     topics:
       follow-created: mople.follow.created.v1
       playlist-content-added: mople.playlist.content-added.v1
+      direct-message-created: mople.direct-message.created.v1
+      notification-created: mople.notification.created.v1
     enabled: false
 
   data:
@@ -84,6 +86,14 @@ oauth2:
   redirect:
     success-uri: http://localhost:3000/
     failure-uri: http://localhost:3000/login
+
+app:
+  cors:
+    allowed-origins:
+      - "http://localhost:5173"
+  websocket:
+    allowed-origins:
+      - "http://localhost:5173"
 
 sse:
   stream-consumer:

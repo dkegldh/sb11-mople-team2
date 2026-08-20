@@ -1,5 +1,6 @@
 package com.codeit.mople.global.jwt;
 
+import com.codeit.mople.domain.user.entity.Role;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -37,13 +38,14 @@ public class JwtProvider {
     this.refreshTokenExpiration = refreshTokenExpiration;
   }
 
-  public String createAccessToken(UUID userId, String jti) {
+  public String createAccessToken(UUID userId, String jti, Role role) {
     Date now = new Date();
     Date expiry = new Date(now.getTime() + accessTokenExpiration);
 
     return Jwts.builder()
         .subject(userId.toString())
         .id(jti)
+        .claim("role", role.name())
         .issuedAt(now)
         .expiration(expiry)
         .signWith(secretKey)
@@ -82,6 +84,14 @@ public class JwtProvider {
       throw new JwtException("jti claim이 없는 토큰입니다.");
     }
     return jti;
+  }
+
+  public Role getRole(String token) {
+    String role = parseClaims(token).get("role", String.class);
+    if(role == null) {
+      throw new JwtException("role claim이 없는 토큰 입니다.");
+    }
+    return Role.valueOf(role);
   }
 
   public long getRefreshTokenExpiration() {

@@ -21,8 +21,6 @@ import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.global.dto.CursorResponse;
 import com.codeit.mople.global.dto.SortDirection;
 import com.codeit.mople.global.storage.FileStorageService;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -247,19 +245,6 @@ public class UserServiceTest {
   }
 
   @Test
-  @DisplayName("본인이 아닌 사용자가 프로필을 수정 시 예외 발생")
-  void updateProfile_throwsException_whenNotOwner() {
-    UUID userId = UUID.randomUUID();
-    UUID otherUserId = UUID.randomUUID();
-
-    UserUpdateRequest request = new UserUpdateRequest("newName");
-
-    assertThatThrownBy(() -> userService.updateProfile(userId, otherUserId, request, null))
-        .isInstanceOf(UserException.class)
-        .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.FORBIDDEN_ACCESS);
-  }
-
-  @Test
   @DisplayName("이름만 변경")
   void updateProfile_success_nameOnly() {
     UUID userId = UUID.randomUUID();
@@ -267,7 +252,7 @@ public class UserServiceTest {
 
     UserUpdateRequest request = new UserUpdateRequest("newName");
 
-    UserDto response = userService.updateProfile(userId, userId, request, null);
+    UserDto response = userService.updateProfile(userId, request, null);
 
     assertThat(response.name()).isEqualTo("newName");
   }
@@ -282,7 +267,7 @@ public class UserServiceTest {
     MockMultipartFile image = new MockMultipartFile("image", "test.jpg", "image/jpeg", "content".getBytes());
     UserUpdateRequest request = new UserUpdateRequest(null);
 
-    UserDto response = userService.updateProfile(userId, userId, request, image);
+    UserDto response = userService.updateProfile(userId, request, image);
 
     assertThat(response.profileImageUrl()).isEqualTo("https://placeholder.mople.com/test.jpg");
     assertThat(response.name()).isEqualTo(user.getName());
@@ -298,7 +283,7 @@ public class UserServiceTest {
     MockMultipartFile image = new MockMultipartFile("image", "test.jpg", "image/jpeg", "content".getBytes());
     UserUpdateRequest request = new UserUpdateRequest("newName");
 
-    UserDto response = userService.updateProfile(userId, userId, request, image);
+    UserDto response = userService.updateProfile(userId, request, image);
 
     assertThat(response.name()).isEqualTo("newName");
     assertThat(response.profileImageUrl()).isEqualTo("https://placeholder.mople.com/test.jpg");
@@ -313,23 +298,10 @@ public class UserServiceTest {
 
     ChangePasswordRequest request = new ChangePasswordRequest("newPw123");
 
-    userService.changePassword(userId, userId, request);
+    userService.changePassword(userId, request);
 
     assertThat(user.getPassword()).isEqualTo("encodedNewPw");
     verify(refreshTokenRepository).invalidate(userId);
     verify(sessionTokenRepository).invalidate(userId);
-  }
-
-  @Test
-  @DisplayName("본인이 아닌 사용자가 비밀번호 변경 시 예외 발생")
-  void changePassword_throwsException_whenNotOwner() {
-    UUID userId = UUID.randomUUID();
-    UUID otherUserId = UUID.randomUUID();
-
-    ChangePasswordRequest request = new ChangePasswordRequest("newPw123");
-
-    assertThatThrownBy(() -> userService.changePassword(userId, otherUserId, request))
-        .isInstanceOf(UserException.class)
-        .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.FORBIDDEN_ACCESS);
   }
 }
