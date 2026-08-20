@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.codeit.mople.domain.auth.repository.AccountLockRepository;
 import com.codeit.mople.domain.auth.repository.SessionTokenRepository;
 import com.codeit.mople.domain.auth.security.CustomOAuth2UserService;
 import com.codeit.mople.domain.auth.security.CustomUserDetails;
@@ -24,7 +25,6 @@ import com.codeit.mople.domain.follow.exception.FollowErrorCode;
 import com.codeit.mople.domain.follow.exception.FollowException;
 import com.codeit.mople.domain.follow.service.FollowService;
 import com.codeit.mople.domain.user.entity.Role;
-import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.global.config.SecurityConfig;
 import com.codeit.mople.global.jwt.JwtProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -57,7 +57,7 @@ class FollowControllerTest {
   JwtProvider jwtProvider;
 
   @MockitoBean
-  UserRepository userRepository;
+  AccountLockRepository accountLockRepository;
 
   @MockitoBean
   CustomOAuth2UserService customOAuth2UserService;

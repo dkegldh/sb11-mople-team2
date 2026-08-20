@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.codeit.mople.domain.auth.repository.AccountLockRepository;
 import com.codeit.mople.domain.auth.repository.SessionTokenRepository;
 import com.codeit.mople.domain.auth.security.CustomOAuth2UserService;
 import com.codeit.mople.domain.auth.security.handler.OAuth2FailureHandler;
@@ -21,7 +22,6 @@ import com.codeit.mople.domain.user.admin.dto.LockUpdateRequest;
 import com.codeit.mople.domain.user.admin.dto.RoleUpdateRequest;
 import com.codeit.mople.domain.user.admin.service.AdminService;
 import com.codeit.mople.domain.user.exception.UserErrorCode;
-import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.global.config.SecurityConfig;
 import com.codeit.mople.global.error.CustomException;
 import com.codeit.mople.global.jwt.JwtProvider;
@@ -52,7 +52,7 @@ class AdminControllerTest {
   AdminService adminService;
 
   @MockitoBean
-  UserRepository userRepository;
+  AccountLockRepository accountLockRepository;
 
   @MockitoBean
   JwtProvider jwtProvider;

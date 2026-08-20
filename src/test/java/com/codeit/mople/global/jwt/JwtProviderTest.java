@@ -1,7 +1,10 @@
 package com.codeit.mople.global.jwt;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.codeit.mople.domain.user.entity.Role;
+import io.jsonwebtoken.JwtException;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,5 +32,23 @@ class JwtProviderTest {
     assertThat(firstJti).isNotNull();
     assertThat(secondJti).isNotNull();
     assertThat(firstJti).isNotEqualTo(secondJti);
+  }
+
+  @Test
+  @DisplayName("Access Token에 담은 role을 다시 꺼낼 수 있음")
+  void createAccessToken_embedsRole_retrievableViaGetRole() {
+    UUID userId = UUID.randomUUID();
+    String token = jwtProvider.createAccessToken(userId, UUID.randomUUID().toString(), Role.ADMIN);
+
+    assertThat(jwtProvider.getRole(token)).isEqualTo(Role.ADMIN);
+  }
+
+  @Test
+  @DisplayName("role claim이 없는 토큰이면 getRole 호출 시 예외가 발생함")
+  void getRole_throwsException_whenRoleClaimMissing() {
+    String token = jwtProvider.createRefreshToken(UUID.randomUUID());
+
+    assertThatThrownBy(() -> jwtProvider.getRole(token))
+        .isInstanceOf(JwtException.class);
   }
 }

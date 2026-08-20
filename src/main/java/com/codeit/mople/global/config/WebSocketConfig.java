@@ -4,6 +4,7 @@ import com.codeit.mople.domain.auth.security.JwtChannelInterceptor;
 import com.codeit.mople.global.error.CustomStompErrorHandler;
 import com.codeit.mople.global.websocket.WebSocketAuthenticationPrincipalResolver;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.validation.constraints.NotEmpty;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.Getter;
@@ -19,6 +20,7 @@ import org.springframework.messaging.handler.invocation.HandlerMethodArgumentRes
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.util.MimeTypeUtils;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
@@ -81,8 +83,10 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
   // yaml 파일에 값이 없을 때 사용할 디폴트 값 설정
   @Getter
   @Setter
+  @Validated
   @ConfigurationProperties(prefix = "app.websocket")
   public static class WebSocketProperties {
-    private List<String> allowedOrigins = new ArrayList<>(List.of("http://localhost:8080"));
+    @NotEmpty
+    private final List<String> allowedOrigins = new ArrayList<>(List.of());
   }
 }

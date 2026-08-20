@@ -1,6 +1,5 @@
 package com.codeit.mople.domain.user.controller;
 
-import com.codeit.mople.domain.auth.security.CustomUserDetails;
 import com.codeit.mople.domain.user.controller.api.UserApi;
 import com.codeit.mople.domain.user.dto.request.ChangePasswordRequest;
 import com.codeit.mople.domain.user.dto.request.UserCreateRequest;
@@ -15,9 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -56,21 +53,19 @@ public class UserController implements UserApi {
   @PatchMapping(value = "/{userId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   public ResponseEntity<UserDto> updateProfile(
       @PathVariable UUID userId,
-      @AuthenticationPrincipal CustomUserDetails principal,
       @Valid @RequestPart UserUpdateRequest request,
       @RequestPart(value = "image", required = false)MultipartFile image
   ) {
-    return ResponseEntity.ok(userService.updateProfile(userId, principal.getUserId(), request, image));
+    return ResponseEntity.ok(userService.updateProfile(userId, request, image));
   }
 
   @Override
   @PatchMapping("/{userId}/password")
   public ResponseEntity<Void> changePassword(
       @PathVariable UUID userId,
-      @AuthenticationPrincipal CustomUserDetails principal,
       @Valid @RequestBody ChangePasswordRequest request
   ) {
-    userService.changePassword(userId, principal.getUserId(), request);
+    userService.changePassword(userId, request);
     return ResponseEntity.noContent().build();
   }
 }
