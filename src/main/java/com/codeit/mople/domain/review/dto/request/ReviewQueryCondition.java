@@ -1,5 +1,6 @@
 package com.codeit.mople.domain.review.dto.request;
 
+import com.codeit.mople.global.dto.SortDirection;
 import com.fasterxml.jackson.annotation.JsonValue;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -28,11 +29,6 @@ public record ReviewQueryCondition(
     @NotNull(message = "정렬 조건은 필수입니다.")
     ReviewSortBy sortBy // 정렬 기준
 ) {
-
-  public enum SortDirection {
-    ASCENDING, // 오름차순
-    DESCENDING // 내림차순
-  }
 
   public enum ReviewSortBy {
     CREATED_AT("createdAt"), // 생성 순

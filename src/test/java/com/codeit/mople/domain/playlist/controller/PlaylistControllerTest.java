@@ -19,15 +19,15 @@ import com.codeit.mople.domain.auth.security.CustomUserDetails;
 import com.codeit.mople.domain.playlist.dto.request.PlaylistCreateRequest;
 import com.codeit.mople.domain.playlist.dto.request.PlaylistQueryCondition;
 import com.codeit.mople.domain.playlist.dto.request.PlaylistQueryCondition.PlaylistSortBy;
-import com.codeit.mople.domain.playlist.dto.request.PlaylistQueryCondition.SortDirection;
 import com.codeit.mople.domain.playlist.dto.request.PlaylistUpdateRequest;
-import com.codeit.mople.domain.playlist.dto.response.PlaylistCursorResponse;
 import com.codeit.mople.domain.playlist.dto.response.PlaylistResponse;
 import com.codeit.mople.domain.playlist.exception.PlaylistErrorCode;
 import com.codeit.mople.domain.playlist.exception.PlaylistException;
 import com.codeit.mople.domain.playlist.service.PlaylistService;
 import com.codeit.mople.domain.user.entity.Role;
 import com.codeit.mople.domain.user.entity.User;
+import com.codeit.mople.global.dto.CursorResponse;
+import com.codeit.mople.global.dto.SortDirection;
 import com.codeit.mople.global.dto.UserSummary;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
@@ -252,14 +252,14 @@ public class PlaylistControllerTest {
 
       // BeforeEach에서 userDetails 초기화
 
-      PlaylistCursorResponse response = new PlaylistCursorResponse(
+      CursorResponse<PlaylistResponse> response = new CursorResponse<>(
           List.of(),
           null,
           null,
           false,
           0L,
-          PlaylistSortBy.UPDATED_AT,
-          SortDirection.ASCENDING
+          PlaylistSortBy.UPDATED_AT.getValue(),
+          SortDirection.ASCENDING.name()
       );
 
       given(playlistService.findAll(any(PlaylistQueryCondition.class), eq(userDetails.getUserId())))

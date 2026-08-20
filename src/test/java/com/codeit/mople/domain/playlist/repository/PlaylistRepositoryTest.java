@@ -4,14 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.codeit.mople.domain.playlist.dto.request.PlaylistQueryCondition;
 import com.codeit.mople.domain.playlist.dto.request.PlaylistQueryCondition.PlaylistSortBy;
-import com.codeit.mople.domain.playlist.dto.request.PlaylistQueryCondition.SortDirection;
-import com.codeit.mople.domain.playlist.dto.response.PlaylistCursorResponse;
-import com.codeit.mople.domain.playlist.dto.response.PlaylistResponse;
 import com.codeit.mople.domain.playlist.entity.Playlist;
 import com.codeit.mople.domain.playlist.entity.PlaylistSubscription;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.global.config.JpaAuditingConfig;
 import com.codeit.mople.global.config.QueryDslConfig;
+import com.codeit.mople.global.dto.SortDirection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
@@ -24,7 +22,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.context.annotation.Import;
-import org.springframework.test.util.ReflectionTestUtils;
 
 @Import({JpaAuditingConfig.class, QueryDslConfig.class})
 @DataJpaTest

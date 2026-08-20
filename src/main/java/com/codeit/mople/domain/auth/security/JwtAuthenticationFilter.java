@@ -1,8 +1,9 @@
 package com.codeit.mople.domain.auth.security;
 
 import com.codeit.mople.domain.auth.exception.AuthErrorCode;
+import com.codeit.mople.domain.auth.repository.AccountLockRepository;
 import com.codeit.mople.domain.auth.repository.SessionTokenRepository;
-import com.codeit.mople.domain.user.repository.UserRepository;
+import com.codeit.mople.domain.user.entity.Role;
 import com.codeit.mople.global.jwt.JwtProvider;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
@@ -20,13 +21,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
   public static final String AUTH_ERROR_CODE_ATTRIBUTE = "authErrorCode";
 
   private final JwtProvider jwtProvider;
-  private final UserRepository userRepository;
+  private final AccountLockRepository accountLockRepository;
   private final SessionTokenRepository sessionTokenRepository;
 
-  public JwtAuthenticationFilter(JwtProvider jwtProvider, UserRepository userRepository,
+  public JwtAuthenticationFilter(JwtProvider jwtProvider, AccountLockRepository accountLockRepository,
       SessionTokenRepository sessionTokenRepository) {
     this.jwtProvider = jwtProvider;
-    this.userRepository = userRepository;
+    this.accountLockRepository = accountLockRepository;
     this.sessionTokenRepository = sessionTokenRepository;
   }
 
@@ -40,19 +41,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         UUID userId = jwtProvider.getUserId(token);
         String tokenJti = jwtProvider.getJti(token);
 
-        userRepository.findById(userId).ifPresent(user -> {
-          if(!sessionTokenRepository.isValid(user.getId(), tokenJti)) {
-            // 다른 기기에서 재로그인하여 세션이 만료됨 -> 인증 세팅 안 함, entry point에서 EXPIRED_SESSION으로 401 응답
-            request.setAttribute(AUTH_ERROR_CODE_ATTRIBUTE, AuthErrorCode.EXPIRED_SESSION);
-          } else if(user.isLocked()) {
-            // 신원은 확인됐으나 접근이 막힌 상태 -> 인증 세팅 안 함, entry point에서 LOCKED_ACCOUNT로 403 응답
-            request.setAttribute(AUTH_ERROR_CODE_ATTRIBUTE, AuthErrorCode.LOCKED_ACCOUNT);
-          } else {
-            CustomUserDetails principal = new CustomUserDetails(user.getId(), user.getRole());
-            var authentication = new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-          }
-        });
+        if(accountLockRepository.isLocked(userId)) {
+          // 신원은 확인됐으나 접근이 막힌 상태 -> 인증 세팅 안 함, entry point에서 LOCKED_ACCOUNT로 403 응답
+          request.setAttribute(AUTH_ERROR_CODE_ATTRIBUTE, AuthErrorCode.LOCKED_ACCOUNT);
+        } else if(!sessionTokenRepository.isValid(userId, tokenJti)) {
+          // 다른 기기에서 재로그인하여 세션이 만료됨 -> 인증 세팅 안 함, entry point에서 EXPIRED_SESSION으로 401 응답
+          request.setAttribute(AUTH_ERROR_CODE_ATTRIBUTE, AuthErrorCode.EXPIRED_SESSION);
+        } else {
+          Role role = jwtProvider.getRole(token);
+          CustomUserDetails principal = new CustomUserDetails(userId, role);
+          var authentication = new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
+          SecurityContextHolder.getContext().setAuthentication(authentication);
+        }
       } catch (JwtException | IllegalArgumentException e) {
         // 토큰이 만료/변조 등으로 유효하지 않으면 인증 세팅 안 함, entry point에서 INVALID_TOKEN으로 401 응답
         request.setAttribute(AUTH_ERROR_CODE_ATTRIBUTE, AuthErrorCode.INVALID_TOKEN);

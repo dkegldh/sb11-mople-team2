@@ -4,10 +4,10 @@ import static com.codeit.mople.domain.review.entity.QReview.review;
 
 import com.codeit.mople.domain.review.dto.request.ReviewQueryCondition;
 import com.codeit.mople.domain.review.dto.request.ReviewQueryCondition.ReviewSortBy;
-import com.codeit.mople.domain.review.dto.request.ReviewQueryCondition.SortDirection;
 import com.codeit.mople.domain.review.entity.Review;
 import com.codeit.mople.domain.review.exception.ReviewErrorCode;
 import com.codeit.mople.domain.review.exception.ReviewException;
+import com.codeit.mople.global.dto.SortDirection;
 import com.querydsl.core.types.Order;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;

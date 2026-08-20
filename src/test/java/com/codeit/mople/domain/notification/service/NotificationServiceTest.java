@@ -3,11 +3,13 @@ package com.codeit.mople.domain.notification.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 
 import com.codeit.mople.domain.notification.dto.request.NotificationCursorRequest;
 import com.codeit.mople.domain.notification.exception.NotificationErrorCode;
@@ -56,7 +58,7 @@ class NotificationServiceTest {
         void success_first_page_returns_correct_data_and_metadata() {
             // given
             NotificationCursorRequest request = new NotificationCursorRequest(
-                null, null, 20, "DESCENDING", "createdAt");
+                null, null, 20);
 
             Instant createdAt1 = Instant.parse("2025-08-03T10:00:00Z");
             Instant createdAt2 = Instant.parse("2025-08-02T10:00:00Z");
@@ -103,7 +105,7 @@ class NotificationServiceTest {
         void success_has_next_when_result_exceeds_limit() {
             // given
             NotificationCursorRequest request = new NotificationCursorRequest(
-                null, null, 2, "DESCENDING", "createdAt");
+                null, null, 2);
 
             Instant lastItemTime = Instant.parse("2025-08-01T10:00:00Z");
             UUID lastItemId = UUID.randomUUID();
@@ -133,7 +135,7 @@ class NotificationServiceTest {
         void success_has_next_false_when_result_equals_limit() {
             // given
             NotificationCursorRequest request = new NotificationCursorRequest(
-                null, null, 2, "DESCENDING", "createdAt");
+                null, null, 2);
 
             Notification n1 = mockNotification(UUID.randomUUID(), "알림1", "내용", NotificationLevel.INFO, Instant.now());
             Notification n2 = mockNotification(UUID.randomUUID(), "알림2", "내용", NotificationLevel.INFO, Instant.now());
@@ -158,7 +160,7 @@ class NotificationServiceTest {
         void success_empty_result() {
             // given
             NotificationCursorRequest request = new NotificationCursorRequest(
-                null, null, 20, "DESCENDING", "createdAt");
+                null, null, 20);
 
             given(notificationRepository.findNotificationByCursor(eq(receiverId), isNull(), isNull(), eq(20)))
                 .willReturn(List.of());
@@ -182,7 +184,7 @@ class NotificationServiceTest {
             String cursorStr = "2025-08-01T10:00:00Z";
             UUID idAfter = UUID.randomUUID();
             NotificationCursorRequest request = new NotificationCursorRequest(
-                cursorStr, idAfter, 20, "DESCENDING", "createdAt");
+                cursorStr, idAfter, 20);
 
             given(notificationRepository.findNotificationByCursor(
                 eq(receiverId), eq(Instant.parse(cursorStr)), eq(idAfter), eq(20)))
@@ -196,6 +198,8 @@ class NotificationServiceTest {
             assertThat(result.data()).isEmpty();
             assertThat(result.hasNext()).isFalse();
             assertThat(result.totalCount()).isZero();
+            then(notificationRepository).should()
+                .findNotificationByCursor(eq(receiverId), eq(Instant.parse(cursorStr)), eq(idAfter), eq(20));
         }
 
         @Test
@@ -203,11 +207,47 @@ class NotificationServiceTest {
         void fail_throws_exception_when_cursor_format_is_invalid() {
             // given
             NotificationCursorRequest request = new NotificationCursorRequest(
-                "invalid-date", UUID.randomUUID(), 20, "DESCENDING", "createdAt");
+                "invalid-date", UUID.randomUUID(), 20);
 
             // when & then — parseCursorToInstant()에서 예외 발생, Repository는 호출되지 않음
             assertThatThrownBy(() -> notificationService.getNotifications(receiverId, request))
-                .isInstanceOf(NotificationException.class);
+                .isInstanceOf(NotificationException.class)
+                .satisfies(e -> assertThat(((NotificationException) e).getErrorCode())
+                    .isEqualTo(NotificationErrorCode.NOTIFICATION_INVALID_CURSOR));
+            then(notificationRepository).should(never())
+                .findNotificationByCursor(any(), any(), any(), anyInt());
+        }
+
+        @Test
+        @DisplayName("실패: cursor만 있고 idAfter가 없으면 NotificationException이 발생한다.")
+        void fail_throws_exception_when_cursor_without_id_after() {
+            // given
+            NotificationCursorRequest request = new NotificationCursorRequest(
+                "2025-08-01T10:00:00Z", null, 20);
+
+            // when & then — validateCursorPair()에서 예외 발생, Repository는 호출되지 않음
+            assertThatThrownBy(() -> notificationService.getNotifications(receiverId, request))
+                .isInstanceOf(NotificationException.class)
+                .satisfies(e -> assertThat(((NotificationException) e).getErrorCode())
+                    .isEqualTo(NotificationErrorCode.NOTIFICATION_INVALID_CURSOR_PAIR));
+            then(notificationRepository).should(never())
+                .findNotificationByCursor(any(), any(), any(), anyInt());
+        }
+
+        @Test
+        @DisplayName("실패: idAfter만 있고 cursor가 없으면 NotificationException이 발생한다.")
+        void fail_throws_exception_when_id_after_without_cursor() {
+            // given
+            NotificationCursorRequest request = new NotificationCursorRequest(
+                null, UUID.randomUUID(), 20);
+
+            // when & then — validateCursorPair()에서 예외 발생, Repository는 호출되지 않음
+            assertThatThrownBy(() -> notificationService.getNotifications(receiverId, request))
+                .isInstanceOf(NotificationException.class)
+                .satisfies(e -> assertThat(((NotificationException) e).getErrorCode())
+                    .isEqualTo(NotificationErrorCode.NOTIFICATION_INVALID_CURSOR_PAIR));
+            then(notificationRepository).should(never())
+                .findNotificationByCursor(any(), any(), any(), anyInt());
         }
 
         @Test
@@ -215,7 +255,7 @@ class NotificationServiceTest {
         void success_single_result_has_next_false() {
             // given
             NotificationCursorRequest request = new NotificationCursorRequest(
-                null, null, 20, "DESCENDING", "createdAt");
+                null, null, null);
 
             UUID notifId = UUID.randomUUID();
             Instant createdAt = Instant.parse("2025-08-01T09:00:00Z");

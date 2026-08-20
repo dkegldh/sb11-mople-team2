@@ -1,6 +1,7 @@
 package com.codeit.mople.domain.notification.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
@@ -15,6 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.codeit.mople.domain.auth.repository.AccountLockRepository;
 import com.codeit.mople.domain.auth.repository.SessionTokenRepository;
 import com.codeit.mople.domain.auth.security.CustomOAuth2UserService;
 import com.codeit.mople.domain.auth.security.CustomUserDetails;
@@ -27,7 +29,6 @@ import com.codeit.mople.domain.notification.dto.response.NotificationResponse;
 import com.codeit.mople.domain.notification.NotificationLevel;
 import com.codeit.mople.domain.notification.service.NotificationService;
 import com.codeit.mople.domain.user.entity.Role;
-import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.global.config.SecurityConfig;
 import com.codeit.mople.global.jwt.JwtProvider;
 import java.time.Instant;
@@ -58,7 +59,7 @@ class NotificationControllerTest {
     JwtProvider jwtProvider;
 
     @MockitoBean
-    UserRepository userRepository;
+    AccountLockRepository accountLockRepository;
 
     @MockitoBean
     CustomOAuth2UserService customOAuth2UserService;
@@ -93,15 +94,13 @@ class NotificationControllerTest {
                 notifId, createdAt, principal.getUserId(), "팔로우 알림", "홍길동님이 팔로우했습니다.", NotificationLevel.INFO);
 
             CursorResponseNotificationDto response = new CursorResponseNotificationDto(
-                List.of(notifResponse), null, null, false, 1, "createdAt", "DESCENDING");
+                List.of(notifResponse), null, null, false, 1L, "createdAt", "DESCENDING");
 
             given(notificationService.getNotifications(any(), any())).willReturn(response);
 
             // when & then
             mockMvc.perform(get("/api/notifications")
                     .param("limit", "20")
-                    .param("sortDirection", "DESCENDING")
-                    .param("sortBy", "createdAt")
                     .with(user(principal)))
                 .andDo(print())
                 .andExpect(status().isOk())
@@ -125,7 +124,7 @@ class NotificationControllerTest {
         void success_200_with_empty_list() throws Exception {
             // given
             CursorResponseNotificationDto response = new CursorResponseNotificationDto(
-                List.of(), null, null, false, 0, "createdAt", "DESCENDING");
+                List.of(), null, null, false, 0L, "createdAt", "DESCENDING");
 
             given(notificationService.getNotifications(any(), any())).willReturn(response);
 
@@ -150,7 +149,7 @@ class NotificationControllerTest {
             String nextCursor = "2025-08-01T09:00:00Z";
             UUID nextIdAfter = UUID.randomUUID();
             CursorResponseNotificationDto response = new CursorResponseNotificationDto(
-                List.of(), nextCursor, nextIdAfter, true, 20, "createdAt", "DESCENDING");
+                List.of(), nextCursor, nextIdAfter, true, 20L, "createdAt", "DESCENDING");
 
             given(notificationService.getNotifications(any(), any())).willReturn(response);
 
@@ -168,17 +167,21 @@ class NotificationControllerTest {
         }
 
         @Test
-        @DisplayName("실패: limit이 없으면 400을 반환한다.")
-        void fail_400_when_limit_is_missing() throws Exception {
+        @DisplayName("성공: limit이 없으면 기본값 20이 적용된다.")
+        void success_200_with_default_limit_when_missing() throws Exception {
+            // given
+            given(notificationService.getNotifications(any(), any())).willReturn(
+                new CursorResponseNotificationDto(List.of(), null, null, false, 0L, "createdAt", "DESCENDING"));
+
             // when & then
             mockMvc.perform(get("/api/notifications")
                     .with(user(principal)))
                 .andDo(print())
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error.code").value("COMMON-001"));
+                .andExpect(status().isOk());
 
-            verifyNoInteractions(notificationService);
+            then(notificationService).should().getNotifications(
+                eq(principal.getUserId()),
+                argThat(request -> request.limit() == 20));
         }
 
         @Test
@@ -212,57 +215,10 @@ class NotificationControllerTest {
         }
 
         @Test
-        @DisplayName("실패: sortDirection이 ASCENDING이면 400을 반환한다.")
-        void fail_400_when_sort_direction_is_ascending() throws Exception {
-            // when & then
-            mockMvc.perform(get("/api/notifications")
-                    .param("limit", "20")
-                    .param("sortDirection", "ASCENDING")
-                    .with(user(principal)))
-                .andDo(print())
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error.code").value("COMMON-001"));
-
-            verifyNoInteractions(notificationService);
-        }
-
-        @Test
-        @DisplayName("실패: sortBy가 createdAt이 아니면 400을 반환한다.")
-        void fail_400_when_sort_by_is_invalid() throws Exception {
-            // when & then
-            mockMvc.perform(get("/api/notifications")
-                    .param("limit", "20")
-                    .param("sortBy", "updatedAt")
-                    .with(user(principal)))
-                .andDo(print())
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error.code").value("COMMON-001"));
-
-            verifyNoInteractions(notificationService);
-        }
-
-        @Test
-        @DisplayName("실패: cursor만 있고 idAfter가 없으면 400을 반환한다.")
-        void fail_400_when_cursor_without_id_after() throws Exception {
-            // when & then
-            mockMvc.perform(get("/api/notifications")
-                    .param("limit", "20")
-                    .param("cursor", "2025-08-01T10:00:00Z")
-                    .with(user(principal)))
-                .andDo(print())
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.code").value("COMMON-001"));
-
-            verifyNoInteractions(notificationService);
-        }
-
-        @Test
         @DisplayName("성공: limit이 1(최솟값)이면 200을 반환한다.")
         void success_200_when_limit_is_min() throws Exception {
             given(notificationService.getNotifications(any(), any())).willReturn(
-                new CursorResponseNotificationDto(List.of(), null, null, false, 0, "createdAt", "DESCENDING"));
+                new CursorResponseNotificationDto(List.of(), null, null, false, 0L, "createdAt", "DESCENDING"));
 
             mockMvc.perform(get("/api/notifications")
                     .param("limit", "1")
@@ -276,7 +232,7 @@ class NotificationControllerTest {
         @DisplayName("성공: limit이 100(최댓값)이면 200을 반환한다.")
         void success_200_when_limit_is_max() throws Exception {
             given(notificationService.getNotifications(any(), any())).willReturn(
-                new CursorResponseNotificationDto(List.of(), null, null, false, 0, "createdAt", "DESCENDING"));
+                new CursorResponseNotificationDto(List.of(), null, null, false, 0L, "createdAt", "DESCENDING"));
 
             mockMvc.perform(get("/api/notifications")
                     .param("limit", "100")
@@ -292,7 +248,7 @@ class NotificationControllerTest {
             String cursor = "2025-08-01T10:00:00Z";
             UUID idAfter = UUID.randomUUID();
             given(notificationService.getNotifications(any(), any())).willReturn(
-                new CursorResponseNotificationDto(List.of(), null, null, false, 0, "createdAt", "DESCENDING"));
+                new CursorResponseNotificationDto(List.of(), null, null, false, 0L, "createdAt", "DESCENDING"));
 
             mockMvc.perform(get("/api/notifications")
                     .param("limit", "20")
@@ -302,20 +258,6 @@ class NotificationControllerTest {
                 .andExpect(status().isOk());
 
             then(notificationService).should().getNotifications(eq(principal.getUserId()), any());
-        }
-
-        @Test
-        @DisplayName("실패: idAfter만 있고 cursor가 없으면 400을 반환한다.")
-        void fail_400_when_id_after_without_cursor() throws Exception {
-            mockMvc.perform(get("/api/notifications")
-                    .param("limit", "20")
-                    .param("idAfter", UUID.randomUUID().toString())
-                    .with(user(principal)))
-                .andDo(print())
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.code").value("COMMON-001"));
-
-            verifyNoInteractions(notificationService);
         }
 
         @Test

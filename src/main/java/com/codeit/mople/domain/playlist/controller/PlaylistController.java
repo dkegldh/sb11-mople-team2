@@ -5,9 +5,9 @@ import com.codeit.mople.domain.playlist.controller.api.PlaylistApi;
 import com.codeit.mople.domain.playlist.dto.request.PlaylistCreateRequest;
 import com.codeit.mople.domain.playlist.dto.request.PlaylistQueryCondition;
 import com.codeit.mople.domain.playlist.dto.request.PlaylistUpdateRequest;
-import com.codeit.mople.domain.playlist.dto.response.PlaylistCursorResponse;
 import com.codeit.mople.domain.playlist.dto.response.PlaylistResponse;
 import com.codeit.mople.domain.playlist.service.PlaylistService;
+import com.codeit.mople.global.dto.CursorResponse;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.UUID;
@@ -58,11 +58,11 @@ public class PlaylistController implements PlaylistApi {
 
   @Override
   @GetMapping
-  public ResponseEntity<PlaylistCursorResponse> findAll(
+  public ResponseEntity<CursorResponse<PlaylistResponse>> findAll(
       @Valid @ModelAttribute PlaylistQueryCondition condition,
       @AuthenticationPrincipal(errorOnInvalidType = true) CustomUserDetails userDetails
   ) {
-    PlaylistCursorResponse response = playlistService.findAll(condition, userDetails.getUserId());
+    CursorResponse<PlaylistResponse> response = playlistService.findAll(condition, userDetails.getUserId());
 
     return ResponseEntity.ok(response);
   }

@@ -7,7 +7,6 @@ import com.codeit.mople.domain.playlist.dto.request.PlaylistQueryCondition;
 import com.codeit.mople.domain.playlist.dto.request.PlaylistQueryCondition.PlaylistSortBy;
 import com.codeit.mople.domain.playlist.dto.request.PlaylistUpdateRequest;
 import com.codeit.mople.domain.playlist.dto.response.PlaylistContentResponse;
-import com.codeit.mople.domain.playlist.dto.response.PlaylistCursorResponse;
 import com.codeit.mople.domain.playlist.dto.response.PlaylistResponse;
 import com.codeit.mople.domain.playlist.entity.Playlist;
 import com.codeit.mople.domain.playlist.entity.PlaylistContent;
@@ -25,6 +24,7 @@ import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.exception.UserErrorCode;
 import com.codeit.mople.domain.user.exception.UserException;
 import com.codeit.mople.domain.user.repository.UserRepository;
+import com.codeit.mople.global.dto.CursorResponse;
 import com.codeit.mople.global.dto.UserSummary;
 import java.util.HashSet;
 import java.util.List;
@@ -122,7 +122,7 @@ public class PlaylistService {
 
   // 플레이리스트 목록 조회
   @Transactional(readOnly = true)
-  public PlaylistCursorResponse findAll(PlaylistQueryCondition condition, UUID requesterId) {
+  public CursorResponse<PlaylistResponse> findAll(PlaylistQueryCondition condition, UUID requesterId) {
 
     log.debug("플레이리스트 목록 조회 시도: requesterId={}, keywordLike={}, ownerId={}, subscriberId={},"
             + " cursor={}, idAfter={}, limit={}, sortBy={}, sortDirection={}",
@@ -139,14 +139,6 @@ public class PlaylistService {
 
     // 목록 조회(limit + 1까지)
     List<Playlist> playlists = playlistRepository.findAll(condition);
-
-    // 다음 페이지가 있는지 확인
-    boolean hasNext = playlists.size() > condition.limit();
-
-    // 다음 페이지가 있으면 limit까지만 조회
-    if (hasNext) {
-      playlists = playlists.subList(0, condition.limit());
-    }
 
     // 목록 조회된 Playlist의 총 개수
     long totalCount = playlistRepository.count(condition);
@@ -185,37 +177,29 @@ public class PlaylistService {
         ))
         .toList();
 
-    // 임시 커서, 보조 커서 초기화
-    String nextCursor = null;
-    UUID nextIdAfter = null;
+    CursorResponse<PlaylistResponse> response = CursorResponse.of(
+        data,
+        condition.limit(),
+        totalCount,
+        condition.sortBy().name(),
+        condition.sortDirection().name(),
+        playlist -> {
+          // 정렬조건
+          if (condition.sortBy() == PlaylistSortBy.UPDATED_AT) {
+            return String.valueOf(playlist.updatedAt());
+          } else if (condition.sortBy() == PlaylistSortBy.SUBSCRIBE_COUNT) {
+            return String.valueOf(playlist.subscriberCount());
+          }
 
-    // 마지막 원소 조회
-    if (hasNext && !playlists.isEmpty()) {
-      Playlist lastItem = playlists.get(playlists.size() - 1);
-
-      // 보조커서
-      nextIdAfter = lastItem.getId();
-
-      // 정렬조건
-      if (condition.sortBy() == PlaylistSortBy.UPDATED_AT) {
-        nextCursor = lastItem.getUpdatedAt().toString();
-      } else if (condition.sortBy() == PlaylistSortBy.SUBSCRIBE_COUNT) {
-        nextCursor = String.valueOf(lastItem.getSubscriberCount());
-      }
-    }
+          return null;
+        },
+        PlaylistResponse::id
+    );
 
     log.info("플레이리스트 목록 조회 완료: size={}, totalCount={}, hasNext={}",
-        data.size(), totalCount, hasNext);
+        data.size(), response.totalCount(), response.hasNext());
 
-    return new PlaylistCursorResponse(
-        data,
-        nextCursor,
-        nextIdAfter,
-        hasNext,
-        totalCount,
-        condition.sortBy(),
-        condition.sortDirection()
-    );
+    return response;
   }
 
   @Transactional

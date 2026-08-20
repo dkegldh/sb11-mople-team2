@@ -4,8 +4,8 @@ import com.codeit.mople.domain.auth.security.CustomUserDetails;
 import com.codeit.mople.domain.playlist.dto.request.PlaylistCreateRequest;
 import com.codeit.mople.domain.playlist.dto.request.PlaylistQueryCondition;
 import com.codeit.mople.domain.playlist.dto.request.PlaylistUpdateRequest;
-import com.codeit.mople.domain.playlist.dto.response.PlaylistCursorResponse;
 import com.codeit.mople.domain.playlist.dto.response.PlaylistResponse;
+import com.codeit.mople.global.dto.CursorResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -91,7 +91,7 @@ public interface PlaylistApi {
           responseCode = "200",
           description = "플레이리스트 목록 조회 성공",
           content = @Content(
-              schema = @Schema(implementation = PlaylistCursorResponse.class)
+              schema = @Schema(implementation = CursorResponse.class)
           )
       ),
       @ApiResponse(
@@ -110,7 +110,7 @@ public interface PlaylistApi {
           content = @Content(schema = @Schema(implementation = com.codeit.mople.global.response.ApiResponse.class))
       )
   })
-  ResponseEntity<PlaylistCursorResponse> findAll(
+  ResponseEntity<CursorResponse<PlaylistResponse>> findAll(
       @ModelAttribute PlaylistQueryCondition condition,
       @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
   );

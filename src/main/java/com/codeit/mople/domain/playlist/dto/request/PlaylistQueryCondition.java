@@ -1,5 +1,6 @@
 package com.codeit.mople.domain.playlist.dto.request;
 
+import com.codeit.mople.global.dto.SortDirection;
 import com.fasterxml.jackson.annotation.JsonValue;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -34,11 +35,6 @@ public record PlaylistQueryCondition(
     @NotNull(message = "정렬 조건은 필수입니다.")
     PlaylistSortBy sortBy // 정렬 기준
 ) {
-
-  public enum SortDirection {
-    ASCENDING, // 오름차순
-    DESCENDING // 내림차순
-  }
 
   public enum PlaylistSortBy {
     UPDATED_AT("updatedAt"), // 최신순

@@ -5,10 +5,10 @@ import static com.codeit.mople.domain.playlist.entity.QPlaylistSubscription.play
 
 import com.codeit.mople.domain.playlist.dto.request.PlaylistQueryCondition;
 import com.codeit.mople.domain.playlist.dto.request.PlaylistQueryCondition.PlaylistSortBy;
-import com.codeit.mople.domain.playlist.dto.request.PlaylistQueryCondition.SortDirection;
 import com.codeit.mople.domain.playlist.entity.Playlist;
 import com.codeit.mople.domain.playlist.exception.PlaylistErrorCode;
 import com.codeit.mople.domain.playlist.exception.PlaylistException;
+import com.codeit.mople.global.dto.SortDirection;
 import com.querydsl.core.types.Order;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;

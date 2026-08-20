@@ -16,10 +16,8 @@ import com.codeit.mople.domain.content.repository.ContentRepository;
 import com.codeit.mople.domain.playlist.dto.request.PlaylistCreateRequest;
 import com.codeit.mople.domain.playlist.dto.request.PlaylistQueryCondition;
 import com.codeit.mople.domain.playlist.dto.request.PlaylistQueryCondition.PlaylistSortBy;
-import com.codeit.mople.domain.playlist.dto.request.PlaylistQueryCondition.SortDirection;
 import com.codeit.mople.domain.playlist.dto.request.PlaylistUpdateRequest;
 import com.codeit.mople.domain.playlist.dto.response.PlaylistContentResponse;
-import com.codeit.mople.domain.playlist.dto.response.PlaylistCursorResponse;
 import com.codeit.mople.domain.playlist.dto.response.PlaylistResponse;
 import com.codeit.mople.domain.playlist.entity.Playlist;
 import com.codeit.mople.domain.playlist.entity.PlaylistContent;
@@ -37,6 +35,8 @@ import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.exception.UserErrorCode;
 import com.codeit.mople.domain.user.exception.UserException;
 import com.codeit.mople.domain.user.repository.UserRepository;
+import com.codeit.mople.global.dto.CursorResponse;
+import com.codeit.mople.global.dto.SortDirection;
 import com.codeit.mople.global.dto.UserSummary;
 import java.time.Instant;
 import java.util.List;
@@ -368,7 +368,7 @@ public class PlaylistServiceTest {
           .willReturn(List.of());
 
       // when
-      PlaylistCursorResponse result = playlistService.findAll(condition, userId);
+      CursorResponse<PlaylistResponse> result = playlistService.findAll(condition, userId);
 
       // then
       assertThat(result.data()).hasSize(1);
@@ -409,6 +409,10 @@ public class PlaylistServiceTest {
       UUID nextPlaylistId = UUID.randomUUID();
       Instant nextUpdatedAt = mockUpdatedAt.plusSeconds(1);
 
+      Playlist extraPlaylist = mock(Playlist.class);
+      UUID extraPlaylistId = UUID.randomUUID();
+      Instant extraUpdatedAt = mockUpdatedAt.plusSeconds(2);
+
       given(owner.getId())
           .willReturn(ownerId);
       given(owner.getName())
@@ -434,27 +438,36 @@ public class PlaylistServiceTest {
       given(nextPlaylist.getSubscriberCount())
           .willReturn(0L);
 
+      given(extraPlaylist.getId())
+          .willReturn(extraPlaylistId);
+      given(extraPlaylist.getOwner())
+          .willReturn(owner);
+      given(extraPlaylist.getUpdatedAt())
+          .willReturn(extraUpdatedAt);
+      given(extraPlaylist.getSubscriberCount())
+          .willReturn(0L);
+
       // 임시 Playlist Mock 객체를 추가하여 3개가 들어있는거로 가장
       given(playlistRepository.findAll(condition))
-          .willReturn(List.of(mockPlaylist, nextPlaylist, mock(Playlist.class)));
+          .willReturn(List.of(mockPlaylist, nextPlaylist, extraPlaylist));
       given(playlistRepository.count(condition))
           .willReturn(3L);
 
       given(playlistContentRepository
           .findAllByPlaylistIdInOrderByCreatedAtAsc(
-              List.of(playlistId, nextPlaylistId)
+              List.of(playlistId, nextPlaylistId, extraPlaylistId)
           ))
           .willReturn(List.of());
 
       given(playlistSubscriptionRepository
           .findPlaylistIdsBySubscriberIdAndPlaylistIdIn(
               userId,
-              List.of(playlistId, nextPlaylistId)
+              List.of(playlistId, nextPlaylistId, extraPlaylistId)
           ))
           .willReturn(List.of());
 
       // when
-      PlaylistCursorResponse result = playlistService.findAll(condition, userId);
+      CursorResponse<PlaylistResponse> result = playlistService.findAll(condition, userId);
 
       // then
       assertThat(result.data()).hasSize(2);
@@ -533,7 +546,7 @@ public class PlaylistServiceTest {
           .willReturn(List.of());
 
       // when
-      PlaylistCursorResponse result = playlistService.findAll(condition, userId);
+      CursorResponse<PlaylistResponse> result = playlistService.findAll(condition, userId);
 
       // then
       assertThat(result.data()).hasSize(2);
@@ -593,7 +606,7 @@ public class PlaylistServiceTest {
           .willReturn(List.of(playlistId));
 
       // when
-      PlaylistCursorResponse result =
+      CursorResponse<PlaylistResponse> result =
           playlistService.findAll(condition, userId);
 
       // then
@@ -626,7 +639,7 @@ public class PlaylistServiceTest {
           .willReturn(0L);
 
       // when
-      PlaylistCursorResponse result = playlistService.findAll(condition, userId);
+      CursorResponse<PlaylistResponse> result = playlistService.findAll(condition, userId);
 
       // then
       assertThat(result.data()).isEmpty();

@@ -4,13 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
+import com.codeit.mople.domain.auth.security.CustomUserDetails;
 import com.codeit.mople.domain.content.entity.Content;
 import com.codeit.mople.domain.content.exception.ContentErrorCode;
 import com.codeit.mople.domain.content.exception.ContentException;
@@ -18,7 +18,6 @@ import com.codeit.mople.domain.content.repository.ContentRepository;
 import com.codeit.mople.domain.review.dto.request.ReviewCreateRequest;
 import com.codeit.mople.domain.review.dto.request.ReviewQueryCondition;
 import com.codeit.mople.domain.review.dto.request.ReviewQueryCondition.ReviewSortBy;
-import com.codeit.mople.domain.review.dto.request.ReviewQueryCondition.SortDirection;
 import com.codeit.mople.domain.review.dto.request.ReviewUpdateRequest;
 import com.codeit.mople.domain.review.dto.response.ReviewCursorResponse;
 import com.codeit.mople.domain.review.dto.response.ReviewResponse;
@@ -30,14 +29,17 @@ import com.codeit.mople.domain.review.event.ReviewWrittenEvent;
 import com.codeit.mople.domain.review.exception.ReviewErrorCode;
 import com.codeit.mople.domain.review.exception.ReviewException;
 import com.codeit.mople.domain.review.repository.ReviewRepository;
+import com.codeit.mople.domain.user.entity.Role;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.exception.UserErrorCode;
 import com.codeit.mople.domain.user.exception.UserException;
 import com.codeit.mople.domain.user.repository.UserRepository;
+import com.codeit.mople.global.dto.SortDirection;
 import com.codeit.mople.global.dto.UserSummary;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -47,6 +49,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -100,6 +104,17 @@ public class ReviewServiceTest {
     ReflectionTestUtils.setField(review1, "id", review1Id);
 
     updateRequest = new ReviewUpdateRequest("수정된 내용", 3.0);
+  }
+
+  @AfterEach
+  void clearSecurityContext() {
+    SecurityContextHolder.clearContext();
+  }
+
+  private void setAuth(UUID userId, Role role) {
+    CustomUserDetails principal = new CustomUserDetails(userId, role);
+    SecurityContextHolder.getContext().setAuthentication(
+        new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities()));
   }
 
   @Nested
@@ -510,6 +525,7 @@ public class ReviewServiceTest {
     void update_fail_forbidden() {
       // given
       UUID noAuthorId = UUID.randomUUID();
+      setAuth(noAuthorId, Role.USER);
 
       // BeforeEach에서 reviewId, authorId, updateRequest를 초기화
 
@@ -528,6 +544,35 @@ public class ReviewServiceTest {
           .isEqualTo(ReviewErrorCode.REVIEW_FORBIDDEN);
     }
 
+    @Test
+    @DisplayName("리뷰 수정 성공 - ADMIN은 작성자가 아니어도 허용됨")
+    void update_success_whenAdmin() {
+      // given
+      UUID adminId = UUID.randomUUID();
+      setAuth(adminId, Role.ADMIN);
+
+      given(reviewRepository.findById(review1Id)).willReturn(Optional.of(review1));
+      given(author.getId()).willReturn(authorId);
+      given(author.getName()).willReturn("test");
+      given(author.getProfileImageUrl()).willReturn("prorfile.png");
+      given(content.getId()).willReturn(contentId);
+
+      // when
+      ReviewResponse result = reviewService.update(review1Id, updateRequest, adminId);
+
+      // then
+      assertThat(result.text()).isEqualTo(updateRequest.text());
+      assertThat(result.rating()).isEqualTo(updateRequest.rating());
+      verify(eventPublisher).publishEvent(
+          argThat((Object event) ->
+              event instanceof ReviewUpdatedEvent updatedEvent
+                  && updatedEvent.eventId() != null
+                  && updatedEvent.contentId().equals(contentId)
+                  && updatedEvent.oldRating() == reviewRating
+                  && updatedEvent.newRating() == updateRequest.rating()
+          )
+      );
+    }
   }
 
   @Nested
@@ -594,6 +639,7 @@ public class ReviewServiceTest {
     void delete_fail_forbidden() {
       // given
       UUID noAuthorId = UUID.randomUUID();
+      setAuth(noAuthorId, Role.USER);
 
       given(reviewRepository.findById(review1Id))
           .willReturn(Optional.of(review1));
@@ -616,6 +662,31 @@ public class ReviewServiceTest {
       verifyNoInteractions(content);
     }
 
+    @Test
+    @DisplayName("리뷰 삭제 성공 - ADMIN은 작성자가 아니어도 리뷰 삭제가 허용됨")
+    void delete_success_whenAdmin() {
+      // given
+      UUID adminId = UUID.randomUUID();
+      setAuth(adminId, Role.ADMIN);
+
+      given(reviewRepository.findById(review1Id)).willReturn(Optional.of(review1));
+      given(author.getId()).willReturn(authorId);
+      given(content.getId()).willReturn(contentId);
+
+      // when
+      reviewService.delete(review1Id, adminId);
+
+      // then
+      verify(reviewRepository).delete(review1);
+      verify(eventPublisher).publishEvent(
+          argThat((Object event) ->
+              event instanceof ReviewDeletedEvent deletedEvent
+                  && deletedEvent.eventId() != null
+                  && deletedEvent.contentId().equals(contentId)
+                  && deletedEvent.rating() == reviewRating
+          )
+      );
+    }
   }
 
 }

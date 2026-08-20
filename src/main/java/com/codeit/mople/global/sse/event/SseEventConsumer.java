@@ -19,7 +19,7 @@ public class SseEventConsumer {
   private final SseService sseService;
   private final SseEventService sseEventService;
 
-  @KafkaListener(topics = "direct-message-created")
+  @KafkaListener(topics = "${spring.kafka.topics.direct-message-created}")
   public void handle(DirectMessageCreatedEvent event) {
 
     log.debug("SSE 이벤트 전송 시도: receiverId={}, directMessageId={}",
@@ -43,7 +43,7 @@ public class SseEventConsumer {
         event.receiverId(), event.directMessageId());
   }
 
-  @KafkaListener(topics = "notification-created")
+  @KafkaListener(topics = "${spring.kafka.topics.notification-created}")
   public void handle(NotificationCreatedEvent event) {
 
     log.debug("SSE 이벤트 전송 시도: receiverId={}, notificationId={}",
