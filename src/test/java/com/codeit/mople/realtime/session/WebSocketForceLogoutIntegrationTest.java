@@ -115,7 +115,7 @@ class WebSocketForceLogoutIntegrationTest {
   void accountLocked_notifiesAndClosesConnectedWebSocketSession() throws Exception {
     // given - 로그인 상태와 동일하게 access token 발급 + 세션 토큰 등록
     String jti = UUID.randomUUID().toString();
-    String accessToken = jwtProvider.createAccessToken(targetUser.getId(), jti);
+    String accessToken = jwtProvider.createAccessToken(targetUser.getId(), jti, targetUser.getRole());
     sessionTokenRepository.save(targetUser.getId(), jti, Duration.ofMinutes(30));
 
     StompHeaders connectHeaders = new StompHeaders();
