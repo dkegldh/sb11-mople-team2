@@ -65,7 +65,7 @@ public class UserControllerTest {
 
   private String tokenFor(User user) {
     String jti = UUID.randomUUID().toString();
-    String token = jwtProvider.createAccessToken(user.getId(), jti);
+    String token = jwtProvider.createAccessToken(user.getId(), jti, user.getRole());
     sessionTokenRepository.save(user.getId(), jti, Duration.ofDays(7));
     issuedSessionUserIds.add(user.getId());
     return token;
@@ -281,7 +281,7 @@ public class UserControllerTest {
         .with(csrf()))
         .andDo(print())
         .andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.error.code").value("USER-005"));
+        .andExpect(jsonPath("$.error.code").value("COMMON-003"));
   }
 
   @Test

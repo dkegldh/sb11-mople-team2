@@ -82,3 +82,10 @@ batch:
 
 sse:
   server-id: ${SSE_SERVER_ID}
+app:
+  cors:
+    allowed-origins:
+      - ${FRONTEND_ORIGIN:https://mople.com}
+  websocket:
+    allowed-origins:
+      - ${FRONTEND_ORIGIN:https://mople.com}
