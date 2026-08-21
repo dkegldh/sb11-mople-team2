@@ -9,6 +9,8 @@ spring:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT}
       password: ${REDIS_PASSWORD}
+      ssl:
+        enabled: true
       # 커맨드 타임아웃, 이게 없으면 응답 없는 Redis에 요청 스레드가 묶임
       timeout: 2s
       connect-timeout: 1s
@@ -87,5 +89,4 @@ app:
     allowed-origins:
       - ${FRONTEND_ORIGIN:https://mople.com}
   websocket:
-    allowed-origins:
-      - ${FRONTEND_ORIGIN:https://mople.com}
+    allowed-origins: ${CORS_ALLOWED_ORIGIN}

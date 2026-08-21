@@ -12,6 +12,7 @@ import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.exception.UserErrorCode;
 import com.codeit.mople.domain.user.exception.UserException;
 import com.codeit.mople.domain.user.repository.UserRepository;
+import com.codeit.mople.global.config.CacheNames;
 import com.codeit.mople.global.dto.CursorResponse;
 import com.codeit.mople.global.storage.FileStorageService;
 import java.util.List;
@@ -50,7 +51,7 @@ public class UserService {
     return UserDto.from(saved);
   }
 
-  @Cacheable(value = "users", key = "#userId")
+  @Cacheable(value = CacheNames.USERS, key = "#userId")
   public UserDto getUser(UUID userId) {
     User user = findUserOrThrow(userId);
     return UserDto.from(user);
@@ -72,7 +73,7 @@ public class UserService {
   }
 
   @PreAuthorize("hasRole('ADMIN') or #targetUserId == authentication.principal.userId")
-  @CacheEvict(value = "users", key = "#targetUserId")
+  @CacheEvict(value = CacheNames.USERS, key = "#targetUserId")
   @Transactional
   public UserDto updateProfile(UUID targetUserId, UserUpdateRequest request, MultipartFile image) {
     User user = findUserOrThrow(targetUserId);

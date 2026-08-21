@@ -6,35 +6,25 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-import com.codeit.mople.domain.auth.repository.SessionTokenRepository;
 import com.codeit.mople.domain.user.dto.request.ChangePasswordRequest;
 import com.codeit.mople.domain.user.dto.request.UserCreateRequest;
 import com.codeit.mople.domain.user.dto.request.UserUpdateRequest;
 import com.codeit.mople.domain.user.entity.Role;
 import com.codeit.mople.domain.user.entity.User;
-import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.global.jwt.JwtProvider;
+import com.codeit.mople.support.AbstractRedisCleanupTest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
-@SpringBootTest
-@AutoConfigureMockMvc
-@ActiveProfiles("test")
-public class UserControllerTest {
+public class UserControllerTest extends AbstractRedisCleanupTest {
 
   @Autowired
   private MockMvc mockMvc;
@@ -43,31 +33,15 @@ public class UserControllerTest {
   private ObjectMapper objectMapper;
 
   @Autowired
-  private UserRepository userRepository;
-
-  @Autowired
   private PasswordEncoder passwordEncoder;
 
   @Autowired
   private JwtProvider jwtProvider;
 
-  @Autowired
-  private SessionTokenRepository sessionTokenRepository;
-
-  private final List<UUID> issuedSessionUserIds = new ArrayList<>();
-
-  @AfterEach
-  void tearDown() {
-    userRepository.deleteAll();
-    issuedSessionUserIds.forEach(sessionTokenRepository::invalidate);
-    issuedSessionUserIds.clear();
-  }
-
   private String tokenFor(User user) {
     String jti = UUID.randomUUID().toString();
     String token = jwtProvider.createAccessToken(user.getId(), jti, user.getRole());
     sessionTokenRepository.save(user.getId(), jti, Duration.ofDays(7));
-    issuedSessionUserIds.add(user.getId());
     return token;
   }
 

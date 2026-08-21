@@ -380,8 +380,6 @@ public class AuthServiceTest {
   void refresh_throwsException_whenUserNotFound() {
     UUID userId = UUID.randomUUID();
     when(jwtProvider.getUserId("some-token")).thenReturn(userId);
-    when(jwtProvider.createRefreshToken(userId)).thenReturn("new-refresh-token");
-    when(refreshTokenRepository.rotate(eq(userId), eq("some-token"), eq("new-refresh-token"), eq(EXPECTED_TTL))).thenReturn(true);
     when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> authService.refresh("some-token"))
@@ -394,6 +392,7 @@ public class AuthServiceTest {
   void refresh_throwsException_whenRotateFails() {
     UUID userId = UUID.randomUUID();
     when(jwtProvider.getUserId("wrong-token")).thenReturn(userId);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(jwtProvider.createRefreshToken(userId)).thenReturn("new-refresh-token");
     when(refreshTokenRepository.rotate(eq(userId), eq("wrong-token"), eq("new-refresh-token"), eq(EXPECTED_TTL))).thenReturn(false);
 
@@ -401,7 +400,23 @@ public class AuthServiceTest {
         .isInstanceOf(AuthException.class)
         .hasFieldOrPropertyWithValue("errorCode", AuthErrorCode.INVALID_TOKEN);
 
-    verify(userRepository, never()).findById(any());
+    verify(sessionTokenRepository, never()).save(any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("잠긴 계정이면 refreshToken이 유효해도 재발급이 거부됨")
+  void refresh_throwsException_whenAccountIsLocked() {
+    UUID userId = UUID.randomUUID();
+    User lockedUser = User.createUser("locked@test.com", "encodedPw", "lockedUser");
+    lockedUser.lock();
+    when(jwtProvider.getUserId("locked-user-token")).thenReturn(userId);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(lockedUser));
+
+    assertThatThrownBy(() -> authService.refresh("locked-user-token"))
+        .isInstanceOf(AuthException.class)
+        .hasFieldOrPropertyWithValue("errorCode", AuthErrorCode.LOCKED_ACCOUNT);
+
+    verify(refreshTokenRepository, never()).rotate(any(), any(), any(), any());
   }
 
   @Test
@@ -417,6 +432,17 @@ public class AuthServiceTest {
     authService.refresh("old-token");
 
     verify(refreshTokenRepository).rotate(eq(userId), eq("old-token"), eq("new-refresh"), eq(EXPECTED_TTL));
+  }
+
+  @Test
+  @DisplayName("OAuth 로그인 시 기존에 발급돼 있던 세션이 즉시 무효화됨")
+  void issueOAuthRefreshToken_invalidatesExistingSession() {
+    when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+    when(jwtProvider.createRefreshToken(user.getId())).thenReturn("oauth-refresh-token");
+
+    authService.issueOAuthRefreshToken(user.getId());
+
+    verify(sessionTokenRepository).invalidate(user.getId());
   }
 
   @Test

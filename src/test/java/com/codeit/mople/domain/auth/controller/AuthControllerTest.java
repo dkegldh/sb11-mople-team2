@@ -7,32 +7,23 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-import com.codeit.mople.domain.auth.repository.RefreshTokenRepository;
 import com.codeit.mople.domain.auth.repository.AccountLockRepository;
-import com.codeit.mople.domain.auth.repository.SessionTokenRepository;
 import com.codeit.mople.domain.user.entity.User;
-import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.global.jwt.JwtProvider;
+import com.codeit.mople.support.AbstractRedisCleanupTest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
 import java.time.Duration;
 import java.util.UUID;
 import org.springframework.http.MediaType;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-@SpringBootTest
-@AutoConfigureMockMvc
-@ActiveProfiles("test")
-public class AuthControllerTest {
+public class AuthControllerTest extends AbstractRedisCleanupTest {
   @Autowired
   private MockMvc mockMvc;
 
@@ -40,23 +31,11 @@ public class AuthControllerTest {
   private ObjectMapper objectMapper;
 
   @Autowired
-  private UserRepository userRepository;
-
-  @Autowired
   private PasswordEncoder passwordEncoder;
   @Autowired
   private JwtProvider jwtProvider;
   @Autowired
-  private SessionTokenRepository sessionTokenRepository;
-  @Autowired
-  private RefreshTokenRepository refreshTokenRepository;
-  @Autowired
   private AccountLockRepository accountLockRepository;
-
-  @AfterEach
-  void tearDown() {
-    userRepository.deleteAll();
-  }
 
   private String issueAccessToken(User user) {
     String jti = UUID.randomUUID().toString();
@@ -191,8 +170,8 @@ public class AuthControllerTest {
   }
 
   @Test
-  @DisplayName("잠긴 계정으로 로그인하면 403을 반환")
-  void signIn_returnsForbidden_whenAccountIsLocked() throws Exception {
+  @DisplayName("잠긴 계정으로 로그인하면 401을 반환")
+  void signIn_returnsUnauthorized_whenAccountIsLocked() throws Exception {
     User user = userRepository.save(User.createUser("locked@test.com", passwordEncoder.encode("rawPw123"), "lockedUser"));
     user.lock();
     userRepository.save(user);
@@ -202,12 +181,12 @@ public class AuthControllerTest {
         .param("username", "locked@test.com")
         .param("password", "rawPw123"))
         .andDo(print())
-        .andExpect(status().isForbidden())
+        .andExpect(status().isUnauthorized())
         .andExpect(jsonPath("$.error.code").value("AUTH-004"));
   }
 
   @Test
-  @DisplayName("로그인 상태에서 계정이 잠기면 기존 토큰은 403(LOCKED_ACCOUNT)으로 거부됨")
+  @DisplayName("로그인 상태에서 계정이 잠기면 기존 토큰은 401(LOCKED_ACCOUNT)으로 거부됨")
   void existingToken_becomesLocked_whenAccountGetsLockedAfterward() throws Exception {
     User user = userRepository.save(User.createUser("lockAfter@test.com", passwordEncoder.encode("rawPw123"), "tester"));
     String token = issueAccessToken(user);
@@ -224,11 +203,11 @@ public class AuthControllerTest {
     sessionTokenRepository.invalidate(user.getId());
     accountLockRepository.lock(user.getId());
 
-    // 같은 토큰으로 재요청 -> 신원은 확인됐으나 접근이 막힌 상태이므로 401이 아닌 403
+    // 같은 토큰으로 재요청 -> 프론트가 재인증 필요 신호를 401 하나로만 처리하므로 LOCKED_ACCOUNT도 401로 통일
     mockMvc.perform(get("/api/users/{userId}", user.getId())
         .header("Authorization", "Bearer " + token))
         .andDo(print())
-        .andExpect(status().isForbidden())
+        .andExpect(status().isUnauthorized())
         .andExpect(jsonPath("$.error.code").value("AUTH-004"));
   }
 

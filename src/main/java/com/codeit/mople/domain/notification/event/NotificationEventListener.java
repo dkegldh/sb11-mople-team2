@@ -1,14 +1,11 @@
 package com.codeit.mople.domain.notification.event;
 
 import com.codeit.mople.domain.directmessage.event.DirectMessageReceivedEvent;
-import com.codeit.mople.domain.follow.event.FollowCreatedEvent;
 import com.codeit.mople.domain.follow.service.FollowService;
 import com.codeit.mople.domain.notification.entity.NotificationType;
 import com.codeit.mople.domain.notification.service.NotificationCreator;
-import com.codeit.mople.domain.playlist.event.PlaylistContentAddedEvent;
 import com.codeit.mople.domain.playlist.event.PlaylistCreatedEvent;
 import com.codeit.mople.domain.playlist.event.PlaylistSubscribedEvent;
-import com.codeit.mople.domain.playlist.service.PlaylistService;
 import com.codeit.mople.domain.review.event.ReviewWrittenEvent;
 import com.codeit.mople.global.event.UserAccountStatusChangedEvent;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +22,6 @@ public class NotificationEventListener {
 
   private final NotificationCreator notificationCreator;
   private final FollowService followService;
-  private final PlaylistService playlistService;
 
   @Async
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -59,19 +55,6 @@ public class NotificationEventListener {
 
   @Async
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-  public void handlePlaylistContentAdded(PlaylistContentAddedEvent event) {
-    log.debug("플레이리스트 콘텐츠 추가 알림 처리 시작 - playlistId: {}", event.playlistId());
-    playlistService.getSubscriberIds(event.playlistId())
-        .forEach(subscriberId -> notificationCreator.createNotification(
-            subscriberId,
-            "구독한 플레이리스트에 새 콘텐츠가 추가되었습니다.",
-            event.playlistTitle() + "에 새 콘텐츠가 추가되었습니다.",
-            NotificationType.PLAYLIST_CONTENT_ADDED
-        ));
-  }
-
-  @Async
-  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void handlePlaylistSubscribed(PlaylistSubscribedEvent event) {
     log.debug("플레이리스트 구독 알림 처리 시작 - ownerId: {}", event.ownerId());
     notificationCreator.createNotification(
@@ -91,18 +74,6 @@ public class NotificationEventListener {
         "새로운 메시지가 도착했습니다.",
         event.senderName() + ": " + event.messageContent(),
         NotificationType.DIRECT_MESSAGE
-    );
-  }
-
-  @Async
-  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-  public void handleFollowCreated(FollowCreatedEvent event) {
-    log.debug("신규 팔로워 알림 처리 시작 - followeeId: {}", event.followeeId());
-    notificationCreator.createNotification(
-        event.followeeId(),
-        "새로운 팔로워가 생겼습니다.",
-        event.followerName() + "님이 팔로우했습니다.",
-        NotificationType.NEW_FOLLOWER
     );
   }
 

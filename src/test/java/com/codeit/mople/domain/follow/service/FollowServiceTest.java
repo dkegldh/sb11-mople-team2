@@ -93,8 +93,17 @@ class FollowServiceTest {
       assertThat(captured.getFollowee()).isSameAs(followee);
       assertThat(captured.getFollower()).isSameAs(follower);
 
-      verify(publisher).publishEvent(
-          new FollowCreatedEvent(saved.getId(), followeeId, followerId, "아메리카노좋아"));
+      ArgumentCaptor<FollowCreatedEvent> eventCaptor =
+          ArgumentCaptor.forClass(FollowCreatedEvent.class);
+      verify(publisher).publishEvent(eventCaptor.capture());
+
+      FollowCreatedEvent published = eventCaptor.getValue();
+      assertThat(published.eventId()).isNotNull();
+      assertThat(published.occurredAt()).isEqualTo(saved.getCreatedAt());
+      assertThat(published.followId()).isEqualTo(saved.getId());
+      assertThat(published.followeeId()).isEqualTo(followeeId);
+      assertThat(published.followerId()).isEqualTo(followerId);
+      assertThat(published.followerName()).isEqualTo("아메리카노좋아");
     }
 
     @Test

@@ -42,12 +42,7 @@ public interface AuthApi {
       ),
       @ApiResponse(
           responseCode = "401",
-          description = "이메일 또는 비밀번호가 올바르지 않음",
-          content = @Content(schema = @Schema(implementation = com.codeit.mople.global.response.ApiResponse.class))
-      ),
-      @ApiResponse(
-          responseCode = "403",
-          description = "잠긴 계정",
+          description = "이메일 또는 비밀번호가 올바르지 않거나, 잠긴 계정임",
           content = @Content(schema = @Schema(implementation = com.codeit.mople.global.response.ApiResponse.class))
       ),
       @ApiResponse(
@@ -131,7 +126,7 @@ public interface AuthApi {
       ),
       @ApiResponse(
           responseCode = "401",
-          description = "Refresh Token이 없거나, 유효하지 않거나, 만료됨",
+          description = "Refresh Token이 없거나, 유효하지 않거나, 만료됐거나, 계정이 잠김",
           content = @Content(schema = @Schema(implementation = com.codeit.mople.global.response.ApiResponse.class))
       ),
       @ApiResponse(

@@ -1,5 +1,6 @@
 package com.codeit.mople.domain.follow.event;
 
+import com.codeit.mople.global.event.PublishableEvent;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import java.time.Instant;
 import java.util.UUID;
@@ -12,12 +13,12 @@ public record FollowCreatedMessage(
     UUID followeeId,
     UUID followerId,
     String followerName
-) {
+) implements PublishableEvent {
 
   public static FollowCreatedMessage from(FollowCreatedEvent event) {
     return new FollowCreatedMessage(
-        UUID.randomUUID(),
-        Instant.now(),
+        event.eventId(),
+        event.occurredAt(),
         event.followId(),
         event.followeeId(),
         event.followerId(),

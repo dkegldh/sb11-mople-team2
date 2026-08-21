@@ -58,8 +58,14 @@ public class FollowService {
 
     log.info("팔로우 성공: followId={}, followeeId={}, followerId={}", saved.getId(), followeeId, followerId);
 
-    // 알림을 위한 이벤트 발행, 발신자 이름 포함했음
-    publisher.publishEvent(new FollowCreatedEvent(saved.getId(), followeeId, followerId, follower.getName()));
+    publisher.publishEvent(new FollowCreatedEvent(
+        UUID.randomUUID(),
+        saved.getCreatedAt(),
+        saved.getId(),
+        followeeId,
+        followerId,
+        follower.getName()
+    ));
 
     return FollowResponse.from(saved);
   }

@@ -63,18 +63,6 @@ public class ConversationRepositoryTest {
   }
 
   @Test
-  @DisplayName("countByParticipantId: 내가 참여한 대화방의 개수만 정확하게 카운트한다.")
-  void countByParticipantId_success() {
-    // when
-    long myCount = conversationRepository.countByParticipantId(me.getId());
-    long user1Count = conversationRepository.countByParticipantId(user1.getId());
-
-    // then
-    assertThat(myCount).isEqualTo(2L);
-    assertThat(user1Count).isEqualTo(2L);
-  }
-
-  @Test
   @DisplayName("findWithDetailsById: 식별자로 대화방 조회 시 마지막 메시지와 발신자 정보까지 Fetch Join으로 가져온다.")
   void findWithDetailsById_success() {
     // when
@@ -188,6 +176,30 @@ public class ConversationRepositoryTest {
     assertThat(result).hasSize(1);
     assertThat(result.get(0).getId()).isEqualTo(myConvWithUser1.getId());
     assertThat(result.get(0).getLastMessageAt()).isBeforeOrEqualTo(cursorTime);
+  }
+
+  @Test
+  @DisplayName("countByParticipantIdAndKeyword: 검색어가 없을 때 내가 참여한 모든 대화방의 총 개수를 반환한다.")
+  void countByParticipantIdAndKeyword_no_keyword() {
+    long count = conversationRepository.countByParticipantIdAndKeyword(me.getId(), null);
+
+    assertThat(count).isEqualTo(2L);
+  }
+
+  @Test
+  @DisplayName("countByParticipantIdAndKeyword: [상대방 닉네임 검색] 일치하는 방의 개수만 반환한다.")
+  void countByParticipantIdAndKeyword_search_by_partner_name() {
+    long count = conversationRepository.countByParticipantIdAndKeyword(me.getId(), "1");
+
+    assertThat(count).isEqualTo(1L);
+  }
+
+  @Test
+  @DisplayName("countByParticipantIdAndKeyword: [메시지 내용 검색] 상대방 닉네임이 달라도 메시지에 키워드가 있으면 카운트한다.")
+  void countByParticipantIdAndKeyword_search_by_message_content() {
+    long count = conversationRepository.countByParticipantIdAndKeyword(me.getId(), "문자");
+
+    assertThat(count).isEqualTo(1L);
   }
 
 }

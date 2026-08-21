@@ -8,6 +8,7 @@ import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.exception.UserErrorCode;
 import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.domain.user.exception.UserException;
+import com.codeit.mople.global.config.CacheNames;
 import com.codeit.mople.global.event.ForceLogoutReason;
 import com.codeit.mople.global.event.UserAccountStatusChangedEvent;
 import java.util.UUID;
@@ -29,7 +30,7 @@ public class AdminService {
   private final SessionTokenRepository sessionTokenRepository;
   private final RefreshTokenRepository refreshTokenRepository;
 
-  @CacheEvict(value = "users", key = "#userId")
+  @CacheEvict(value = CacheNames.USERS, key = "#userId")
   @Transactional
   public void changeUserRole(UUID userId, String roleStr) {
     validateNotSelf(userId);
@@ -47,7 +48,7 @@ public class AdminService {
     log.info("권한 변경 완료 - userId: {}, role: {}", userId, role);
   }
 
-  @CacheEvict(value = "users", key = "#userId")
+  @CacheEvict(value = CacheNames.USERS, key = "#userId")
   @Transactional
   public void changeUserLocked(UUID userId, boolean locked) {
     validateNotSelf(userId);

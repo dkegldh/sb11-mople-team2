@@ -20,6 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -126,6 +127,27 @@ public class JwtAuthenticationFilterTest {
     assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
     assertThat(request.getAttribute(JwtAuthenticationFilter.AUTH_ERROR_CODE_ATTRIBUTE))
         .isEqualTo(AuthErrorCode.LOCKED_ACCOUNT);
+    verify(filterChain).doFilter(request, response);
+  }
+
+  @Test
+  @DisplayName("Redis 장애로 잠금/세션 확인이 불가능하면 AUTH_SERVICE_UNAVAILABLE을 세팅하고 인증하지 않음")
+  void doFilter_setsAuthServiceUnavailable_whenRedisFails() throws Exception {
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.addHeader("Authorization", "Bearer " + validToken);
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    FilterChain filterChain = mock(FilterChain.class);
+
+    given(jwtProvider.getUserId(validToken)).willReturn(userId);
+    given(jwtProvider.getJti(validToken)).willReturn(jti);
+    given(accountLockRepository.isLocked(userId))
+        .willThrow(new RedisConnectionFailureException("connection refused"));
+
+    jwtAuthenticationFilter.doFilter(request, response, filterChain);
+
+    assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+    assertThat(request.getAttribute(JwtAuthenticationFilter.AUTH_ERROR_CODE_ATTRIBUTE))
+        .isEqualTo(AuthErrorCode.AUTH_SERVICE_UNAVAILABLE);
     verify(filterChain).doFilter(request, response);
   }
 

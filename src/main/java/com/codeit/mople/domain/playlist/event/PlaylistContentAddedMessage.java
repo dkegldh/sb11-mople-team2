@@ -1,5 +1,6 @@
 package com.codeit.mople.domain.playlist.event;
 
+import com.codeit.mople.global.event.PublishableEvent;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonFormat.Shape;
 import java.time.Instant;
@@ -13,12 +14,12 @@ public record PlaylistContentAddedMessage(
     UUID playlistId,
     UUID contentId,
     String playlistTitle
-) {
+) implements PublishableEvent {
 
   public static PlaylistContentAddedMessage from(PlaylistContentAddedEvent event) {
     return new PlaylistContentAddedMessage(
-        UUID.randomUUID(),
-        Instant.now(),
+        event.eventId(),
+        event.occurredAt(),
         event.playlistContentId(),
         event.playlistId(),
         event.contentId(),

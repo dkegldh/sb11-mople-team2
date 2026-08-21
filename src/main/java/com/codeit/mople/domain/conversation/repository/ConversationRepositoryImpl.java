@@ -41,7 +41,7 @@ public class ConversationRepositoryImpl implements ConversationRepositoryCustom{
         .leftJoin(lastMessage.sender, sender).fetchJoin()
         .where(
             isMyConversation(requesterId),
-            containsKeyword(request.keywordLike(), requesterId),
+            containsKeyword(requesterId, request.keywordLike()),
             cursorCondition(cursorTime, request.idAfter())
         )
         .limit(request.limit() + 1)
@@ -54,6 +54,22 @@ public class ConversationRepositoryImpl implements ConversationRepositoryCustom{
         .fetch();
   }
 
+  @Override
+  public long countByParticipantIdAndKeyword(UUID requesterId, String keyword) {
+    Long count = queryFactory
+        .select(conversation.count())
+        .from(conversation)
+        .leftJoin(conversation.userA)
+        .leftJoin(conversation.userB)
+        .where(
+            isMyConversation(requesterId),
+            containsKeyword(requesterId, keyword)
+        )
+        .fetchOne();
+
+    return count != null ? count : 0L;
+  }
+
   // 내가 참여한 대화방 필터링
   private BooleanExpression isMyConversation(UUID requesterId) {
     return conversation.userA.id.eq(requesterId)
@@ -61,7 +77,7 @@ public class ConversationRepositoryImpl implements ConversationRepositoryCustom{
   }
 
   // 상대방의 닉네임 OR 대화 내용 검색
-  private BooleanExpression containsKeyword(String keywordLike, UUID requesterId) {
+  private BooleanExpression containsKeyword(UUID requesterId, String keywordLike) {
     // 문자열이 null인지, 빈 문자열인지 공백만 있는지를 한 번에 체크해서 false이면 해당 조건을 무시하도록 구현
     if (!StringUtils.hasText(keywordLike)) {
       return null;

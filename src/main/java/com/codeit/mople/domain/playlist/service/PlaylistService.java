@@ -368,7 +368,14 @@ public class PlaylistService {
     log.info("플레이리스트에 콘텐츠 추가 성공: playlistContentId={}, playlistId={}, contentId={}, requesterId={}",
         saved.getId(), playlistId, contentId, requesterId);
 
-    publisher.publishEvent(new PlaylistContentAddedEvent(saved.getId(), playlistId, contentId, playlist.getTitle()));
+    publisher.publishEvent(new PlaylistContentAddedEvent(
+        UUID.randomUUID(),
+        saved.getCreatedAt(),
+        saved.getId(),
+        playlistId,
+        contentId,
+        playlist.getTitle()
+    ));
   }
 
   @Transactional
@@ -394,6 +401,7 @@ public class PlaylistService {
     playlistContentRepository.delete(playlistContent);
   }
 
+  @Transactional(readOnly = true)
   public List<UUID> getSubscriberIds(UUID playlistId) {
     log.debug("구독자 id 목록 조회: playlistId={}", playlistId);
     return playlistSubscriptionRepository.findSubscriberIdsByPlaylistId(playlistId);

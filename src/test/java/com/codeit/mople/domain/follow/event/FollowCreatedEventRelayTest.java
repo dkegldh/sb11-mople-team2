@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 
 import com.codeit.mople.global.config.KafkaProperties;
 import com.codeit.mople.global.event.KafkaEventPublisher;
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -42,6 +43,7 @@ class FollowCreatedEventRelayTest {
   void setUp() {
     KafkaProperties properties = new KafkaProperties(
         true,
+        "localhost:9092",
         new KafkaProperties.Topics(
             TOPIC,
             "mople.playlist.content-added.v1",
@@ -53,7 +55,8 @@ class FollowCreatedEventRelayTest {
     followId = UUID.randomUUID();
     followeeId = UUID.randomUUID();
     followerId = UUID.randomUUID();
-    event = new FollowCreatedEvent(followId, followeeId, followerId, "아메리카노좋아");
+    event = new FollowCreatedEvent(
+        UUID.randomUUID(), Instant.now(), followId, followeeId, followerId, "아메리카노좋아");
   }
 
   @Nested
@@ -104,25 +107,25 @@ class FollowCreatedEventRelayTest {
   class MessageMapping {
 
     @Test
-    @DisplayName("발행 시각과 이벤트 id를 채우는지")
-    void fillsEventIdAndOccurredAt() {
+    @DisplayName("도메인 이벤트의 id와 발생 시각을 그대로 싣는지")
+    void carriesEventIdAndOccurredAt() {
       // when
       FollowCreatedMessage message = FollowCreatedMessage.from(event);
 
       // then
-      assertThat(message.eventId()).isNotNull();
-      assertThat(message.occurredAt()).isNotNull();
+      assertThat(message.eventId()).isEqualTo(event.eventId());
+      assertThat(message.occurredAt()).isEqualTo(event.occurredAt());
     }
 
     @Test
-    @DisplayName("이벤트 id가 호출마다 새로 생성되는지")
-    void generatesNewEventIdPerCall() {
+    @DisplayName("같은 도메인 이벤트를 다시 변환해도 이벤트 id가 유지되는지")
+    void keepsEventIdAcrossCalls() {
       // when
       FollowCreatedMessage first = FollowCreatedMessage.from(event);
       FollowCreatedMessage second = FollowCreatedMessage.from(event);
 
       // then
-      assertThat(first.eventId()).isNotEqualTo(second.eventId());
+      assertThat(first.eventId()).isEqualTo(second.eventId());
     }
   }
 }

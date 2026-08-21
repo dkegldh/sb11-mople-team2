@@ -1,5 +1,7 @@
 package com.codeit.mople.global.config;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
@@ -11,9 +13,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.connection.RedisStreamCommands.XAddOptions;
 import org.springframework.data.redis.core.StreamOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -39,7 +41,7 @@ public class KafkaConfigTest {
     kafkaConfig = new KafkaConfig(
         redisTemplate,
         objectMapper,
-        "test"
+        new KafkaProperties(true, "test", null)
     );
   }
 
@@ -77,8 +79,8 @@ public class KafkaConfigTest {
 
       // then
       verify(streamOperations).add(
-          FAILED_STREAM_KEY,
-          Map.of(
+          eq(FAILED_STREAM_KEY),
+          eq(Map.of(
               "type", "CONSUMER",
               "topic", "review-created",
               "key", "content-key",
@@ -86,7 +88,8 @@ public class KafkaConfigTest {
               "offset", "100",
               "data", "{\"contentId\":\"test\"}",
               "error", "리뷰 통계 업데이트 실패"
-          )
+          )),
+          any(XAddOptions.class)
       );
     }
 
@@ -121,8 +124,8 @@ public class KafkaConfigTest {
 
       // then
       verify(streamOperations).add(
-          FAILED_STREAM_KEY,
-          Map.of(
+          eq(FAILED_STREAM_KEY),
+          eq(Map.of(
               "type", "CONSUMER",
               "topic", "review-created",
               "key", "",
@@ -130,7 +133,8 @@ public class KafkaConfigTest {
               "offset", "10",
               "data", "{\"test\":\"data\"}",
               "error", "처리 실패"
-          )
+          )),
+          any(XAddOptions.class)
       );
     }
   }

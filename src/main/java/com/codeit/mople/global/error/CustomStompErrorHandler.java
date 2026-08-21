@@ -25,11 +25,13 @@ public class CustomStompErrorHandler extends StompSubProtocolErrorHandler {
   @Override
   public @Nullable Message<byte[]> handleClientMessageProcessingError(
       @Nullable Message<byte[]> clientMessage, Throwable ex) {
-    while (ex != null && !(ex instanceof AuthException)) {
-      ex = ex.getCause();
+    Throwable cause = ex;
+
+    while (cause != null && !(cause instanceof AuthException)) {
+      cause = cause.getCause();
     }
 
-    if (ex instanceof AuthException authException) {
+    if (cause instanceof AuthException authException) {
       log.warn("STOMP 인프라 레이어 예외 감지 - ERROR 프레임 생성 시작");
       return prepareErrorMessage(authException.getMessage());
     }
