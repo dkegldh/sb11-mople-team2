@@ -18,7 +18,7 @@ import com.codeit.mople.domain.conversation.repository.ConversationRepository;
 import com.codeit.mople.domain.directmessage.dto.request.DirectMessageCursorRequest;
 import com.codeit.mople.domain.directmessage.dto.response.DirectMessageDto;
 import com.codeit.mople.domain.directmessage.entity.DirectMessage;
-import com.codeit.mople.domain.directmessage.event.DirectMessageCreatedEvent;
+import com.codeit.mople.domain.directmessage.event.DirectMessageLastReadAtEvent;
 import com.codeit.mople.domain.directmessage.exception.DirectMessageErrorCode;
 import com.codeit.mople.domain.directmessage.exception.DirectMessageException;
 import com.codeit.mople.domain.directmessage.repository.DirectMessageReadRedisRepository;
@@ -90,7 +90,7 @@ public class DirectMessageServiceTest {
   class SendMessage {
 
     @Test
-    @DisplayName("성공: 정당한 참여자가 메시지를 발송하면 저장되고, 대화방 메타데이터와 발신자 워터마크가 전진한다.")
+    @DisplayName("성공: 정당한 참여자가 메시지를 발송하면 저장되고, 대화방 메타데이터 갱신 및 워터마크 이벤트가 발행된다.")
     void success_send_message() {
       //given
       String content = "테스트 메시지";
@@ -116,9 +116,6 @@ public class DirectMessageServiceTest {
       given(directMessageRepository.save(any(DirectMessage.class)))
           .willReturn(mockSavedMessage);
 
-      given(readRedisRepository.saveLastReadAt(conversationId, userAId, messageCreatedAt))
-          .willReturn(true);
-
       //when
       DirectMessageDto result = directMessageService.sendMessage(conversationId, userAId, content);
 
@@ -129,10 +126,11 @@ public class DirectMessageServiceTest {
       // 가장 최근(마지막) 메시지 및 발신자 워터마크 갱신 메서드가 호출되었는지 검증
       verify(conversation).updateLastMessage(mockSavedMessage);
 
-      verify(readRedisRepository).saveLastReadAt(conversationId, userAId, messageCreatedAt);
-      verify(conversation, never()).updateLastReadAt(eq(userAId), any());
-
+      verify(publisher).publishEvent(any(DirectMessageLastReadAtEvent.class));
       verify(publisher).publishEvent(any(DirectMessageReceivedEvent.class));
+
+      verify(readRedisRepository, never()).saveLastReadAt(any(), any(), any());
+      verify(conversation, never()).updateLastReadAt(eq(userAId), any());
     }
 
     @Test
@@ -260,10 +258,12 @@ public class DirectMessageServiceTest {
   class ReadMessage {
 
     @Test
-    @DisplayName("성공: 올바른 수신자가 메시지 수신 시 대화방 내 본인의 읽음 상태가 갱신된다.")
+    @DisplayName("성공 (Cache Miss): 레디스에 값이 없으면 DB를 조회하여 복구하고, 본인의 읽음 상태가 갱신된다.")
     void success_read_message() {
       //given
       Instant messageTime = Instant.now().minusSeconds(10);
+      Instant pastTime = Instant.now().minusSeconds(20); // DB에 저장되어 있던 과거 시간
+
       given(directMessageRepository.findById(messageId)).willReturn(Optional.of(message));
       given(message.getConversation()).willReturn(conversation);
       given(conversation.getId()).willReturn(conversationId);
@@ -273,13 +273,17 @@ public class DirectMessageServiceTest {
       given(userB.getId()).willReturn(userBId);
       given(message.getCreatedAt()).willReturn(messageTime);
 
-      given(readRedisRepository.getLastReadAt(conversation, userBId)).willReturn(null);
+      given(readRedisRepository.getCachedLastReadAt(conversationId, userBId)).willReturn(Optional.empty());
+      given(conversation.getMyLastReadAt(userBId)).willReturn(pastTime);
+
       given(readRedisRepository.saveLastReadAt(conversationId, userBId, messageTime)).willReturn(true);
 
       //when
       directMessageService.readMessage(conversationId, messageId, userBId);
 
       //then
+      verify(readRedisRepository).setCachedLastReadAt(conversationId, userBId, pastTime);
+
       verify(readRedisRepository).saveLastReadAt(conversationId, userBId, messageTime);
       verify(conversation, never()).updateLastReadAt(eq(userBId), any());
     }
@@ -361,7 +365,8 @@ public class DirectMessageServiceTest {
       given(userB.getId()).willReturn(userBId);
       given(message.getCreatedAt()).willReturn(messageTime);
 
-      given(readRedisRepository.getLastReadAt(conversation, userBId)).willReturn(null);
+      given(readRedisRepository.getCachedLastReadAt(conversationId, userBId)).willReturn(Optional.empty());
+      given(conversation.getMyLastReadAt(userBId)).willReturn(Instant.now().minusSeconds(20));
 
       // 레디스 저장이 실패(false 리턴)했다고 가정
       given(readRedisRepository.saveLastReadAt(conversationId, userBId, messageTime)).willReturn(false);
@@ -375,6 +380,37 @@ public class DirectMessageServiceTest {
 
       // 2. 레디스가 실패했으므로, Fallback을 타서 엔티티의 updateLastReadAt이 호출되었는지 검증
       verify(conversation).updateLastReadAt(userBId, messageTime);
+    }
+
+    @Test
+    @DisplayName("성공 (Cache Hit): Redis에 읽음 시각이 있으면 DB를 조회하지 않고 바로 처리한다.")
+    void success_read_message_cache_hit() {
+      // given
+      Instant messageTime = Instant.now().minusSeconds(10);
+      Instant cachedTime = Instant.now().minusSeconds(20); // 레디스에 있던 과거 시간
+
+      given(directMessageRepository.findById(messageId)).willReturn(Optional.of(message));
+      given(message.getConversation()).willReturn(conversation);
+      given(conversation.getId()).willReturn(conversationId);
+      given(message.getSender()).willReturn(userA);
+      given(userA.getId()).willReturn(userAId);
+      given(message.getReceiver()).willReturn(userB);
+      given(userB.getId()).willReturn(userBId);
+      given(message.getCreatedAt()).willReturn(messageTime);
+
+      // 레디스에 이미 값이 존재함 (Cache Hit)
+      given(readRedisRepository.getCachedLastReadAt(conversationId, userBId)).willReturn(Optional.of(cachedTime));
+      given(readRedisRepository.saveLastReadAt(conversationId, userBId, messageTime)).willReturn(true);
+
+      // when
+      directMessageService.readMessage(conversationId, messageId, userBId);
+
+      // then
+      // DB 조회(getMyLastReadAt)와 캐시 복구(setCachedLastReadAt)가 호출되지 않았는지 검증
+      verify(conversation, never()).getMyLastReadAt(any());
+      verify(readRedisRepository, never()).setCachedLastReadAt(any(), any(), any());
+
+      verify(readRedisRepository).saveLastReadAt(conversationId, userBId, messageTime);
     }
   }
 }

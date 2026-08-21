@@ -70,6 +70,10 @@ jwt:
 password-reset:
   expiration-minutes: 3
 
+ws:
+  session:
+    heartbeat-interval-ms: 30000  # 세션 생존 TTL = 이 값의 3배 (WebSocketSessionRegistryService 참고)
+
 admin:
   email: "admin@mople.com"
   password: ${ADMIN_PASSWORD}
@@ -89,6 +93,10 @@ batch:
     collect:
       max-pages: 5
       skip-limit: 10
+
+dm:
+  read-sync:
+    delay-ms: 10000 # 10초마다 Redis DM 워터마크 DB 반영 스케줄러 자동 실행
 
 sse:
   stream-consumer:

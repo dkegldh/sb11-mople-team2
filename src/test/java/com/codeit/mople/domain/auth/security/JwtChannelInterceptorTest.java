@@ -2,7 +2,10 @@ package com.codeit.mople.domain.auth.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.codeit.mople.domain.auth.exception.AuthErrorCode;
@@ -13,6 +16,7 @@ import com.codeit.mople.domain.user.entity.Role;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.global.jwt.JwtProvider;
+import com.codeit.mople.realtime.session.WebSocketSessionRegistryService;
 import io.jsonwebtoken.ExpiredJwtException;
 import java.util.Optional;
 import java.util.UUID;
@@ -42,6 +46,9 @@ public class JwtChannelInterceptorTest {
 
   @Mock
   private SessionTokenRepository sessionTokenRepository;
+
+  @Mock
+  private WebSocketSessionRegistryService sessionRegistryService;
 
   @Mock
   private UserRepository userRepository;
@@ -86,6 +93,7 @@ public class JwtChannelInterceptorTest {
       assertThat(auth).isNotNull();
       CustomUserDetails principal = (CustomUserDetails) auth.getPrincipal();
       assertThat(principal.getUserId()).isEqualTo(userId);
+      verify(sessionRegistryService).registerSession(eq(userId), any());
     }
 
     @Test
@@ -99,6 +107,7 @@ public class JwtChannelInterceptorTest {
       assertThatThrownBy(() -> jwtChannelInterceptor.preSend(message, messageChannel))
           .isInstanceOf(AuthException.class)
           .hasFieldOrPropertyWithValue("errorCode", AuthErrorCode.INVALID_TOKEN);
+      verify(sessionRegistryService, never()).registerSession(any(), any());
     }
 
     @Test
@@ -115,6 +124,7 @@ public class JwtChannelInterceptorTest {
       assertThatThrownBy(() -> jwtChannelInterceptor.preSend(message, messageChannel))
           .isInstanceOf(AuthException.class)
           .hasFieldOrPropertyWithValue("errorCode", AuthErrorCode.INVALID_TOKEN);
+      verify(sessionRegistryService, never()).registerSession(any(), any());
     }
 
     @Test
@@ -136,7 +146,8 @@ public class JwtChannelInterceptorTest {
       // when & then
       assertThatThrownBy(() -> jwtChannelInterceptor.preSend(message, messageChannel))
           .isInstanceOf(AuthException.class)
-          .hasFieldOrPropertyWithValue("errorCode", AuthErrorCode.EXPIRED_SESSION);
+          .hasFieldOrPropertyWithValue("errorCode", AuthErrorCode.INVALID_TOKEN);
+      verify(sessionRegistryService, never()).registerSession(any(), any());
     }
 
     @Test
@@ -161,7 +172,8 @@ public class JwtChannelInterceptorTest {
       // when & then
       assertThatThrownBy(() -> jwtChannelInterceptor.preSend(message, messageChannel))
           .isInstanceOf(AuthException.class)
-          .hasFieldOrPropertyWithValue("errorCode", AuthErrorCode.LOCKED_ACCOUNT);
+          .hasFieldOrPropertyWithValue("errorCode", AuthErrorCode.INVALID_TOKEN);
+      verify(sessionRegistryService, never()).registerSession(any(), any());
     }
   }
 

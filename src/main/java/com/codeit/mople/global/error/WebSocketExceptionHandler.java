@@ -28,7 +28,7 @@ public class WebSocketExceptionHandler {
     String errorMessage = "잘못된 요청 형식입니다.";
 
     // BindingResult와 에러 리스트가 비어있지 않은지 안전하게 확인
-    if (e.getBindingResult() != null && e.getBindingResult().hasErrors()) {
+    if (e.getBindingResult().hasErrors()) {
       String parsedMessage = e.getBindingResult().getAllErrors().get(0).getDefaultMessage();
 
       if (parsedMessage != null && !parsedMessage.isBlank()) {
@@ -38,6 +38,14 @@ public class WebSocketExceptionHandler {
 
     log.warn("WebSocket SEND 실패 (DTO 검증): {}", errorMessage);
     return Map.of("reason", errorMessage);
+  }
+
+  // 광역 에러 핸들러 추가
+  @MessageExceptionHandler(Exception.class)
+  @SendToUser("/queue/errors")
+  public Map<String, String> handleGlobalException(Exception e) {
+    log.error("WebSocket 처리 중 예상치 못한 에러 발생: {}", e.getMessage(), e);
+    return Map.of("reason", "서버 내부 오류가 발생하여 요청을 처리할 수 없습니다.");
   }
 
 }

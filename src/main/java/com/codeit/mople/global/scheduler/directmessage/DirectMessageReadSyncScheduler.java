@@ -1,17 +1,16 @@
 package com.codeit.mople.global.scheduler.directmessage;
 
-import com.codeit.mople.domain.conversation.entity.Conversation;
-import com.codeit.mople.domain.conversation.repository.ConversationRepository;
 import com.codeit.mople.domain.directmessage.repository.DirectMessageReadRedisRepository;
+import com.codeit.mople.domain.directmessage.service.DirectMessageReadSyncService;
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.RedisTemplate;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Component
@@ -19,12 +18,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class DirectMessageReadSyncScheduler {
 
   private final DirectMessageReadRedisRepository readRedisRepository;
-  private final ConversationRepository conversationRepository;
-  private final RedisTemplate<String, Object> redisTemplate;
+  private final DirectMessageReadSyncService readSyncService;
 
-  // 10초마다 자동으로 실행
-  @Scheduled(fixedDelay = 10000)
-  @Transactional
+  @Scheduled(fixedDelayString = "${dm.read-sync.delay-ms}")
+  @SchedulerLock(
+      name = "DirectMessageReadSyncLock",
+      lockAtLeastFor = "5s", // 최소 5초간 락 유지
+      lockAtMostFor = "30s" // 최대 30초간 락 유지
+  )
   public void syncLastReadAtToDb() {
     Set<Object> dirtyMembers = readRedisRepository.getDirtyMembers();
 
@@ -38,27 +39,29 @@ public class DirectMessageReadSyncScheduler {
     for (Object memberObj : dirtyMembers) {
       String dirtyMember = (String) memberObj;
 
+      Object cachedValue = null;
+
       try {
         String[] parts = dirtyMember.split(":");
         UUID conversationId = UUID.fromString(parts[0]);
         UUID userId = UUID.fromString(parts[1]);
 
-        String valueKey = "dm:read:" + conversationId + ":" + userId;
-        Object cachedValue = redisTemplate.opsForValue().get(valueKey);
+        cachedValue = readRedisRepository.getLastReadAtForScheduler(dirtyMember);
 
         if (cachedValue != null) {
           Instant lastReadAt = Instant.parse(cachedValue.toString());
 
-          Conversation conversation = conversationRepository.findById(conversationId).orElse(null);
-          if (conversation != null) {
-            conversation.updateLastReadAt(userId, lastReadAt);
-            successCount++;
-            log.debug("읽음 워터마크 동기화 성공 - conversationId: {}, userId: {}", conversationId, userId);
-          } else {
-            log.warn("읽음 워터마크 동기화 건너뜀 (존재하지 않거나 삭제된 대화방) - conversationId: {}, userId: {}",
-                conversationId, userId);
-          }
+          readSyncService.syncToDb(conversationId, userId, lastReadAt);
+          successCount++;
+          log.debug("읽음 워터마크 동기화 성공 - conversationId: {}, userId: {}", conversationId, userId);
+        } else {
+          log.warn("읽음 워터마크 동기화 건너뜀 (존재하지 않거나 삭제된 대화방) - conversationId: {}, userId: {}",
+              conversationId, userId);
         }
+        // DB 커밋이 무사히 통과했을 때만 레디스 대기열 삭제
+        readRedisRepository.removeDirtyMember(dirtyMember);
+      } catch (DateTimeParseException e) {
+        log.error("Redis 읽음 시각 파싱 실패 (Dirty Set에서 삭제 처리) - member: {}, cachedValue: {}", dirtyMember, cachedValue, e);
         readRedisRepository.removeDirtyMember(dirtyMember);
       } catch (Exception e) {
         log.error("읽음 워터마크 DB 동기화 중 에러 발생 (Dirty Set 유지) - member: {}", dirtyMember, e);

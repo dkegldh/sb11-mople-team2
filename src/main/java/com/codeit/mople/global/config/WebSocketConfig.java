@@ -10,6 +10,7 @@ import java.util.List;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
@@ -24,6 +25,8 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
+import org.springframework.web.socket.config.annotation.WebSocketTransportRegistration;
+import org.springframework.web.socket.handler.WebSocketHandlerDecoratorFactory;
 
 @Configuration
 @EnableWebSocketMessageBroker
@@ -35,6 +38,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
   private final ObjectMapper objectMapper;
   private final CustomStompErrorHandler customStompErrorHandler;
   private final WebSocketProperties webSocketProperties;
+
+  @Qualifier("webSocketSessionTrackingDecoratorFactory")
+  private final WebSocketHandlerDecoratorFactory webSocketSessionTrackingDecoratorFactory;
 
   @Override
   public void registerStompEndpoints(StompEndpointRegistry registry) {
@@ -60,6 +66,11 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
   }
 
   @Override
+  public void configureWebSocketTransport(WebSocketTransportRegistration registry) {
+    registry.addDecoratorFactory(webSocketSessionTrackingDecoratorFactory);
+  }
+
+  @Override
   public boolean configureMessageConverters(List<MessageConverter> messageConverters) {
     MappingJackson2MessageConverter converter = new MappingJackson2MessageConverter();
     converter.setObjectMapper(objectMapper);
@@ -80,13 +91,14 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     resolvers.add(new WebSocketAuthenticationPrincipalResolver());
   }
 
-  // yaml 파일에 값이 없을 때 사용할 디폴트 값 설정
+  // yaml 파일에 값이 없을 때 애플리케이션이 켜지지 않도록 검증
   @Getter
   @Setter
   @Validated
   @ConfigurationProperties(prefix = "app.websocket")
   public static class WebSocketProperties {
-    @NotEmpty
+
+    @NotEmpty(message = "WebSocket allowed-origins 설정이 누락되었습니다.")
     private final List<String> allowedOrigins = new ArrayList<>(List.of());
   }
 }

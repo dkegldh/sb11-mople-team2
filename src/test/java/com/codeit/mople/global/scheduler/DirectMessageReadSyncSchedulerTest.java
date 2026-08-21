@@ -11,6 +11,7 @@ import com.codeit.mople.global.scheduler.directmessage.DirectMessageReadSyncSche
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -93,26 +94,29 @@ public class DirectMessageReadSyncSchedulerTest {
     User userA = userRepository.save(User.createUser("testA@test.com", "12345678", "유저A"));
     User userB = userRepository.save(User.createUser("testB@test.com", "12345678", "유저B"));
     Conversation conversation = conversationRepository.save(Conversation.createConversation(userA, userB));
+    UUID convId = conversation.getId();
 
     Instant dbTime = Instant.now().truncatedTo(ChronoUnit.MILLIS);
-    conversation.updateLastReadAt(userA.getId(), dbTime);
-    conversationRepository.saveAndFlush(conversation); // DB에 시각 강제 저장
 
     // when 1: 처음 조회 (Redis는 비어있으므로 Cache Miss 발생 -> DB에서 꺼내옴)
-    Instant firstRead = readRedisRepository.getLastReadAt(conversation, userA.getId());
+    Optional<Instant> firstRead = readRedisRepository.getCachedLastReadAt(convId, userA.getId());
 
     em.flush(); em.clear();
 
-    // then 1: DB에 있던 시각과 일치해야 함
-    assertThat(firstRead).isEqualTo(dbTime);
+    // then 1: 비어있어야 함
+    assertThat(firstRead).isEmpty();
 
-    // when 2: 다시 조회 (이번엔 방금 캐싱되었으므로 Cache Hit 발생 -> Redis에서 바로 꺼내옴)
-    Instant secondRead = readRedisRepository.getLastReadAt(conversation, userA.getId());
+    // when 2: 서비스 계층에서 DB 값을 꺼내와 레디스에 복구했다고 가정하고 세팅
+    readRedisRepository.setCachedLastReadAt(convId, userA.getId(), dbTime);
+
+    // when 3: 다시 조회 (이번엔 방금 캐싱되었으므로 Cache Hit 발생 -> Redis에서 바로 꺼내옴)
+    Optional<Instant> secondRead = readRedisRepository.getCachedLastReadAt(convId, userA.getId());
 
     em.flush(); em.clear();
 
     // then 2: 동일한 시각이 반환되어야 하며, Dirty Set에는 추가되지 않아야 함
-    assertThat(secondRead).isEqualTo(dbTime);
+    assertThat(secondRead).isPresent();
+    assertThat(secondRead.get()).isEqualTo(dbTime);
     assertThat(readRedisRepository.getDirtyMembers()).isEmpty();
 
     // 레디스에 값이 잘 캐싱되었는지를 직접 꺼내서 검증

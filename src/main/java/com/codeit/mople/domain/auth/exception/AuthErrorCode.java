@@ -16,7 +16,8 @@ public enum AuthErrorCode implements ErrorCode {
   EMAIL_ALREADY_REGISTERED(HttpStatus.CONFLICT, "AUTH-005", "이미 다른 방식으로 가입된 이메일입니다."),
   OAUTH_PROVIDER_ID_MISSING(HttpStatus.UNAUTHORIZED, "AUTH-006", "OAuth 제공자로부터 사용자 식별자를 받지 못했습니다."),
   UNSUPPORTED_OAUTH_PROVIDER(HttpStatus.BAD_REQUEST, "AUTH-007", "지원하지 않는 로그인 방식입니다."),
-  TOO_MANY_RESET_PASSWORD_REQUEST(HttpStatus.TOO_MANY_REQUESTS, "AUTH-008", "잠시 후 다시 시도해 주세요.");
+  TOO_MANY_RESET_PASSWORD_REQUEST(HttpStatus.TOO_MANY_REQUESTS, "AUTH-008", "잠시 후 다시 시도해 주세요."),
+  AUTH_SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "AUTH-009", "인증 서비스를 일시적으로 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.");
 
   private final HttpStatus status;
   private final String code;

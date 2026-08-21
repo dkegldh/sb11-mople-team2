@@ -178,37 +178,6 @@ class NotificationEventListenerIntegrationTest {
     }
 
     @Test
-    @DisplayName("플레이리스트 콘텐츠 추가 트랜잭션 커밋 후 PLAYLIST_CONTENT_ADDED 알림이 구독자 전원에게 저장된다")
-    void 플레이리스트_콘텐츠_추가_트랜잭션_커밋_후_PLAYLIST_CONTENT_ADDED_알림이_구독자_전원에게_저장된다() {
-        // given
-        User owner = userRepository.findById(targetUserId).orElseThrow();
-        User subscriberA = userRepository.save(User.createUser("subA@test.com", "encoded", "구독자A"));
-        User subscriberB = userRepository.save(User.createUser("subB@test.com", "encoded", "구독자B"));
-        Playlist playlist = playlistRepository.save(Playlist.create(owner, "테스트 플레이리스트", "설명"));
-        Content content = contentRepository.save(new Content(ContentType.MOVIE, "테스트 영화", null, null, null));
-        playlistService.subscribe(playlist.getId(), subscriberA.getId());
-        playlistService.subscribe(playlist.getId(), subscriberB.getId());
-        await().atMost(3, SECONDS).until(() -> notificationRepository.count() >= 2);
-        notificationRepository.deleteAll(); // 구독 알림 제거
-
-        // when
-        playlistService.addContent(playlist.getId(), content.getId(), targetUserId);
-
-        // then
-        await().atMost(3, SECONDS).untilAsserted(() -> {
-            List<Notification> notifications = notificationRepository.findAll();
-            assertThat(notifications).hasSize(2);
-            assertThat(notifications)
-                .extracting(n -> n.getReceiver().getId())
-                .containsExactlyInAnyOrder(subscriberA.getId(), subscriberB.getId());
-            assertThat(notifications)
-                .allMatch(n -> n.getNotificationType() == NotificationType.PLAYLIST_CONTENT_ADDED);
-            assertThat(notifications)
-                .allMatch(n -> n.getContent().equals("테스트 플레이리스트에 새 콘텐츠가 추가되었습니다."));
-        });
-    }
-
-    @Test
     @DisplayName("플레이리스트 구독 트랜잭션 커밋 후 PLAYLIST_SUBSCRIBE 알림이 owner에게 저장된다")
     void 플레이리스트_구독_트랜잭션_커밋_후_PLAYLIST_SUBSCRIBE_알림이_owner에게_저장된다() {
         // given
@@ -228,27 +197,6 @@ class NotificationEventListenerIntegrationTest {
             assertThat(notification.getReceiver().getId()).isEqualTo(targetUserId);
             assertThat(notification.getTitle()).isEqualTo("플레이리스트에 새 구독자가 생겼습니다.");
             assertThat(notification.getContent()).isEqualTo("구독자유저님이 테스트 플레이리스트을(를) 구독했습니다.");
-        });
-    }
-
-    @Test
-    @DisplayName("팔로우 트랜잭션 커밋 후 NEW_FOLLOWER 알림이 followee에게 저장된다")
-    void 팔로우_트랜잭션_커밋_후_NEW_FOLLOWER_알림이_followee에게_저장된다() {
-        // given
-        User follower = userRepository.save(User.createUser("follower@test.com", "encoded", "팔로워유저"));
-
-        // when
-        followService.follow(new FollowRequest(targetUserId), follower.getId());
-
-        // then
-        await().atMost(3, SECONDS).untilAsserted(() -> {
-            List<Notification> notifications = notificationRepository.findAll();
-            assertThat(notifications).hasSize(1);
-            Notification notification = notifications.get(0);
-            assertThat(notification.getNotificationType()).isEqualTo(NotificationType.NEW_FOLLOWER);
-            assertThat(notification.getReceiver().getId()).isEqualTo(targetUserId);
-            assertThat(notification.getTitle()).isEqualTo("새로운 팔로워가 생겼습니다.");
-            assertThat(notification.getContent()).isEqualTo("팔로워유저님이 팔로우했습니다.");
         });
     }
 

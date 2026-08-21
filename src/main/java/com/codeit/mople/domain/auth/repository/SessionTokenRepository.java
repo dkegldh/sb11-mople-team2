@@ -3,7 +3,7 @@ package com.codeit.mople.domain.auth.repository;
 import java.time.Duration;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -12,7 +12,7 @@ public class SessionTokenRepository {
 
   private static final String KEY_PREFIX = "session:current:";
 
-  private final RedisTemplate<String, Object> redisTemplate;
+  private final StringRedisTemplate redisTemplate;
 
   public void save(UUID userId, String jti, Duration ttl) {
     redisTemplate.opsForValue().set(KEY_PREFIX + userId, jti, ttl);

@@ -5,6 +5,7 @@ public final class CacheNames {
 
   public static final String FOLLOW_COUNT = "follow:count";
   public static final String TMDB_GENRES = "tmdb:genres";
+  public static final String USERS = "users:v1";
 
   private CacheNames() {
   }

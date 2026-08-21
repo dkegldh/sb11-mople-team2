@@ -7,32 +7,23 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-import com.codeit.mople.domain.auth.repository.RefreshTokenRepository;
 import com.codeit.mople.domain.auth.repository.AccountLockRepository;
-import com.codeit.mople.domain.auth.repository.SessionTokenRepository;
 import com.codeit.mople.domain.user.entity.User;
-import com.codeit.mople.domain.user.repository.UserRepository;
 import com.codeit.mople.global.jwt.JwtProvider;
+import com.codeit.mople.support.AbstractRedisCleanupTest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
 import java.time.Duration;
 import java.util.UUID;
 import org.springframework.http.MediaType;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-@SpringBootTest
-@AutoConfigureMockMvc
-@ActiveProfiles("test")
-public class AuthControllerTest {
+public class AuthControllerTest extends AbstractRedisCleanupTest {
   @Autowired
   private MockMvc mockMvc;
 
@@ -40,23 +31,11 @@ public class AuthControllerTest {
   private ObjectMapper objectMapper;
 
   @Autowired
-  private UserRepository userRepository;
-
-  @Autowired
   private PasswordEncoder passwordEncoder;
   @Autowired
   private JwtProvider jwtProvider;
   @Autowired
-  private SessionTokenRepository sessionTokenRepository;
-  @Autowired
-  private RefreshTokenRepository refreshTokenRepository;
-  @Autowired
   private AccountLockRepository accountLockRepository;
-
-  @AfterEach
-  void tearDown() {
-    userRepository.deleteAll();
-  }
 
   private String issueAccessToken(User user) {
     String jti = UUID.randomUUID().toString();
