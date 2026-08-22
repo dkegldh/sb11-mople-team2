@@ -29,13 +29,13 @@ public class UserRepositoryImpl implements UserRepositoryCustom{
   private static final QUser user = QUser.user;
 
   @Override
-  public List<User> searchUsers(UserSearchRequest request) {
+  public List<User> searchUsers(UserSearchRequest request, List<UUID> userIds) {
     boolean isAsc = request.sortDirectionOrDefault() == SortDirection.ASCENDING;
 
     return queryFactory
         .selectFrom(user)
         .where(
-            emailLikeCondition(request),
+            idCondition(userIds),
             roleEqualCondition(request),
             isLockedCondition(request),
             cursorCondition(request, isAsc)
@@ -45,19 +45,18 @@ public class UserRepositoryImpl implements UserRepositoryCustom{
         .fetch();
   }
 
-  private BooleanExpression emailLikeCondition(UserSearchRequest request) {
-    if (request.emailLike() == null || request.emailLike().isBlank()) {
+  private BooleanExpression idCondition(List<UUID> userIds) {
+    if (userIds == null) {
       return null;
     }
 
-    String escaped = request.emailLike()
-        .toLowerCase(Locale.ROOT)
-        .replace(".", "..")
-        .replace("%", ".%")
-        .replace("_", "._");
+    if (userIds.isEmpty()) {
+      return user.id.isNull();
+    }
 
-    return user.email.like("%" + escaped + "%", '.');
+    return user.id.in(userIds);
   }
+
   private BooleanExpression roleEqualCondition(UserSearchRequest request) {
     return request.roleEqual() != null ? user.role.eq(request.roleEqual()) : null;
   }
@@ -155,12 +154,12 @@ public class UserRepositoryImpl implements UserRepositoryCustom{
   }
 
   @Override
-  public long countUsers(UserSearchRequest request) {
+  public long countUsers(UserSearchRequest request, List<UUID> userIds) {
     Long total = queryFactory
         .select(user.count())
         .from(user)
         .where(
-            emailLikeCondition(request),
+            idCondition(userIds),
             roleEqualCondition(request),
             isLockedCondition(request)
             //totalCount는 전체 개수이므로 커서 조건(cursorCondition)은 제외

@@ -3,6 +3,7 @@ package com.codeit.mople.domain.user.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -15,9 +16,12 @@ import com.codeit.mople.domain.user.dto.request.UserSortBy;
 import com.codeit.mople.domain.user.dto.request.UserUpdateRequest;
 import com.codeit.mople.domain.user.dto.response.UserDto;
 import com.codeit.mople.domain.user.entity.User;
+import com.codeit.mople.domain.user.event.UserSearchIndexEvent;
 import com.codeit.mople.domain.user.exception.UserErrorCode;
 import com.codeit.mople.domain.user.exception.UserException;
 import com.codeit.mople.domain.user.repository.UserRepository;
+import com.codeit.mople.domain.user.repository.search.UserDocument;
+import com.codeit.mople.domain.user.repository.search.UserSearchRepository;
 import com.codeit.mople.global.dto.CursorResponse;
 import com.codeit.mople.global.dto.SortDirection;
 import com.codeit.mople.global.storage.FileStorageService;
@@ -32,6 +36,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -56,6 +61,12 @@ public class UserServiceTest {
   @Mock
   private RefreshTokenRepository refreshTokenRepository;
 
+  @Mock
+  private UserSearchRepository searchRepository;
+
+  @Mock
+  private ApplicationEventPublisher eventPublisher;
+
   @InjectMocks
   private UserService userService;
 
@@ -75,7 +86,11 @@ public class UserServiceTest {
   @Test
   @DisplayName("회원가입 성공")
   void signUp_success() {
+    UUID userId = UUID.randomUUID();
     UserCreateRequest request = new UserCreateRequest("test@test.com", "rawPw123", "testUser");
+
+    ReflectionTestUtils.setField(user, "id", userId);
+
     when(userRepository.existsByEmail(request.email())).thenReturn(false);
     when(passwordEncoder.encode(request.password())).thenReturn("encodedPw");
     when(userRepository.save(any(User.class))).thenReturn(user);
@@ -83,7 +98,15 @@ public class UserServiceTest {
     UserDto response = userService.signUp(request);
 
     assertThat(response.email()).isEqualTo("test@test.com");
+
     verify(userRepository).save(any(User.class));
+    verify(eventPublisher).publishEvent(
+        argThat((UserSearchIndexEvent event) ->
+            event.eventId() != null
+                && event.userId().equals(userId)
+                && event.email().equals(user.getEmail())
+        )
+    );
   }
 
   @Test
@@ -146,14 +169,14 @@ public class UserServiceTest {
         SortDirection.ASCENDING, UserSortBy.NAME
     );
     User user1 = User.createUser("user1@test.com", "encoded", "user1");
-    when(userRepository.searchUsers(request)).thenReturn(List.of(user1));
-    when(userRepository.countUsers(request)).thenReturn(1L);
+    when(userRepository.searchUsers(request, null)).thenReturn(List.of(user1));
+    when(userRepository.countUsers(request, null)).thenReturn(1L);
 
     CursorResponse<UserDto> response = userService.getUsers(request);
 
     assertThat(response.data()).hasSize(1);
     assertThat(response.totalCount()).isEqualTo(1L);
-    verify(userRepository).searchUsers(request);
+    verify(userRepository).searchUsers(request, null);
   }
 
   @Test
@@ -166,8 +189,8 @@ public class UserServiceTest {
     User user1 = User.createUser("a@test.com", "encoded", "aa");
     User user2 = User.createUser("b@test.com", "encoded", "bb");
     User user3 = User.createUser("c@test.com", "encoded", "cc");
-    when(userRepository.searchUsers(request)).thenReturn(List.of(user1, user2, user3));
-    when(userRepository.countUsers(request)).thenReturn(100L);
+    when(userRepository.searchUsers(request, null)).thenReturn(List.of(user1, user2, user3));
+    when(userRepository.countUsers(request, null)).thenReturn(100L);
 
     CursorResponse<UserDto> response = userService.getUsers(request);
 
@@ -186,8 +209,8 @@ public class UserServiceTest {
     User user1 = User.createUser("a@test.com", "encoded", "aa");
     User user2 = User.createUser("b@test.com", "encoded", "bb");
     User user3 = User.createUser("c@test.com", "encoded", "cc");
-    when(userRepository.searchUsers(request)).thenReturn(List.of(user1, user2, user3));
-    when(userRepository.countUsers(request)).thenReturn(3L);
+    when(userRepository.searchUsers(request, null)).thenReturn(List.of(user1, user2, user3));
+    when(userRepository.countUsers(request, null)).thenReturn(3L);
 
     CursorResponse<UserDto> response = userService.getUsers(request);
 
@@ -208,8 +231,8 @@ public class UserServiceTest {
     User user1 = User.createUser("user1@test.com", "encoded", "user1");
     User user2 = User.createUser("user2@test.com", "encoded", "user2");
     User user3 = User.createUser("user3@test.com", "encoded", "user3");
-    when(userRepository.searchUsers(request)).thenReturn(List.of(user1, user2, user3));
-    when(userRepository.countUsers(request)).thenReturn(3L);
+    when(userRepository.searchUsers(request, null)).thenReturn(List.of(user1, user2, user3));
+    when(userRepository.countUsers(request, null)).thenReturn(3L);
 
     CursorResponse<UserDto> response = userService.getUsers(request);
 
@@ -227,8 +250,8 @@ public class UserServiceTest {
         SortDirection.ASCENDING, UserSortBy.NAME
     );
     User user1 = User.createUser("user1@test.com", "encoded", "user1");
-    when(userRepository.searchUsers(request)).thenReturn(List.of(user1));
-    when(userRepository.countUsers(request)).thenReturn(1L);
+    when(userRepository.searchUsers(request, null)).thenReturn(List.of(user1));
+    when(userRepository.countUsers(request, null)).thenReturn(1L);
 
     CursorResponse<UserDto> response = userService.getUsers(request);
 
@@ -246,8 +269,8 @@ public class UserServiceTest {
     );
     User user1 = User.createUser("user1@test.com", "encoded", "user1");
     User user2 = User.createUser("user2@test.com", "encoded", "user2");
-    when(userRepository.searchUsers(request)).thenReturn(List.of(user1, user2));
-    when(userRepository.countUsers(request)).thenReturn(2L);
+    when(userRepository.searchUsers(request, null)).thenReturn(List.of(user1, user2));
+    when(userRepository.countUsers(request, null)).thenReturn(2L);
 
     CursorResponse<UserDto> response = userService.getUsers(request);
 

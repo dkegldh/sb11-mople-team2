@@ -67,6 +67,9 @@ spring:
       mail.smtp.timeout: 5000
       mail.smtp.writetimeout: 5000
 
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URI}:9200
+
 server:
   port: 8080
   shutdown: graceful

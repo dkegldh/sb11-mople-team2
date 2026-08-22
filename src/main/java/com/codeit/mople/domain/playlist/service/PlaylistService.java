@@ -13,6 +13,8 @@ import com.codeit.mople.domain.playlist.entity.PlaylistContent;
 import com.codeit.mople.domain.playlist.entity.PlaylistSubscription;
 import com.codeit.mople.domain.playlist.event.PlaylistContentAddedEvent;
 import com.codeit.mople.domain.playlist.event.PlaylistCreatedEvent;
+import com.codeit.mople.domain.playlist.event.PlaylistSearchIndexDeleteEvent;
+import com.codeit.mople.domain.playlist.event.PlaylistSearchIndexEvent;
 import com.codeit.mople.domain.playlist.event.PlaylistSubscribedEvent;
 import com.codeit.mople.domain.playlist.event.PlaylistUnsubscribedEvent;
 import com.codeit.mople.domain.playlist.exception.PlaylistErrorCode;
@@ -20,10 +22,12 @@ import com.codeit.mople.domain.playlist.exception.PlaylistException;
 import com.codeit.mople.domain.playlist.repository.PlaylistContentRepository;
 import com.codeit.mople.domain.playlist.repository.PlaylistRepository;
 import com.codeit.mople.domain.playlist.repository.PlaylistSubscriptionRepository;
+import com.codeit.mople.domain.playlist.repository.search.PlaylistSearchRepository;
 import com.codeit.mople.domain.user.entity.User;
 import com.codeit.mople.domain.user.exception.UserErrorCode;
 import com.codeit.mople.domain.user.exception.UserException;
 import com.codeit.mople.domain.user.repository.UserRepository;
+import com.codeit.mople.global.config.CacheNames;
 import com.codeit.mople.global.dto.CursorResponse;
 import com.codeit.mople.global.dto.UserSummary;
 import java.util.HashSet;
@@ -34,6 +38,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,7 +55,9 @@ public class PlaylistService {
   private final ContentRepository contentRepository;
   private final PlaylistSubscriptionRepository playlistSubscriptionRepository;
   private final ApplicationEventPublisher publisher;
+  private final PlaylistSearchRepository searchRepository;
 
+  @CacheEvict(cacheNames = {CacheNames.PLAYLISTS, CacheNames.PLAYLIST_LIST}, allEntries = true)
   @Transactional
   public PlaylistResponse create(PlaylistCreateRequest request, UUID ownerId) {
 
@@ -78,12 +86,21 @@ public class PlaylistService {
     log.info("플레이리스트 생성 완료: playlistId={}, ownerId={}",
         savedPlaylist.getId(), owner.getId());
 
-    publisher.publishEvent(new PlaylistCreatedEvent(ownerId, owner.getName(), savedPlaylist.getTitle()));
+    publisher.publishEvent(
+        new PlaylistCreatedEvent(ownerId, owner.getName(), savedPlaylist.getTitle())
+    );
+
+    publisher.publishEvent(
+        new PlaylistSearchIndexEvent(
+            UUID.randomUUID(), savedPlaylist.getId(), savedPlaylist.getTitle()
+        )
+    );
 
     return response;
   }
 
   // 플레이리스트 세부 조회(단건 조회)
+  @Cacheable(value = CacheNames.PLAYLISTS, key = "{#playlistId, #requesterId}")
   @Transactional(readOnly = true)
   public PlaylistResponse find(UUID playlistId, UUID requesterId) {
 
@@ -121,8 +138,23 @@ public class PlaylistService {
   }
 
   // 플레이리스트 목록 조회
+  @Cacheable(
+      cacheNames = CacheNames.PLAYLIST_LIST,
+      key = "{"
+          + "#condition.keywordLike(),"
+          + "#condition.ownerIdEqual(),"
+          + "#condition.subscriberIdEqual(), "
+          + "#condition.cursor(),"
+          + "#condition.idAfter(),"
+          + "#condition.limit(), "
+          + "#condition.sortBy(),"
+          + "#condition.sortDirection(),"
+          + "#requesterId"
+          + "}"
+  )
   @Transactional(readOnly = true)
-  public CursorResponse<PlaylistResponse> findAll(PlaylistQueryCondition condition, UUID requesterId) {
+  public CursorResponse<PlaylistResponse> findAll(PlaylistQueryCondition condition,
+      UUID requesterId) {
 
     log.debug("플레이리스트 목록 조회 시도: requesterId={}, keywordLike={}, ownerId={}, subscriberId={},"
             + " cursor={}, idAfter={}, limit={}, sortBy={}, sortDirection={}",
@@ -137,11 +169,20 @@ public class PlaylistService {
         condition.sortDirection()
     );
 
+    List<UUID> searchPlaylistIds = null;
+
+    if (condition.keywordLike() != null && !condition.keywordLike().isBlank()) {
+      searchPlaylistIds =
+          searchRepository.findAllByTitleContainingIgnoreCase(
+              condition.keywordLike()
+          );
+    }
+
     // 목록 조회(limit + 1까지)
-    List<Playlist> playlists = playlistRepository.findAll(condition);
+    List<Playlist> playlists = playlistRepository.findAll(condition, searchPlaylistIds);
 
     // 목록 조회된 Playlist의 총 개수
-    long totalCount = playlistRepository.count(condition);
+    long totalCount = playlistRepository.count(condition, searchPlaylistIds);
 
     // 조회된 플레이리스트 ID
     List<UUID> playlistIds = playlists.stream().map(Playlist::getId).toList();
@@ -202,6 +243,7 @@ public class PlaylistService {
     return response;
   }
 
+  @CacheEvict(cacheNames = {CacheNames.PLAYLISTS, CacheNames.PLAYLIST_LIST}, allEntries = true)
   @Transactional
   public PlaylistResponse update(
       UUID playlistId,
@@ -241,9 +283,18 @@ public class PlaylistService {
     log.info("플레이리스트 수정 완료: playlistId={}, ownerId={}",
         playlistId, ownerId);
 
+    publisher.publishEvent(
+        new PlaylistSearchIndexEvent(
+            UUID.randomUUID(),
+            playlist.getId(),
+            playlist.getTitle()
+        )
+    );
+
     return response;
   }
 
+  @CacheEvict(cacheNames = {CacheNames.PLAYLISTS, CacheNames.PLAYLIST_LIST}, allEntries = true)
   @Transactional
   public void delete(UUID playlistId, UUID ownerId) {
 
@@ -267,8 +318,16 @@ public class PlaylistService {
     log.info("플레이리스트 삭제 완료: playlistId={}, ownerId={}",
         playlistId, ownerId);
 
+    publisher.publishEvent(
+        new PlaylistSearchIndexDeleteEvent(
+            UUID.randomUUID(),
+            playlistId
+        )
+    );
+
   }
 
+  @CacheEvict(cacheNames = {CacheNames.PLAYLISTS, CacheNames.PLAYLIST_LIST}, allEntries = true)
   @Transactional
   public void subscribe(UUID playlistId, UUID subscriberId) {
 
@@ -316,6 +375,7 @@ public class PlaylistService {
     ));
   }
 
+  @CacheEvict(cacheNames = {CacheNames.PLAYLISTS, CacheNames.PLAYLIST_LIST}, allEntries = true)
   @Transactional
   public void unSubscribe(UUID playlistId, UUID subscriberId) {
     log.debug("플레이리스트 구독 취소 시도: playlistId={}, subscriberId={}",
@@ -339,6 +399,7 @@ public class PlaylistService {
         playlistId, subscriberId);
   }
 
+  @CacheEvict(cacheNames = {CacheNames.PLAYLISTS, CacheNames.PLAYLIST_LIST}, allEntries = true)
   @Transactional
   public void addContent(UUID playlistId, UUID contentId, UUID requesterId) {
     log.debug("플레이리스트에 콘텐츠 추가 시도: playlistId={}, contentId={}, requesterId={}",
@@ -378,6 +439,7 @@ public class PlaylistService {
     ));
   }
 
+  @CacheEvict(cacheNames = {CacheNames.PLAYLISTS, CacheNames.PLAYLIST_LIST}, allEntries = true)
   @Transactional
   public void removeContent(UUID playlistId, UUID contentId, UUID requesterId) {
     log.debug("플레이리스트에 콘텐츠 삭제 시도: playlistId={}, contentId={}, requesterId={}",

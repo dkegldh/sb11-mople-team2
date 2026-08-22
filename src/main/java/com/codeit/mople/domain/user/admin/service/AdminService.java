@@ -30,7 +30,7 @@ public class AdminService {
   private final SessionTokenRepository sessionTokenRepository;
   private final RefreshTokenRepository refreshTokenRepository;
 
-  @CacheEvict(value = CacheNames.USERS, key = "#userId")
+  @CacheEvict(value = CacheNames.USERS, allEntries = true)
   @Transactional
   public void changeUserRole(UUID userId, String roleStr) {
     validateNotSelf(userId);
@@ -48,7 +48,7 @@ public class AdminService {
     log.info("권한 변경 완료 - userId: {}, role: {}", userId, role);
   }
 
-  @CacheEvict(value = CacheNames.USERS, key = "#userId")
+  @CacheEvict(value = CacheNames.USERS, allEntries = true)
   @Transactional
   public void changeUserLocked(UUID userId, boolean locked) {
     validateNotSelf(userId);

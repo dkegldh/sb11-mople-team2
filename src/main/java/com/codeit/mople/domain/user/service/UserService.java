@@ -9,9 +9,11 @@ import com.codeit.mople.domain.user.dto.request.UserSortBy;
 import com.codeit.mople.domain.user.dto.request.UserUpdateRequest;
 import com.codeit.mople.domain.user.dto.response.UserDto;
 import com.codeit.mople.domain.user.entity.User;
+import com.codeit.mople.domain.user.event.UserSearchIndexEvent;
 import com.codeit.mople.domain.user.exception.UserErrorCode;
 import com.codeit.mople.domain.user.exception.UserException;
 import com.codeit.mople.domain.user.repository.UserRepository;
+import com.codeit.mople.domain.user.repository.search.UserSearchRepository;
 import com.codeit.mople.global.config.CacheNames;
 import com.codeit.mople.global.dto.CursorResponse;
 import com.codeit.mople.global.storage.FileStorageService;
@@ -22,6 +24,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -40,16 +43,25 @@ public class UserService {
   private final FileStorageService fileStorageService;
   private final SessionTokenRepository sessionTokenRepository;
   private final RefreshTokenRepository refreshTokenRepository;
+  private final UserSearchRepository searchRepository;
 
+  private final ApplicationEventPublisher eventPublisher;
+
+  @CacheEvict(value = CacheNames.USERS, allEntries = true)
   @Transactional
   public UserDto signUp(UserCreateRequest request) {
     String normalizedEmail = request.email().toLowerCase(Locale.ROOT);
-    if(userRepository.existsByEmail(normalizedEmail)) {
+    if (userRepository.existsByEmail(normalizedEmail)) {
       throw new UserException(UserErrorCode.DUPLICATE_EMAIL, Map.of("email", normalizedEmail));
     }
     String encodedPassword = passwordEncoder.encode(request.password());
     User user = User.createUser(normalizedEmail, encodedPassword, request.name());
     User saved = userRepository.save(user);
+
+    eventPublisher.publishEvent(
+        new UserSearchIndexEvent(UUID.randomUUID(), saved.getId(), saved.getEmail())
+    );
+
     return UserDto.from(saved);
   }
 
@@ -59,12 +71,36 @@ public class UserService {
     return UserDto.from(user);
   }
 
+  @Cacheable(
+      value = CacheNames.USERS,
+      key = "{"
+          + "#request.emailLike(),"
+          + "#request.roleEqual(),"
+          + "#request.isLocked(),"
+          + "#request.cursor(),"
+          + "#request.idAfter(),"
+          + "#request.limitOrDefault(),"
+          + "#request.sortByOrDefault(),"
+          + "#request.sortDirectionOrDefault()"
+          + "}"
+  )
   public CursorResponse<UserDto> getUsers(UserSearchRequest request) {
-    List<User> users = userRepository.searchUsers(request);
-    long totalCount = userRepository.countUsers(request);
+    List<UUID> userIds = null;
+
+    if (request.emailLike() != null && !request.emailLike().isBlank()) {
+      userIds = searchRepository.findAllByEmailContainingIgnoreCase(
+          request.emailLike()
+      );
+    }
+
+    long totalCount = userRepository.countUsers(request, userIds);
+
+    List<User> users = userRepository.searchUsers(request, userIds);
 
     return CursorResponse.of(
-        users.stream().map(UserDto::from).toList(),
+        users.stream()
+            .map(UserDto::from)
+            .toList(),
         request.limitOrDefault(),
         totalCount,
         request.sortByOrDefault().getValue(),
@@ -75,7 +111,7 @@ public class UserService {
   }
 
   @PreAuthorize("hasRole('ADMIN') or #targetUserId == authentication.principal.userId")
-  @CacheEvict(value = CacheNames.USERS, key = "#targetUserId")
+  @CacheEvict(value = CacheNames.USERS, allEntries = true)
   @Transactional
   public UserDto updateProfile(UUID targetUserId, UserUpdateRequest request, MultipartFile image) {
     User user = findUserOrThrow(targetUserId);
@@ -83,7 +119,7 @@ public class UserService {
     String imageUrl = user.getProfileImageUrl(); //새롭게 반영될 URL
     final String oldImageUrl = user.getProfileImageUrl(); //삭제 예약을 위한 기존 URL 백업
 
-    if(image != null && !image.isEmpty()) {
+    if (image != null && !image.isEmpty()) {
       //새로운 이미지 업로드 먼저 수행
       imageUrl = fileStorageService.upload(image);
 

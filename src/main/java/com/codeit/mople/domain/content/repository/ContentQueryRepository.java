@@ -23,11 +23,11 @@ public class ContentQueryRepository {
 
   //커서 기반 데이터 조회 (limit + 1개)
   public List<Content> findContentByCursor(UUID cursorId, Object parsedCursorValue,
-      int limit, ContentType type, String keyword, ContentSortBy sortBy) {
+      int limit, ContentType type,  List<UUID> contentIds, ContentSortBy sortBy) {
     return queryFactory.selectFrom(content)
         .where(
             typeCondition(type), //카테고리 동적 필터
-            titleLikeCondition(keyword), //검색어 동적 필터
+            idCondition(contentIds), //검색어 동적 필터
             cursorCondition(cursorId, parsedCursorValue, sortBy) //정렬 기준별 커서 동적 조건 (수정됨)
         )
         .orderBy(orderSpecifiers(sortBy)) //동적 OrderBy
@@ -44,12 +44,12 @@ public class ContentQueryRepository {
   }
 
   //분류(type)별 데이터 개수 조회 메서드
-  public long countContentsByTypeAndKeyword(ContentType type, String keyword) {
+  public long countContentsByTypeAndIds(ContentType type, List<UUID> contentIds) {
     Long count = queryFactory.select(content.count())
         .from(content)
         .where(
             typeCondition(type),
-            titleLikeCondition(keyword)
+            idCondition(contentIds)
         )
         .fetchOne();
     return count != null ? count : 0L;
@@ -60,19 +60,9 @@ public class ContentQueryRepository {
     return type != null ? content.type.eq(type) : null;
   }
 
-  //검색어 필터링 조건
-  private BooleanExpression titleLikeCondition(String keywordLike) {
-    if (keywordLike == null || keywordLike.isBlank()) {
-      return null;
-    }
-
-    String escaped = keywordLike
-        .replace(".", "..")
-        .replace("%", ".%")
-        .replace("_", "._");
-
-    //대소문자 구분 없이 검색하기 위해 lower() 적용
-    return content.title.lower().like("%" + escaped.toLowerCase() + "%", '.');
+  //검색어 필터링 조건(Elasticsearch Document 활용)
+  private BooleanExpression idCondition(List<UUID> contentIds) {
+    return contentIds == null ? null : content.id.in(contentIds);
   }
 
   // 커서 필터링 조건(Service 계층에서 이미 타입 검증/파싱된 값을 받음)

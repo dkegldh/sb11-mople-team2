@@ -63,7 +63,7 @@ public class UserRepositoryTest {
         SortDirection.ASCENDING, UserSortBy.NAME
     );
 
-    List<User> result = userRepository.searchUsers(request);
+    List<User> result = userRepository.searchUsers(request, null);
 
     assertThat(result).extracting(User::getName)
         .containsExactly("aa", "bb", "cc");
@@ -72,8 +72,10 @@ public class UserRepositoryTest {
   @Test
   @DisplayName("emailLike로 앞부분(접두어) 검색이 됨")
   void searchUsers_filtersByEmailLike() {
-    userRepository.save(User.createUser("test1@test.com", "encoded", "user1"));
-    userRepository.save(User.createUser("test2@test.com", "encoded", "user2"));
+    User user1 = userRepository.save(
+        User.createUser("test1@test.com", "encoded", "user1"));
+    User user2 = userRepository.save(
+        User.createUser("test2@test.com", "encoded", "user2"));
     userRepository.save(User.createUser("other@mople.com", "encoded", "user3"));
 
     UserSearchRequest request = new UserSearchRequest(
@@ -81,7 +83,9 @@ public class UserRepositoryTest {
         SortDirection.ASCENDING, UserSortBy.NAME
     );
 
-    List<User> result = userRepository.searchUsers(request);
+    List<UUID> userIds = List.of(user1.getId(), user2.getId());
+
+    List<User> result = userRepository.searchUsers(request, userIds);
 
     assertThat(result).hasSize(2);
     assertThat(result).extracting(User::getEmail)
@@ -91,8 +95,10 @@ public class UserRepositoryTest {
   @Test
   @DisplayName("emailLike는 대소문자를 구분하지 않고 이메일에 포함된 값을 매칭한다")
   void searchUsers_emailLike_contains_ignoresCase() {
-    userRepository.save(User.createUser("TestUser@Test.com", "encoded", "user1"));
-    userRepository.save(User.createUser("other@mople.com", "encoded", "user2"));
+    User user1 = userRepository.save(
+        User.createUser("TestUser@Test.com", "encoded", "user1"));
+    User user2 = userRepository.save(
+        User.createUser("other@mople.com", "encoded", "user2"));
 
     UserSearchRequest upperCase = new UserSearchRequest(
         "TEST", null, null, null, null, 10,
@@ -104,8 +110,8 @@ public class UserRepositoryTest {
         SortDirection.ASCENDING, UserSortBy.NAME
     );
 
-    assertThat(userRepository.searchUsers(upperCase)).hasSize(1);
-    assertThat(userRepository.searchUsers(middleMatch)).hasSize(1);
+    assertThat(userRepository.searchUsers(upperCase, List.of(user1.getId()))).hasSize(1);
+    assertThat(userRepository.searchUsers(middleMatch, List.of(user2.getId()))).hasSize(1);
   }
 
   @Test
@@ -121,7 +127,7 @@ public class UserRepositoryTest {
         SortDirection.ASCENDING, UserSortBy.NAME
     );
 
-    List<User> result = userRepository.searchUsers(request);
+    List<User> result = userRepository.searchUsers(request, null);
 
     assertThat(result).hasSize(1);
     assertThat(result.get(0).getRole()).isEqualTo(Role.ADMIN);
@@ -140,7 +146,7 @@ public class UserRepositoryTest {
         SortDirection.ASCENDING, UserSortBy.NAME
     );
 
-    List<User> result = userRepository.searchUsers(request);
+    List<User> result = userRepository.searchUsers(request, null);
 
     assertThat(result).hasSize(1);
     assertThat(result.get(0).isLocked()).isTrue();
@@ -158,7 +164,7 @@ public class UserRepositoryTest {
         SortDirection.ASCENDING, UserSortBy.NAME
     );
 
-    List<User> result = userRepository.searchUsers(secondPageRequest);
+    List<User> result = userRepository.searchUsers(secondPageRequest, null);
 
     assertThat(result).extracting(User::getName)
         .containsExactly("cc");
@@ -176,7 +182,7 @@ public class UserRepositoryTest {
         SortDirection.ASCENDING, UserSortBy.NAME
     );
 
-    List<User> result = userRepository.searchUsers(request);
+    List<User> result = userRepository.searchUsers(request, null);
 
     assertThat(result).hasSize(4);
   }
@@ -194,7 +200,7 @@ public class UserRepositoryTest {
         SortDirection.ASCENDING, UserSortBy.IS_LOCKED
     );
 
-    List<User> result = userRepository.searchUsers(request);
+    List<User> result = userRepository.searchUsers(request, null);
 
     assertThat(result).extracting(User::getId)
         .containsExactly(locked1.getId());
@@ -213,7 +219,7 @@ public class UserRepositoryTest {
         SortDirection.DESCENDING, UserSortBy.IS_LOCKED
     );
 
-    List<User> result = userRepository.searchUsers(request);
+    List<User> result = userRepository.searchUsers(request, null);
 
     assertThat(result).extracting(User::getId)
         .containsExactly(normal1.getId());
@@ -232,7 +238,7 @@ public class UserRepositoryTest {
         SortDirection.ASCENDING, UserSortBy.ROLE
     );
 
-    List<User> result = userRepository.searchUsers(request);
+    List<User> result = userRepository.searchUsers(request, null);
 
     assertThat(result).extracting(User::getId)
         .containsExactly(user1.getId());
@@ -251,7 +257,7 @@ public class UserRepositoryTest {
         SortDirection.DESCENDING, UserSortBy.ROLE
     );
 
-    List<User> result = userRepository.searchUsers(request);
+    List<User> result = userRepository.searchUsers(request, null);
 
     assertThat(result).extracting(User::getId)
         .containsExactly(admin1.getId());
@@ -265,7 +271,7 @@ public class UserRepositoryTest {
         SortDirection.ASCENDING, UserSortBy.CREATED_AT
     );
 
-    assertThatThrownBy(() -> userRepository.searchUsers(request))
+    assertThatThrownBy(() -> userRepository.searchUsers(request, null))
         .isInstanceOf(UserException.class)
         .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.INVALID_CURSOR);
   }
@@ -278,7 +284,7 @@ public class UserRepositoryTest {
         SortDirection.ASCENDING, UserSortBy.ROLE
     );
 
-    assertThatThrownBy(() -> userRepository.searchUsers(request))
+    assertThatThrownBy(() -> userRepository.searchUsers(request, null))
         .isInstanceOf(UserException.class)
         .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.INVALID_CURSOR);
   }
@@ -291,7 +297,7 @@ public class UserRepositoryTest {
         SortDirection.ASCENDING, UserSortBy.IS_LOCKED
     );
 
-    assertThatThrownBy(() -> userRepository.searchUsers(request))
+    assertThatThrownBy(() -> userRepository.searchUsers(request, null))
         .isInstanceOf(UserException.class)
         .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.INVALID_CURSOR);
   }
@@ -308,11 +314,11 @@ public class UserRepositoryTest {
         SortDirection.ASCENDING, UserSortBy.NAME
     );
 
-    assertThatThrownBy(() -> userRepository.searchUsers(cursorOnly))
+    assertThatThrownBy(() -> userRepository.searchUsers(cursorOnly, null))
         .isInstanceOf(UserException.class)
         .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.INVALID_CURSOR);
 
-    assertThatThrownBy(() -> userRepository.searchUsers(idAfterOnly))
+    assertThatThrownBy(() -> userRepository.searchUsers(idAfterOnly, null))
         .isInstanceOf(UserException.class)
         .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.INVALID_CURSOR);
   }
@@ -336,8 +342,8 @@ public class UserRepositoryTest {
         SortDirection.ASCENDING, UserSortBy.NAME
     );
 
-    assertThat(userRepository.countUsers(noFilter)).isEqualTo(6);
-    assertThat(userRepository.countUsers(lockedOnly)).isEqualTo(1);
+    assertThat(userRepository.countUsers(noFilter, null)).isEqualTo(6);
+    assertThat(userRepository.countUsers(lockedOnly, null)).isEqualTo(1);
   }
 
   @Test
@@ -352,7 +358,7 @@ public class UserRepositoryTest {
         SortDirection.ASCENDING, UserSortBy.NAME
     );
 
-    assertThat(userRepository.countUsers(afterFirst)).isEqualTo(3);
+    assertThat(userRepository.countUsers(afterFirst, null)).isEqualTo(3);
   }
 
   @Test
@@ -366,7 +372,7 @@ public class UserRepositoryTest {
         null, null, null, null, null, 2,
         SortDirection.ASCENDING, UserSortBy.NAME
     );
-    List<User> firstFetch = userRepository.searchUsers(firstPageRequest);
+    List<User> firstFetch = userRepository.searchUsers(firstPageRequest, null);
     List<User> firstPage = firstFetch.subList(0, 2);
     User lastOfFirstPage = firstPage.get(1);
 
@@ -374,7 +380,7 @@ public class UserRepositoryTest {
         null, null, null, lastOfFirstPage.getName(), lastOfFirstPage.getId(), 2,
         SortDirection.ASCENDING, UserSortBy.NAME
     );
-    List<User> secondPage = userRepository.searchUsers(secondPageRequest);
+    List<User> secondPage = userRepository.searchUsers(secondPageRequest, null);
 
     List<UUID> firstPageIds = firstPage.stream().map(User::getId).toList();
     List<UUID> secondPageIds = secondPage.stream().map(User::getId).toList();

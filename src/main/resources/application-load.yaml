@@ -12,6 +12,9 @@ spring:
       timeout: 2s
       connect-timeout: 1s
 
+  elasticsearch:
+    uris: http://elasticsearch-test:9200
+
   jpa:
     hibernate:
       ddl-auto: validate

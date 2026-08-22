@@ -26,6 +26,9 @@ public class ReviewEventConsumer {
   @Transactional
   @KafkaListener(topics = "review-created")
   public void handle(ReviewCreatedEvent event) {
+    log.debug("리뷰 생성 후 콘텐츠 통계 업데이트 시도: contentId={}, rating={}",
+        event.contentId(), event.rating());
+
     if (checkAndRecordProcessedEvent(event.eventId())) {
       return;
     }
@@ -42,6 +45,9 @@ public class ReviewEventConsumer {
   @Transactional
   @KafkaListener(topics = "review-updated")
   public void handle(ReviewUpdatedEvent event) {
+    log.debug("리뷰 수정 후 콘텐츠 통계 업데이트 시도: contentId={}, oldRating={}, newRating={}",
+        event.contentId(), event.oldRating(), event.newRating());
+
     if (checkAndRecordProcessedEvent(event.eventId())) {
       return;
     }
@@ -59,6 +65,9 @@ public class ReviewEventConsumer {
   @Transactional
   @KafkaListener(topics = "review-deleted")
   public void handle(ReviewDeletedEvent event) {
+    log.debug("리뷰 삭제 후 콘텐츠 통계 업데이트 시도: contentId={}, rating={}",
+        event.contentId(), event.rating());
+
     if (checkAndRecordProcessedEvent(event.eventId())) {
       return;
     }

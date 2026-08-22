@@ -24,4 +24,18 @@ public class PlaylistEventProducer {
     eventPublisher.publish("playlist-events", event.playlistId().toString(), event);
   }
 
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  public void on(PlaylistSearchIndexEvent event) {
+    eventPublisher.publish("playlist-search-index-events", event.playlistId().toString(), event);
+  }
+
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  public void on(PlaylistSearchIndexDeleteEvent event) {
+    eventPublisher.publish(
+        "playlist-search-index-events",
+        event.playlistId().toString(),
+        event
+    );
+  }
+
 }

@@ -99,7 +99,7 @@ public class PlaylistRepositoryTest {
       );
 
       // when
-      List<Playlist> result = playlistRepository.findAll(condition);
+      List<Playlist> result = playlistRepository.findAll(condition, null);
 
       // then
       assertThat(result).hasSize(3);
@@ -123,8 +123,10 @@ public class PlaylistRepositoryTest {
           PlaylistSortBy.UPDATED_AT
       );
 
+      List<UUID> searchPlaylistIds = List.of(playlist1.getId());
+
       // when
-      List<Playlist> result = playlistRepository.findAll(condition);
+      List<Playlist> result = playlistRepository.findAll(condition, searchPlaylistIds);
 
       // then
       // Playlist에 존재하는 ID만 추출하여 정확히 playlist1만 존재하는지 ID로 확인
@@ -151,7 +153,7 @@ public class PlaylistRepositoryTest {
       );
 
       // when
-      List<Playlist> result = playlistRepository.findAll(condition);
+      List<Playlist> result = playlistRepository.findAll(condition, null);
 
       // then
       assertThat(result).extracting(Playlist::getId)
@@ -177,7 +179,7 @@ public class PlaylistRepositoryTest {
       );
 
       // when
-      List<Playlist> result = playlistRepository.findAll(condition);
+      List<Playlist> result = playlistRepository.findAll(condition, null);
 
       // then
       assertThat(result).extracting(Playlist::getId)
@@ -204,7 +206,7 @@ public class PlaylistRepositoryTest {
       );
 
       // when
-      List<Playlist> result = playlistRepository.findAll(condition);
+      List<Playlist> result = playlistRepository.findAll(condition, null);
 
       // limit + 1이기 때문에 3번째가 아닌 2번째를 선택(limit)
       Playlist last = result.get(1);
@@ -220,7 +222,7 @@ public class PlaylistRepositoryTest {
           PlaylistSortBy.UPDATED_AT
       );
 
-      List<Playlist> nextResult = playlistRepository.findAll(nextCondition);
+      List<Playlist> nextResult = playlistRepository.findAll(nextCondition, null);
 
       // then
       // limit + 1이기 때문에 2개가 아닌 3개가 조회되어야 함
@@ -250,7 +252,7 @@ public class PlaylistRepositoryTest {
       );
 
       // when
-      List<Playlist> result = playlistRepository.findAll(condition);
+      List<Playlist> result = playlistRepository.findAll(condition, null);
 
       // limit + 1이기 때문에 3번째가 아닌 2번째를 선택(limit)
       Playlist last = result.get(1);
@@ -266,7 +268,7 @@ public class PlaylistRepositoryTest {
           PlaylistSortBy.SUBSCRIBE_COUNT
       );
 
-      List<Playlist> nextResult = playlistRepository.findAll(nextCondition);
+      List<Playlist> nextResult = playlistRepository.findAll(nextCondition, null);
 
       // then
       assertThat(result).hasSize(2 + 1);
@@ -298,7 +300,7 @@ public class PlaylistRepositoryTest {
       );
 
       // when
-      List<Playlist> result = playlistRepository.findAll(condition);
+      List<Playlist> result = playlistRepository.findAll(condition, null);
 
       // limit + 1이기 때문에 3번째가 아닌 2번째를 선택(limit)
       Playlist last = result.get(1);
@@ -314,7 +316,7 @@ public class PlaylistRepositoryTest {
           PlaylistSortBy.SUBSCRIBE_COUNT
       );
 
-      List<Playlist> nextResult = playlistRepository.findAll(nextCondition);
+      List<Playlist> nextResult = playlistRepository.findAll(nextCondition, null);
 
       // then
       assertThat(result).hasSize(2 + 1);
@@ -342,8 +344,10 @@ public class PlaylistRepositoryTest {
           PlaylistSortBy.UPDATED_AT
       );
 
+      List<UUID> searchPlaylistIds = List.of();
+
       // when
-      List<Playlist> result = playlistRepository.findAll(condition);
+      List<Playlist> result = playlistRepository.findAll(condition, searchPlaylistIds);
 
       // then
       assertThat(result).isEmpty();
@@ -375,7 +379,7 @@ public class PlaylistRepositoryTest {
       );
 
       // when
-      List<Playlist> result = playlistRepository.findAll(condition);
+      List<Playlist> result = playlistRepository.findAll(condition, null);
 
       // then
       assertThat(result).isEmpty();
@@ -415,7 +419,7 @@ public class PlaylistRepositoryTest {
       );
 
       // when
-      List<Playlist> result = playlistRepository.findAll(condition);
+      List<Playlist> result = playlistRepository.findAll(condition, null);
 
       Playlist last = result.get(1);
 
@@ -430,7 +434,7 @@ public class PlaylistRepositoryTest {
           PlaylistSortBy.SUBSCRIBE_COUNT
       );
 
-      List<Playlist> nextResult = playlistRepository.findAll(nextCondition);
+      List<Playlist> nextResult = playlistRepository.findAll(nextCondition, null);
 
       // then
       assertThat(result).hasSize(2 + 1);
@@ -482,7 +486,7 @@ public class PlaylistRepositoryTest {
       );
 
       // when
-      long result = playlistRepository.count(condition);
+      long result = playlistRepository.count(condition, null);
 
       // then
       assertThat(result).isEqualTo(3L);
@@ -507,7 +511,7 @@ public class PlaylistRepositoryTest {
       );
 
       // when
-      long result = playlistRepository.count(condition);
+      long result = playlistRepository.count(condition, null);
 
       // then
       // playlist1, playlist2가 개수에 포함
@@ -538,7 +542,7 @@ public class PlaylistRepositoryTest {
       );
 
       // when
-      long result = playlistRepository.count(condition);
+      long result = playlistRepository.count(condition, null);
 
       // then
       assertThat(result).isZero();

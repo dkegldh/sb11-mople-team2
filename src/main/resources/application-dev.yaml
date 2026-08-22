@@ -11,6 +11,9 @@ spring:
       timeout: 2s
       connect-timeout: 1s
 
+  elasticsearch:
+    uris: http://localhost:19201
+
   jpa:
     hibernate:
       ddl-auto: update

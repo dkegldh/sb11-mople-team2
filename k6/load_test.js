@@ -1,6 +1,7 @@
 import http from 'k6/http';
 import {check, sleep} from 'k6';
 import {Rate, Trend} from 'k6/metrics';
+import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.2/index.js';
 
 // 커스텀 Metrics 추가
 
@@ -25,6 +26,8 @@ const playlistCreateTrend = new Trend('playlist_create_duration');
 
 // Test Options
 export const options = {
+  summaryTrendStats: ['avg', 'min', 'med', 'max', 'p(95)', 'p(99)'],
+
   scenarios: {
 
     // 조회 부하
@@ -338,7 +341,6 @@ export function writeLoad(data) {
       `playlistIds=${JSON.stringify(loadTestPlaylistIds)}`
   );
 
-
   // 9분 시점
   sleep(4 * 60);
 
@@ -364,7 +366,6 @@ export function writeLoad(data) {
 
   console.log('[WRITE 2 END]');
 
-
   // 13분 시점
   sleep(4 * 60);
 
@@ -389,6 +390,7 @@ export function writeLoad(data) {
   if (cleanupErrors.length > 0) {
     throw new Error(`정리 실패: ${JSON.stringify(cleanupErrors)}`);
   }
+}
 
 // 콘텐츠, 플레이리스트 추가
 function executeWriteScenario(
@@ -798,4 +800,43 @@ function extractItems(response) {
   }
 
   return [];
+}
+
+export function handleSummary(data) {
+  const metrics = [
+    'login_duration',
+    'content_detail_duration',
+    'content_list_duration',
+    'content_search_duration',
+    'playlist_search_duration',
+    'user_search_duration',
+    'content_create_duration',
+    'playlist_create_duration',
+  ];
+
+  let output = '\n===== LOAD TEST RESULT =====\n';
+
+  for (const name of metrics) {
+    const metric = data.metrics[name];
+
+    if (!metric) {
+      continue;
+    }
+
+    output += `
+${name}
+  avg : ${metric.values.avg.toFixed(2)} ms
+  min : ${metric.values.min.toFixed(2)} ms
+  med : ${metric.values.med.toFixed(2)} ms
+  max : ${metric.values.max.toFixed(2)} ms
+  p95 : ${metric.values['p(95)'].toFixed(2)} ms
+  p99 : ${metric.values['p(99)'].toFixed(2)} ms
+`;
+  }
+
+  return {
+    stdout:
+        textSummary(data, {indent: ' ', enableColors: true}) +
+        output,
+  };
 }

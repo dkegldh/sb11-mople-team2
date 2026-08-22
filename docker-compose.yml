@@ -17,6 +17,7 @@ services:
     ports:
       - "127.0.0.1:6380:6379"
 
+  # Kafka
   broker:
     image: apache/kafka:3.9.0
     hostname: broker
@@ -51,5 +52,23 @@ services:
     volumes:
       - kafka-data:/var/lib/kafka/data
 
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    container_name: mople-elasticsearch
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -fs http://localhost:9200/_cluster/health || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "${ELASTICSEARCH_PORT:-19201}:9200"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+
 volumes:
   kafka-data:
+  elasticsearch-data:
