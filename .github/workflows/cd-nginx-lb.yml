@@ -1,0 +1,126 @@
+name: CD Pipeline (nginx LB track)
+
+# ALB/Fargate 트랙(cd.yml, cd-ecs.yml)과 완전히 별개인 nginx/EC2 트랙 전용 배포.
+# 자동으로는 절대 실행되지 않고, GitHub Actions 탭에서 "Run workflow"를 직접 눌러야 동작한다.
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ap-northeast-2
+  ECR_APP_REPOSITORY: mople-app-lb
+  ECR_NGINX_REPOSITORY: mople-nginx-lb
+  ECS_CLUSTER: mople-nginx-cluster
+  APP_SERVICE: mople-app-lb-service
+  NGINX_SERVICE: mople-nginx-lb-service
+  APP_TASK_DEF_FILE: ecs/task-def-app.json
+  NGINX_TASK_DEF_FILE: ecs/task-def-nginx.json
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      app-image: ${{ steps.build-app.outputs.image }}
+      nginx-image: ${{ steps.build-nginx.outputs.image }}
+
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: AWS 자격 증명 설정
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_NGINX }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_NGINX }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: ECR 로그인
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: app 이미지 빌드 및 푸시
+        id: build-app
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $REGISTRY/$ECR_APP_REPOSITORY:$IMAGE_TAG .
+          docker tag $REGISTRY/$ECR_APP_REPOSITORY:$IMAGE_TAG $REGISTRY/$ECR_APP_REPOSITORY:latest
+          docker push $REGISTRY/$ECR_APP_REPOSITORY:$IMAGE_TAG
+          docker push $REGISTRY/$ECR_APP_REPOSITORY:latest
+          echo "image=$REGISTRY/$ECR_APP_REPOSITORY:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: nginx 이미지 빌드 및 푸시
+        id: build-nginx
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build --provenance=false -f nginx/Dockerfile.prod -t $REGISTRY/$ECR_NGINX_REPOSITORY:$IMAGE_TAG ./nginx
+          docker tag $REGISTRY/$ECR_NGINX_REPOSITORY:$IMAGE_TAG $REGISTRY/$ECR_NGINX_REPOSITORY:latest
+          docker push $REGISTRY/$ECR_NGINX_REPOSITORY:$IMAGE_TAG
+          docker push $REGISTRY/$ECR_NGINX_REPOSITORY:latest
+          echo "image=$REGISTRY/$ECR_NGINX_REPOSITORY:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: AWS 자격 증명 설정
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_NGINX }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_NGINX }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: app 태스크 정의 등록
+        id: register-app
+        run: |
+          TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://${{ env.APP_TASK_DEF_FILE }} \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+          echo "task_def_arn=$TASK_DEF_ARN" >> "$GITHUB_OUTPUT"
+
+      - name: nginx 태스크 정의 등록
+        id: register-nginx
+        run: |
+          TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://${{ env.NGINX_TASK_DEF_FILE }} \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+          echo "task_def_arn=$TASK_DEF_ARN" >> "$GITHUB_OUTPUT"
+
+      - name: app 서비스 업데이트
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ${{ env.APP_SERVICE }} \
+            --task-definition ${{ steps.register-app.outputs.task_def_arn }} \
+            --force-new-deployment
+
+      - name: nginx 서비스 업데이트
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ${{ env.NGINX_SERVICE }} \
+            --task-definition ${{ steps.register-nginx.outputs.task_def_arn }} \
+            --force-new-deployment
+
+      - name: app 배포 안정화 대기
+        run: |
+          aws ecs wait services-stable \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.APP_SERVICE }}
+
+      - name: nginx 배포 안정화 대기
+        run: |
+          aws ecs wait services-stable \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.NGINX_SERVICE }}
