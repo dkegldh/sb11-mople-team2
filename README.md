@@ -7,9 +7,14 @@
 영화·드라마·스포츠 등 다양한 콘텐츠를 큐레이팅하고 공유하며,
 실시간 같이 보기 기능까지 제공하는 소셜 콘텐츠 서비스입니다.
 
-[![Coverage](https://img.shields.io/badge/coverage-pending-lightgrey)](#)
+![Coverage](https://img.shields.io/badge/coverage-line%2080%25%20enforced-brightgreen)
 ![Java](https://img.shields.io/badge/Java-17-orange)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.16-green)
+![Gradle](https://img.shields.io/badge/Gradle-9.5.1-02303A)
+
+<br/>
+
+<img width="1200" height="1310" alt="4컷(4)" src="https://github.com/user-attachments/assets/21fa2545-b0e7-46e6-80d9-bc7391538327" alt="모두의 플리 소개 만화" width="800"/>
 
 </div>
 
@@ -24,6 +29,9 @@
 - [실행 방법](#-실행-방법)
 - [프로젝트 구조](#-프로젝트-구조)
 - [주요 기능](#-주요-기능)
+- [API](#-api)
+- [CI/CD & 테스트](#-cicd--테스트)
+- [문서](#-문서)
 
 ---
 
@@ -34,20 +42,21 @@
 | 프로젝트명 | 모두의 플리 (Mople) |
 | 진행 기간 | 2026.07.27 ~ 2026.08.28 (4.5주) |
 | 팀 구성 | 6인 (Backend) |
+| 저장소 | `dkegldh/sb11-mople-team2` |
 | 프로젝트 목표 | 인증/인가 설계, 복잡한 DB 설계, 실시간 통신 구현, 분산 환경 설계, 안정성 확보 |
 
 ---
 
 ## 👥 팀원 소개
 
-| 이름 | 역할 | 담당 도메인 |
-|---|---|---|
-| (이름 입력) | 팀장 | 인증/인가·사용자관리, 어드민 |
-| (이름 입력) | 팀원 | 콘텐츠 관리·배치·외부 API |
-| (이름 입력) | 팀원 | 평가·큐레이팅(플레이리스트) |
-| (이름 입력) | 팀원 | 소셜(팔로우·구독 연결) |
-| (이름 입력) | 팀원 | 실시간(WebSocket) 같이보기·DM |
-| (이름 입력) | 팀원 | 알림(SSE)·어드민 보조 |
+| 이름   | GitHub | 담당 도메인 |
+|--------|---|---|
+| 김진혁 | `dkegldh` | 인증·인가(JWT/OAuth2), 사용자, ECS·CD 인프라, Elasticsearch 운영 |
+| 김지성 | `jsKim1219` | 콘텐츠·외부 API(TMDB/SportsDB)·수집 배치, 실시간 같이 보기(WebSocket) |
+| 엄주혁 | `eomoff` | 팔로우, 플레이리스트, 콘텐츠·외부 API(TMDB), Kafka 발행/소비 경로, Redis 락·캐시 |
+| 김명근 | `DonToong2` | 리뷰(평점·의견), 플레이리스트, Elasticsearch 매핑·CD 보조 |
+| 강성민 | `seongmin0244` | DM 대화방·다이렉트 메시지(WebSocket + SSE) |
+| 노정빈 | `vincent865` | 사용자 관리·어드민, 알림(SSE) |
 
 ---
 
@@ -56,110 +65,88 @@
 | 분류 | 기술 |
 |---|---|
 | Language | Java 17 |
-| Framework | Spring Boot 3.5.16, Spring Security, Spring Batch |
-| Auth | JWT (jjwt), Spring OAuth2 Client (심화) |
-| Build Tool | Gradle 8.14.4 |
-| DB & ORM | PostgreSQL 16, Spring Data JPA, QueryDSL 5.0.0, H2 |
-| Real-time | Spring WebSocket (STOMP), SSE |
-| Cache | Redis (심화) |
-| Messaging | Kafka (심화) |
-| Search | Elasticsearch (심화) |
-| Infra & Deploy | AWS (ECS, ECR, S3), Docker, Docker Compose, Nginx (심화) |
+| Framework | Spring Boot 3.5.16, Spring Security, Spring Batch, Spring Cloud 2025.0.1 |
+| Auth | JWT (jjwt), Spring OAuth2 Client (Google · Kakao) |
+| Build Tool | Gradle 9.5.1 |
+| DB & ORM | PostgreSQL 16, Spring Data JPA, QueryDSL 5.0.0, H2(테스트) |
+| Real-time | Spring WebSocket (STOMP over SockJS), SSE |
+| Cache & Lock | Redis 7, ShedLock (스케줄러 분산 락) |
+| Messaging | Apache Kafka 3.9.0 (KRaft) |
+| Search | Elasticsearch 8.18.8 |
+| Storage & Mail | AWS S3, Spring Mail (Brevo SMTP) |
+| Infra & Deploy | AWS ECS Fargate, ECR, ALB, Docker, Docker Compose, Nginx |
 | CI/CD | GitHub Actions |
-| Test & QA | JUnit 5, JaCoCo (커버리지 80% 이상 목표) |
-| API Docs | Springdoc OpenAPI (Swagger) |
-| External API | TMDB API, The Sports DB API (Spring Cloud OpenFeign) |
-| Utility | Lombok |
-
-> 심화 표시된 항목은 Phase 5에서 우선순위에 따라 선택적으로 도입됩니다.
+| Monitoring | Spring Actuator, Micrometer + Prometheus, Discord Webhook |
+| Test & QA | JUnit 5, Mockito, Testcontainers, JaCoCo, k6 |
+| API Docs | Springdoc OpenAPI (Swagger UI) |
+| External API | TMDB API, The Sports DB API (OpenFeign) |
 
 ---
 
 ## 🗂 ERD
 
-```
-docs/erd.mermaid 참고
-```
+전체 다이어그램과 컬럼 정의는 [`erd.md`](./erd.md)에 있습니다.
 
-<!-- 이미지로 대체 시:
-![ERD](docs/erd.png)
--->
-
-주요 엔티티: `users`, `contents`, `ratings`, `playlists`, `playlist_contents`,
+주요 테이블: `users`, `contents`, `reviews`, `playlists`, `playlist_contents`,
 `playlist_subscriptions`, `follows`, `conversations`, `direct_messages`, `notifications`
+
+PK는 **UUID**, 시간 컬럼은 **`timestamptz`(Java `Instant`)** 로 통일합니다.
 
 ---
 
 ## 🌿 브랜치 전략 & 커밋 컨벤션
 
-### 브랜치 전략
-- `main` : 배포 가능한 안정 버전만 유지
-- `develop` : 통합 개발 브랜치
-- `feature/{담당}-{기능명}` : 예) `feature/A-login`, `feature/E-watch-session`
-
-### 커밋 컨벤션 (Conventional Commits)
-| type | 의미 |
-|---|---|
-| feat | 새로운 기능 추가 |
-| fix | 버그 수정 |
-| test | 테스트 추가/수정 |
-| refactor | 기능 변화 없는 코드 개선 |
-| docs | 문서 수정 |
-| chore | 빌드/설정 등 잡무성 변경 |
+전체 규칙은 [`conventions.md`](./conventions.md) §11을 따릅니다.
 
 ```
-feat(auth): JWT 로그인 기능 구현
-test(rating): 평점 등록 실패 케이스 테스트 추가
+main (production)
+└── develop (staging)
+    └── {type}/{#이슈번호}-{기능명}
+        예) feature/#5-user-register, fix/#12-login-bug
 ```
 
-### PR 규칙
-- 최소 1인 승인 후 병합 (공통 모듈 변경 시 2인 이상)
-- PR 템플릿(`.github/PULL_REQUEST_TEMPLATE.md`) 필수 작성
-- 24시간 내 리뷰 응답 원칙
+- type: `feature` `fix` `refactor` `docs` `test` `chore` `batch` `deploy`
+- `develop` / `main` 직접 push 금지 — fork에서 작업 후 upstream `develop`으로 PR
+- **2인 이상** 리뷰 승인 후 **Squash and Merge** (PR 제목 = squash 커밋 메시지)
+- 이슈 제목은 `[FEAT] 팔로우 생성 구현` 형식
+
+```
+feat: 팔로우 생성 구현
+fix: 중복 구독 방지 버그 수정
+```
 
 ---
 
 ## 🚀 실행 방법
 
-### 1. 저장소 클론
+### 1. 미들웨어 실행
+
 ```bash
-git clone https://github.com/{조직명}/{repo명}.git
-cd {repo명}
+docker compose up -d      # Kafka(9093), Elasticsearch(19201)
 ```
 
-### 2. 로컬 DB 실행 (Docker Compose)
+PostgreSQL(`localhost:5432`, DB `mople_db`, `mople`/`mople1234`)과 Redis(`localhost:6380`)는 로컬에 직접 준비합니다.
+
+### 2. 환경변수 설정
+
+| 변수 | 필수 | 설명 |
+|---|---|---|
+| `TMDB_API_KEY` | ✅ | TMDB API 키 |
+| `AWS_S3_ACCESS_KEY_ID` / `AWS_S3_SECRET_ACCESS_KEY` | ✅ | S3 이미지 업로드 |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | ✅ | 구글 소셜 로그인 |
+| `KAKAO_CLIENT_ID` / `KAKAO_CLIENT_SECRET` | ✅ | 카카오 소셜 로그인 |
+| `SPORTSDB_API_KEY`, `JWT_SECRET`, `BREVO_SMTP_*`, `DISCORD_WEBHOOK_URL` | ⬜ | 미지정 시 기본값 사용 / 해당 기능 비활성 |
+
+### 3. 실행
+
 ```bash
-docker-compose up -d
+./gradlew bootRun         # 기본 프로파일 dev
 ```
 
-### 3. 환경변수 설정
-`src/main/resources/application-local.yml` 파일에 아래 값을 채워주세요.
-```yaml
-spring:
-  datasource:
-    url: jdbc:postgresql://localhost:5432/mople
-    username: mople
-    password: mople1234
-jwt:
-  secret: (로컬 개발용 시크릿 키 입력)
-```
+- Swagger UI — http://localhost:8080/swagger-ui.html
+- 어드민 계정 — `admin@mople.com` / `Admin1234!` (dev 부팅 시 생성)
 
-### 4. 애플리케이션 실행
-```bash
-./gradlew bootRun --args='--spring.profiles.active=local'
-```
-
-### 5. API 문서 확인
-```
-http://localhost:8080/swagger-ui/index.html
-```
-
-### 6. 테스트 & 커버리지 확인
-```bash
-./gradlew test
-./gradlew jacocoTestReport
-# 리포트 경로: build/reports/jacoco/test/html/index.html
-```
+프로파일은 `dev`(기본) · `test` · `load`(부하 테스트) · `prod`(ECS) 네 가지입니다.
 
 ---
 
@@ -167,32 +154,88 @@ http://localhost:8080/swagger-ui/index.html
 
 ```
 com.codeit.mople
-├── batch          # 콘텐츠 수집 배치 파이프라인
-├── realtime       # WebSocket · SSE 공통 인프라
-├── domain         # 도메인별 비즈니스 로직
-│   ├── user
-│   ├── content
-│   ├── rating
-│   ├── playlist
-│   ├── follow
-│   ├── watch
-│   ├── chat
-│   ├── directmessage
-│   └── notification
-├── infra          # 외부 API 연동 (TMDB, SportsDB)
-└── global         # 공통 설정, 예외처리, 응답 포맷
+├── domain
+│   ├── auth              # 로그인·토큰 재발급·비밀번호 초기화·OAuth2
+│   ├── user              # 회원가입·프로필·어드민(권한/잠금)
+│   ├── content           # 콘텐츠 CRUD + TMDB·SportsDB 수집 배치
+│   ├── review            # 평점·의견
+│   ├── playlist          # 플레이리스트·콘텐츠 연결·구독
+│   ├── follow            # 팔로우
+│   ├── conversation      # DM 대화방
+│   ├── directmessage     # 다이렉트 메시지
+│   ├── notification      # 알림 (이벤트 기반, SSE 전달)
+│   └── watchingsession   # 실시간 같이 보기 · 콘텐츠 채팅
+├── realtime              # WebSocket 세션 레지스트리 · 강제 종료
+└── global                # config · error · event · jwt · sse · storage …
 ```
+
+각 도메인은 `controller → service → repository` 레이어와
+`controller/api`(Swagger 인터페이스) · `dto`(record) · `entity` · `exception` 서브패키지로 구성합니다.
 
 ---
 
 ## ✨ 주요 기능
 
-- **사용자 관리**: 회원가입/로그인(JWT), 어드민(권한변경·계정잠금), 비밀번호 초기화, 소셜 로그인(심화)
-- **콘텐츠 관리**: TMDB/SportsDB 연동 콘텐츠 수집(Batch), 콘텐츠 CRUD
-- **평가 & 큐레이팅**: 평점/의견 등록, 개인 플레이리스트, 플레이리스트 구독
-- **소셜**: 팔로우, 팔로우 활동 알림
-- **실시간 같이보기**: WebSocket 기반 시청 세션 공유, 콘텐츠 실시간 채팅
-- **DM**: 실시간(WebSocket) + 비활성 대화(SSE) 쪽지
-- **알림**: SSE 기반 실시간 알림 (권한변경/구독/팔로우/DM 등)
+| 도메인 | 기능 |
+|---|---|
+| 인증 | JWT 로그인·토큰 재발급, Google/Kakao 소셜 로그인, 비밀번호 초기화(메일), 재로그인 시 기존 기기 세션 무효화 |
+| 사용자 | 회원가입, 프로필 수정(S3 이미지), 어드민 권한 변경·계정 잠금 |
+| 콘텐츠 | 콘텐츠 CRUD(어드민), TMDB·SportsDB 수집 배치, Elasticsearch 검색 |
+| 평가 | 평점·의견 CRUD, 콘텐츠 평균 평점·리뷰 수 집계 |
+| 큐레이팅 | 플레이리스트 CRUD, 콘텐츠 추가/삭제, 구독 |
+| 소셜 | 팔로우·팔로우 취소, 팔로우 알림 |
+| 실시간 같이 보기 | 시청 세션 입장/퇴장 브로드캐스트, 콘텐츠 실시간 채팅 |
+| DM | WebSocket 실시간 전송 + SSE 대화 목록 갱신, Redis 읽음 워터마크 |
+| 알림 | 권한 변경·구독·팔로우·DM 이벤트를 SSE로 실시간 전달 |
+
+배치 Job은 `tmdbCollectJob`(TMDB 영화·시리즈), `sportsContentJob`(스포츠) 두 개입니다.
 
 ---
+
+## 📋 API
+
+전체 명세는 [`api.md`](./api.md), 실행 중 확인은 `/swagger-ui.html`.
+
+- **인증** — `Authorization: Bearer {accessToken}` + CSRF(`XSRF-TOKEN` 쿠키 → `X-XSRF-TOKEN` 헤더). 리프레시 토큰은 `REFRESH_TOKEN` 쿠키
+- **목록 조회** — `cursor` + `idAfter` 복합 커서 페이지네이션
+- **에러 응답** — `{ "success": false, "error": { "code": "FOLLOW-002", "message": "..." } }`. 성공 응답은 DTO를 그대로 반환
+
+### 실시간
+
+| 채널 | 엔드포인트 |
+|---|---|
+| SSE | `GET /api/sse` — `notifications`, `direct-messages` 이벤트 |<img width="1200" height="1310" alt="4컷(4)" src="https://github.com/user-attachments/assets/f918d9b1-a7aa-44fc-8b7b-044ef4847dd1" />
+
+| WebSocket | `/ws` (STOMP over SockJS) — 시청 세션·콘텐츠 채팅·DM |
+
+STOMP destination은 구독 `/sub/...`, 발행 `/pub/...` 접두사를 씁니다.
+
+---
+
+## ⚙️ CI/CD & 테스트
+
+| 워크플로우 | 트리거 | 내용 |
+|---|---|---|
+| `ci.yml` | `main`·`develop` PR / push | 빌드 + 테스트 + 커버리지 검증 |
+| `cd.yml` | CI 성공 후 `main` push | 이미지 빌드 → ECR → ECS Fargate 배포 |
+| `promote-to-main.yml` | `develop` 머지 | 검증된 커밋만 `main`으로 승격 |
+
+```bash
+./gradlew test
+./gradlew jacocoTestCoverageVerification
+# 리포트: build/reports/jacoco/test/html/index.html
+```
+
+테스트는 `service/`(Mockito) · `repository/`(`@DataJpaTest`) · `controller/`(`@WebMvcTest`) · `batch/`(`@SpringBatchTest`)로 나뉘고, 실시간·Redis 통합 테스트는 Testcontainers를 씁니다.
+커버리지는 `domain/**/service/**`의 **클래스별 라인 80%** 미만이면 `check`가 실패합니다.
+
+---
+
+## 📚 문서
+
+| 문서 | 내용 |
+|---|---|
+| [`doc.md`](./doc.md) | 프로젝트 요구사항 |
+| [`api.md`](./api.md) | API 명세 — **계약의 기준** |
+| [`erd.md`](./erd.md) | ERD 다이어그램 및 컬럼 정의 |
+| [`conventions.md`](./conventions.md) | 팀 개발 컨벤션 |
