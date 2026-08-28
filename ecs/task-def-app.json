@@ -48,7 +48,8 @@
         { "name": "ELASTICSEARCH_PORT", "value": "9200" },
         { "name": "ELASTICSEARCH_SSL_ENABLED", "value": "true" },
         { "name": "FRONTEND_ORIGIN", "value": "https://nginx.mople.store" },
-        { "name": "CORS_ALLOWED_ORIGIN", "value": "https://nginx.mople.store" }
+        { "name": "CORS_ALLOWED_ORIGIN", "value": "https://nginx.mople.store" },
+        { "name": "LOGGING_LEVEL_ORG_APACHE_HTTP_WIRE", "value": "DEBUG" }
       ],
       "secrets": [
         { "name": "DB_USERNAME", "valueFrom": "arn:aws:ssm:ap-northeast-2:291883201761:parameter/mople/DB_USERNAME" },

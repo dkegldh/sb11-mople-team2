@@ -19,17 +19,17 @@ log_format sticky_debug '$remote_addr -> $upstream_addr [$time_local] "$request"
 
 # 일반 API 트래픽용 - 진짜 라운드로빈으로 3대에 고르게 분산
 upstream app_server {
-    server 172.31.63.189:8080;
-    server 172.31.13.202:8080;
-    server 172.31.42.45:8080;
+    server 172.31.61.239:8080;
+    server 172.31.13.97:8080;
+    server 172.31.42.248:8080;
 }
 
 # 실시간(WebSocket/SSE) 전용 - 같은 클라이언트는 같은 서버로 고정
 upstream app_server_sticky {
     ip_hash;
-    server 172.31.63.189:8080;
-    server 172.31.13.202:8080;
-    server 172.31.42.45:8080;
+    server 172.31.61.239:8080;
+    server 172.31.13.97:8080;
+    server 172.31.42.248:8080;
 }
 
 server {
