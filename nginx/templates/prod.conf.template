@@ -81,6 +81,28 @@ server {
         chunked_transfer_encoding off;
         proxy_read_timeout 3600s;
     }
+
+    # OAuth2 로그인(구글/카카오) - 시작(authorization) 요청과 콜백(code) 요청이
+    # 서로 다른 인스턴스로 라운드로빈되면, 시작 요청 때 세션에 저장해둔
+    # OAuth 요청 정보를 콜백을 받은 인스턴스가 못 찾아 authorization_request_not_found
+    # 에러가 난다. 같은 클라이언트는 같은 서버로 고정시켜서 세션 연속성을 보장한다.
+    location /oauth2/authorization {
+        proxy_pass http://app_server_sticky;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /login/oauth2/code {
+        proxy_pass http://app_server_sticky;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
 }
 
 server {
@@ -130,5 +152,27 @@ server {
         proxy_cache off;
         chunked_transfer_encoding off;
         proxy_read_timeout 3600s;
+    }
+
+    # OAuth2 로그인(구글/카카오) - 시작(authorization) 요청과 콜백(code) 요청이
+    # 서로 다른 인스턴스로 라운드로빈되면, 시작 요청 때 세션에 저장해둔
+    # OAuth 요청 정보를 콜백을 받은 인스턴스가 못 찾아 authorization_request_not_found
+    # 에러가 난다. 같은 클라이언트는 같은 서버로 고정시켜서 세션 연속성을 보장한다.
+    location /oauth2/authorization {
+        proxy_pass http://app_server_sticky;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /login/oauth2/code {
+        proxy_pass http://app_server_sticky;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
