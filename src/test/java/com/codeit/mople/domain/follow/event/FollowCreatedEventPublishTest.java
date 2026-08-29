@@ -30,17 +30,17 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest
 @ActiveProfiles("test")
-@Import(FollowCreatedEventPublishTest.RelayTestConfig.class)
+@Import(FollowCreatedEventPublishTest.ProducerTestConfig.class)
 @DisplayName("팔로우 생성 이벤트 발행 시점 테스트")
 class FollowCreatedEventPublishTest {
 
   @TestConfiguration
-  static class RelayTestConfig {
+  static class ProducerTestConfig {
 
     @Bean
-    FollowCreatedEventRelay followCreatedEventRelay(
+    FollowEventProducer followEventProducer(
         KafkaEventPublisher publisher, KafkaProperties kafkaProperties) {
-      return new FollowCreatedEventRelay(publisher, kafkaProperties);
+      return new FollowEventProducer(publisher, kafkaProperties);
     }
   }
 
@@ -92,7 +92,7 @@ class FollowCreatedEventPublishTest {
     verify(kafkaEventPublisher).publish(
         eq(kafkaProperties.topics().followCreated()),
         eq(followeeId.toString()),
-        any(FollowCreatedMessage.class));
+        any(FollowCreatedEvent.class));
   }
 
   @Test

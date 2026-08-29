@@ -26,7 +26,7 @@ class RedisFailedEventStoreIntegrationTest {
   static final String NAMESPACE = "mople:test";
   static final String STREAM_KEY = NAMESPACE + ":kafka:events:failed";
   static final String TOPIC = "mople.follow.created.v1";
-  static final String EVENT_TYPE = "com.codeit.mople.domain.follow.event.FollowCreatedMessage";
+  static final String EVENT_TYPE = "com.codeit.mople.domain.follow.event.FollowCreatedEvent";
   static final String DATA = "{\"followId\":\"test\"}";
   static final long MAX_ENTRIES = 1_000L;
 

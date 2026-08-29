@@ -17,13 +17,15 @@ public class DirectMessageReadSyncService {
   private final ConversationRepository conversationRepository;
 
   @Transactional
-  public void syncToDb(UUID conversationId, UUID userId, Instant lastReadAt) {
+  public boolean syncToDb(UUID conversationId, UUID userId, Instant lastReadAt) {
     Conversation conversation = conversationRepository.findById(conversationId).orElse(null);
 
     if (conversation != null) {
       conversation.updateLastReadAt(userId, lastReadAt);
       log.debug("읽음 워터마크 DB 갱신 커밋 완료 - conversationId: {}, userId: {}", conversationId, userId);
+      return true;
     }
+    return false;
   }
 
 }

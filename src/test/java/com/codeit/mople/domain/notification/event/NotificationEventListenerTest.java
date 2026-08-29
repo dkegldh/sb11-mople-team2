@@ -18,6 +18,7 @@ import com.codeit.mople.domain.review.event.ReviewWrittenEvent;
 import com.codeit.mople.global.event.ForceLogoutReason;
 import com.codeit.mople.global.event.UserAccountStatusChangedEvent;
 import java.util.List;
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -131,8 +132,7 @@ class NotificationEventListenerTest {
     UUID playlistId = UUID.randomUUID();
     UUID subscriberId = UUID.randomUUID();
 
-    PlaylistSubscribedEvent event = new PlaylistSubscribedEvent(
-        eventId,
+    PlaylistSubscribedEvent event = new PlaylistSubscribedEvent(eventId, Instant.now(),
         ownerId,
         playlistId,
         subscriberId,

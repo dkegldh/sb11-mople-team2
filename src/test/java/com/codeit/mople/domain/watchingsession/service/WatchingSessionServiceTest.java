@@ -26,6 +26,7 @@ import com.codeit.mople.domain.watchingsession.dto.ContentChatDto;
 import com.codeit.mople.domain.watchingsession.dto.ContentChatSendRequest;
 import com.codeit.mople.domain.watchingsession.dto.CursorResponseWatchingSessionDto;
 import com.codeit.mople.domain.watchingsession.dto.WatchingSessionEvent;
+import com.codeit.mople.domain.watchingsession.dto.WatchingSessionResponse;
 import java.security.Principal;
 import java.time.Instant;
 import java.util.List;
@@ -40,6 +41,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.cache.CacheManager;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.SessionCallback;
@@ -68,6 +70,9 @@ public class WatchingSessionServiceTest {
 
   @Mock
   private ApplicationEventPublisher eventPublisher; //이벤트 발행 검증용
+
+  @Mock
+  private CacheManager cacheManager;
 
   @Mock
   private ValueOperations<String, Object> valueOperations;
@@ -429,6 +434,68 @@ public class WatchingSessionServiceTest {
     //예외가 터지지 않고 null이 반환되어야 함
     UUID result = watchingSessionService.getWatchingContentId(userId);
     org.junit.jupiter.api.Assertions.assertNull(result);
+  }
+
+  @Test
+  @DisplayName("특정 유저 시청 세션 단건 조회 성공 콘텐츠 정보가 채워져 반환")
+  void getWatchingSessionForUser_Success() {
+    UUID userId = UUID.randomUUID();
+    UUID contentId = UUID.randomUUID();
+    UUID sessionId = UUID.randomUUID();
+    long joinTime = Instant.now().toEpochMilli();
+
+    User mockUser = mock(User.class);
+    given(mockUser.getId()).willReturn(userId);
+    given(mockUser.getName()).willReturn("시청자");
+
+    Content mockContent = mock(Content.class);
+    given(mockContent.getId()).willReturn(contentId);
+    given(mockContent.getType()).willReturn(ContentType.MOVIE);
+    given(mockContent.getTitle()).willReturn("테스트 콘텐츠");
+
+    given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
+    given(valueOperations.get("user:watching:" + userId)).willReturn(contentId.toString());
+    given(contentRepository.findById(contentId)).willReturn(Optional.of(mockContent));
+    given(valueOperations.get("user:session:id:" + userId)).willReturn(sessionId.toString());
+    given(zSetOperations.score("content:watchers:" + contentId, userId.toString()))
+        .willReturn((double) joinTime);
+
+    WatchingSessionResponse result = watchingSessionService.getWatchingSessionForUser(userId);
+
+    assertNotNull(result);
+    assertEquals(sessionId, result.id());
+    assertEquals(Instant.ofEpochMilli(joinTime), result.createdAt());
+    assertEquals(userId, result.watcher().userId());
+    assertNotNull(result.content());
+    assertEquals(contentId, result.content().id());
+    assertEquals("테스트 콘텐츠", result.content().title());
+  }
+
+  @Test
+  @DisplayName("특정 유저 시청 세션 단건 조회 - 시청 중이 아니면 null 반환")
+  void getWatchingSessionForUser_ReturnsNullWhenNotWatching() {
+    UUID userId = UUID.randomUUID();
+
+    given(userRepository.findById(userId)).willReturn(Optional.of(mock(User.class)));
+    given(valueOperations.get("user:watching:" + userId)).willReturn(null);
+
+    org.junit.jupiter.api.Assertions.assertNull(watchingSessionService.getWatchingSessionForUser(userId));
+  }
+
+  @Test
+  @DisplayName("특정 유저 시청 세션 단건 조회 - 활성 세션 ID가 없으면 null 반환")
+  void getWatchingSessionForUser_ReturnsNullWhenSessionIdMissing() {
+    UUID userId = UUID.randomUUID();
+    UUID contentId = UUID.randomUUID();
+
+    Content mockContent = mock(Content.class);
+
+    given(userRepository.findById(userId)).willReturn(Optional.of(mock(User.class)));
+    given(valueOperations.get("user:watching:" + userId)).willReturn(contentId.toString());
+    given(contentRepository.findById(contentId)).willReturn(Optional.of(mockContent));
+    given(valueOperations.get("user:session:id:" + userId)).willReturn(null);
+
+    org.junit.jupiter.api.Assertions.assertNull(watchingSessionService.getWatchingSessionForUser(userId));
   }
 
   @Test

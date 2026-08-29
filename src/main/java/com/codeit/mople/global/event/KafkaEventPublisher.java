@@ -8,9 +8,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.concurrent.CompletableFuture;
-import lombok.RequiredArgsConstructor;
+import java.util.concurrent.Executor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.common.errors.SerializationException;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.NestedExceptionUtils;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -19,7 +20,6 @@ import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 @ConditionalOnProperty(prefix = KafkaProperties.PREFIX, name = "enabled", havingValue = "true")
 public class KafkaEventPublisher {
 
@@ -34,7 +34,21 @@ public class KafkaEventPublisher {
   private final FailedEventStore failedEventStore;
   private final ObjectMapper objectMapper;
   private final MeterRegistry meterRegistry;
+  private final Executor failureExecutor;
 
+  public KafkaEventPublisher(
+      KafkaTemplate<String, Object> kafkaTemplate,
+      FailedEventStore failedEventStore,
+      ObjectMapper objectMapper,
+      MeterRegistry meterRegistry,
+      @Qualifier("kafkaPublishFailureExecutor") Executor failureExecutor
+  ) {
+    this.kafkaTemplate = kafkaTemplate;
+    this.failedEventStore = failedEventStore;
+    this.objectMapper = objectMapper;
+    this.meterRegistry = meterRegistry;
+    this.failureExecutor = failureExecutor;
+  }
 
   public void publish(String topic, PublishableEvent event) {
     publish(topic, null, event);
@@ -44,7 +58,7 @@ public class KafkaEventPublisher {
     send(topic, key, event).whenComplete((result, cause) -> {
       if (cause != null) {
         // 실패를 하나의 객체로 생성
-        handleFailure(topic, key, event, cause);
+        failureExecutor.execute(() -> handleFailure(topic, key, event, cause));
       }
     });
   }

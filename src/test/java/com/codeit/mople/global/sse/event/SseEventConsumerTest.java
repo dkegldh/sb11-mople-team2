@@ -13,6 +13,7 @@ import com.codeit.mople.domain.notification.dto.response.NotificationResponse;
 import com.codeit.mople.domain.notification.event.NotificationCreatedEvent;
 import com.codeit.mople.global.sse.service.SseEventService;
 import com.codeit.mople.global.sse.service.SseService;
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -61,7 +62,7 @@ public class SseEventConsumerTest {
       UUID eventId = UUID.randomUUID();
 
       DirectMessageCreatedEvent event =
-          new DirectMessageCreatedEvent(eventId, receiverId, directMessageId);
+          new DirectMessageCreatedEvent(eventId, Instant.now(), receiverId, directMessageId);
 
       DirectMessageDto directMessageDto = mock(DirectMessageDto.class);
 
@@ -90,7 +91,7 @@ public class SseEventConsumerTest {
       UUID eventId = UUID.randomUUID();
 
       DirectMessageCreatedEvent event =
-          new DirectMessageCreatedEvent(eventId, receiverId, directMessageId);
+          new DirectMessageCreatedEvent(eventId, Instant.now(), receiverId, directMessageId);
 
       DirectMessageDto directMessageDto = mock(DirectMessageDto.class);
 
@@ -126,7 +127,7 @@ public class SseEventConsumerTest {
       UUID eventId = UUID.randomUUID();
 
       NotificationCreatedEvent event =
-          new NotificationCreatedEvent(eventId, receiverId, notificationId);
+          new NotificationCreatedEvent(eventId, Instant.now(), receiverId, notificationId);
 
       NotificationResponse notificationResponse = mock(NotificationResponse.class);
 
@@ -155,7 +156,7 @@ public class SseEventConsumerTest {
       UUID eventId = UUID.randomUUID();
 
       NotificationCreatedEvent event =
-          new NotificationCreatedEvent(eventId, receiverId, notificationId);
+          new NotificationCreatedEvent(eventId, Instant.now(), receiverId, notificationId);
 
       NotificationResponse notificationResponse = mock(NotificationResponse.class);
 

@@ -29,6 +29,7 @@ import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -94,6 +95,7 @@ public class ReviewService {
 
     eventPublisher.publishEvent(new ReviewCreatedEvent(
         UUID.randomUUID(),
+        savedReview.getCreatedAt(),
         content.getId(),
         savedReview.getRating()
     ));
@@ -203,6 +205,7 @@ public class ReviewService {
     if (request.rating() != null) {
       eventPublisher.publishEvent(new ReviewUpdatedEvent(
           UUID.randomUUID(),
+          Instant.now(),
           content.getId(),
           oldRating,
           review.getRating()
@@ -242,6 +245,7 @@ public class ReviewService {
 
     eventPublisher.publishEvent(new ReviewDeletedEvent(
         UUID.randomUUID(),
+        Instant.now(),
         content.getId(),
         rating
     ));

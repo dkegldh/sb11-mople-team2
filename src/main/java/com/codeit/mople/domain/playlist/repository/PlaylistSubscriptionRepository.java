@@ -36,4 +36,7 @@ public interface PlaylistSubscriptionRepository extends JpaRepository<PlaylistSu
   @Query("SELECT ps.subscriber.id FROM PlaylistSubscription ps WHERE ps.playlist.id = :playlistId")
   List<UUID> findSubscriberIdsByPlaylistId(@Param("playlistId") UUID playlistId);
 
+  @Modifying(clearAutomatically = true)
+  @Query("delete from PlaylistSubscription ps where ps.playlist.id = :playlistId")
+  void deleteAllByPlaylistId(@Param("playlistId") UUID playlistId);
 }

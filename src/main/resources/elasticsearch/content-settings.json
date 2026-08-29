@@ -7,7 +7,7 @@
         "filter": ["lowercase"]
       },
       "content_search_analyzer": {
-        "tokenizer": "standard",
+        "tokenizer": "keyword",
         "filter": ["lowercase"]
       }
     },

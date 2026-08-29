@@ -4,6 +4,7 @@ import com.codeit.mople.domain.directmessage.repository.DirectMessageReadRedisRe
 import com.codeit.mople.domain.directmessage.service.DirectMessageReadSyncService;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -27,18 +28,21 @@ public class DirectMessageReadSyncScheduler {
       lockAtMostFor = "30s" // 최대 30초간 락 유지
   )
   public void syncLastReadAtToDb() {
-    Set<Object> dirtyMembers = readRedisRepository.getDirtyMembers();
+    Set<Object> dirtyMembers = readRedisRepository.getDirtyMembersWithLimit();
 
     if (dirtyMembers == null || dirtyMembers.isEmpty()) {
       return;
     }
 
-    log.info("Redis -> DB 읽음 워터마크 동기화 시작 (총 {}건)", dirtyMembers.size());
+    log.info("Redis -> DB 읽음 워터마크 동기화 시작 - 대상: {}건 (최대 500건 제한)", dirtyMembers.size());
+
     int successCount = 0;
+
+    // 일괄 삭제를 위해 처리가 완료된 멤버를 모아두는 Set
+    Set<Object> successfullyProcessed = new HashSet<>();
 
     for (Object memberObj : dirtyMembers) {
       String dirtyMember = (String) memberObj;
-
       Object cachedValue = null;
 
       try {
@@ -51,21 +55,32 @@ public class DirectMessageReadSyncScheduler {
         if (cachedValue != null) {
           Instant lastReadAt = Instant.parse(cachedValue.toString());
 
-          readSyncService.syncToDb(conversationId, userId, lastReadAt);
-          successCount++;
-          log.debug("읽음 워터마크 동기화 성공 - conversationId: {}, userId: {}", conversationId, userId);
+          boolean isSuccess = readSyncService.syncToDb(conversationId, userId, lastReadAt);
+
+          if (isSuccess) {
+            successCount++;
+            log.debug("읽음 워터마크 동기화 성공 - conversationId: {}, userId: {}", conversationId, userId);
+          } else {
+            log.warn("읽음 워터마크 동기화 건너뜀: 존재하지 않는 대화방 - conversationId: {}", conversationId);
+          }
         } else {
-          log.warn("읽음 워터마크 동기화 건너뜀 (존재하지 않거나 삭제된 대화방) - conversationId: {}, userId: {}",
+          log.warn("읽음 워터마크 동기화 건너뜀: Redis 키 없음(TTL 만료 추정) - conversationId: {}, userId: {}",
               conversationId, userId);
         }
-        // DB 커밋이 무사히 통과했을 때만 레디스 대기열 삭제
-        readRedisRepository.removeDirtyMember(dirtyMember);
-      } catch (DateTimeParseException e) {
-        log.error("Redis 읽음 시각 파싱 실패 (Dirty Set에서 삭제 처리) - member: {}, cachedValue: {}", dirtyMember, cachedValue, e);
-        readRedisRepository.removeDirtyMember(dirtyMember);
+
+        successfullyProcessed.add(memberObj);
+
+      } catch (DateTimeParseException | IllegalArgumentException | IndexOutOfBoundsException e) {
+        log.error("Redis 대기열 데이터 포맷/파싱 에러 (Dirty Set에서 삭제 처리) - member: {}, cachedValue: {}",
+            dirtyMember, cachedValue, e);
+        successfullyProcessed.add(memberObj);
       } catch (Exception e) {
         log.error("읽음 워터마크 DB 동기화 중 에러 발생 (Dirty Set 유지) - member: {}", dirtyMember, e);
       }
+    }
+
+    if (!successfullyProcessed.isEmpty()) {
+      readRedisRepository.removeProcessedMembers(successfullyProcessed);
     }
 
     log.info("Redis -> DB 읽음 워터마크 동기화 완료 (성공: {}/{}건)", successCount, dirtyMembers.size());

@@ -15,6 +15,7 @@ import org.springframework.batch.core.repository.JobInstanceAlreadyCompleteExcep
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -51,9 +52,9 @@ public class TmdbCollectJobRunner {
       }
     } catch (JobInstanceAlreadyCompleteException | JobExecutionAlreadyRunningException e) {
       log.info("TMDB 수집이 이미 완료되었거나 실행 중이라 건너뜁니다.");
-    } catch (DataIntegrityViolationException e) {
-      log.info("이미 다른 프로세스에서 TMDB 수집 작업을 시작하여 건너뜁니다.");
-    } catch (JobExecutionException e) {
+    } catch (DuplicateKeyException e) {
+      log.warn("TMDB 수집 Job 등록이 다른 인스턴스와 충돌했습니다, 먼저 시작한 쪽이 있어 건너뜁니다.", e);
+    } catch (JobExecutionException | DataIntegrityViolationException e) {
       log.error("TMDB 수집 Job 실행에 실패했습니다.", e);
     }
   }

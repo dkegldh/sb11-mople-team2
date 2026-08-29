@@ -421,5 +421,32 @@ public class DirectMessageServiceTest {
 
       verify(readRedisRepository).saveLastReadAt(conversationId, userBId, messageTime);
     }
+
+    @Test
+    @DisplayName("성공: 이미 읽은 과거의 메시지에 대해 읽음 처리를 시도하면 레디스 갱신을 생략하고 조기 종료한다.")
+    void success_read_message_already_read_early_return() {
+      // given
+      Instant messageTime = Instant.now().minusSeconds(30);
+      Instant cachedTime = Instant.now().minusSeconds(10);
+
+      given(directMessageRepository.findById(messageId)).willReturn(Optional.of(message));
+      given(message.getConversation()).willReturn(conversation);
+      given(conversation.getId()).willReturn(conversationId);
+      given(message.getSender()).willReturn(userA);
+      given(userA.getId()).willReturn(userAId);
+      given(message.getReceiver()).willReturn(userB);
+      given(userB.getId()).willReturn(userBId);
+
+      // 메시지 시각이 캐시된 시각보다 과거로 세팅
+      given(message.getCreatedAt()).willReturn(messageTime);
+      given(readRedisRepository.getCachedLastReadAt(conversationId, userBId)).willReturn(Optional.of(cachedTime));
+
+      // when
+      directMessageService.readMessage(conversationId, messageId, userBId);
+
+      // then
+      verify(readRedisRepository, never()).saveLastReadAt(any(), any(), any());
+      verify(conversation, never()).updateLastReadAt(any(), any());
+    }
   }
 }

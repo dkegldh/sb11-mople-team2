@@ -58,7 +58,7 @@ class PlaylistContentAddedEventConsumerTest {
   void handle_success() {
     // given
     UUID eventId = UUID.randomUUID();
-    PlaylistContentAddedMessage message = new PlaylistContentAddedMessage(
+    PlaylistContentAddedEvent event = new PlaylistContentAddedEvent(
         eventId, Instant.now(), playlistContentId, playlistId, contentId, "테스트 플레이리스트"
     );
 
@@ -67,7 +67,7 @@ class PlaylistContentAddedEventConsumerTest {
         .willReturn(List.of(subscriberA, subscriberB));
 
     // when
-    eventConsumer.handle(message);
+    eventConsumer.handle(event);
 
     // then
     verify(processedEventRepository).insertIfAbsent(eventId);
@@ -90,7 +90,7 @@ class PlaylistContentAddedEventConsumerTest {
   void handle_success_continuesOtherSubscribers_whenOneNotificationFails() {
     // given
     UUID eventId = UUID.randomUUID();
-    PlaylistContentAddedMessage message = new PlaylistContentAddedMessage(
+    PlaylistContentAddedEvent event = new PlaylistContentAddedEvent(
         eventId, Instant.now(), playlistContentId, playlistId, contentId, "테스트 플레이리스트"
     );
 
@@ -106,7 +106,7 @@ class PlaylistContentAddedEventConsumerTest {
         );
 
     // when & then
-    assertThatCode(() -> eventConsumer.handle(message)).doesNotThrowAnyException();
+    assertThatCode(() -> eventConsumer.handle(event)).doesNotThrowAnyException();
 
     verify(notificationCreator).createNotification(
         subscriberB,
@@ -121,7 +121,7 @@ class PlaylistContentAddedEventConsumerTest {
   void handle_success_already_processed_skip() {
     // given
     UUID eventId = UUID.randomUUID();
-    PlaylistContentAddedMessage message = new PlaylistContentAddedMessage(
+    PlaylistContentAddedEvent event = new PlaylistContentAddedEvent(
         eventId, Instant.now(), playlistContentId, playlistId, contentId, "테스트 플레이리스트"
     );
 
@@ -130,7 +130,7 @@ class PlaylistContentAddedEventConsumerTest {
         .willReturn(List.of(subscriberA, subscriberB));
 
     // when
-    eventConsumer.handle(message);
+    eventConsumer.handle(event);
 
     // then
     verify(playlistService).getSubscriberIds(playlistId);

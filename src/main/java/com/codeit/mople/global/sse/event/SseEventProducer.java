@@ -11,7 +11,7 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 @Component
-@ConditionalOnProperty(prefix = "spring.kafka", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(prefix = KafkaProperties.PREFIX, name = "enabled", havingValue = "true")
 public class SseEventProducer {
 
   private final KafkaEventPublisher eventPublisher;

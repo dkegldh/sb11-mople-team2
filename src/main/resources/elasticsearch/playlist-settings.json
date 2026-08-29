@@ -7,7 +7,7 @@
         "filter": ["lowercase"]
       },
       "playlist_search_analyzer": {
-        "tokenizer": "standard",
+        "tokenizer": "keyword",
         "filter": ["lowercase"]
       }
     },

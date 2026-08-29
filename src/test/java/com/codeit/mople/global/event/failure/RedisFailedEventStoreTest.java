@@ -38,7 +38,7 @@ class RedisFailedEventStoreTest {
   static final String NAMESPACE = "mople:test";
   static final String STREAM_KEY = "mople:test:kafka:events:failed";
   static final int MAX_ENTRIES = 1_000;
-  static final String EVENT_TYPE = "com.codeit.mople.domain.follow.event.FollowCreatedMessage";
+  static final String EVENT_TYPE = "com.codeit.mople.domain.follow.event.FollowCreatedEvent";
   static final Duration WITHIN = Duration.ofHours(24);
 
   @Mock

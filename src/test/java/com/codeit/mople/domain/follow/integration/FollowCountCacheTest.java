@@ -40,6 +40,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -69,6 +71,9 @@ class FollowCountCacheTest {
 
   @Autowired
   MockMvc mockMvc;
+
+  @Autowired
+  PlatformTransactionManager transactionManager;
 
   UUID followeeId;
   UUID followerId;
@@ -168,6 +173,38 @@ class FollowCountCacheTest {
             .with(user(new CustomUserDetails(followerId, Role.USER))))
         .andExpect(status().isOk())
         .andExpect(content().string("0"));
+  }
+
+  @Test
+  @DisplayName("바깥 트랜잭션 없이 팔로우하면 메서드가 반환된 시점에 캐시 키가 이미 지워져 있는지")
+  void evictsCacheBeforeFollowReturnsWhenCalledOutsideTransaction() {
+    // given
+    followService.getFollowCount(followeeId);
+    assertThat(stringRedisTemplate.hasKey(CACHE_KEY_PREFIX + followeeId)).isTrue();
+
+    // when
+    followService.follow(new FollowRequest(followeeId), followerId);
+
+    // then
+    assertThat(stringRedisTemplate.hasKey(CACHE_KEY_PREFIX + followeeId)).isFalse();
+  }
+
+  @Test
+  @DisplayName("바깥 트랜잭션 안에서 조회하면 커밋 전에는 캐시에 안 담기고 커밋 후에 담기는지")
+  void defersCachePutUntilOuterTransactionCommits() {
+    // given
+    TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+
+    // when
+    transactionTemplate.executeWithoutResult(status -> {
+      followService.getFollowCount(followeeId);
+
+      // then
+      assertThat(stringRedisTemplate.hasKey(CACHE_KEY_PREFIX + followeeId)).isFalse();
+    });
+
+    // then
+    assertThat(stringRedisTemplate.hasKey(CACHE_KEY_PREFIX + followeeId)).isTrue();
   }
 
   @Test

@@ -5,21 +5,26 @@ import com.codeit.mople.domain.content.client.tmdb.TmdbClient;
 import com.codeit.mople.domain.content.client.tmdb.TmdbGenreProvider;
 import com.codeit.mople.domain.content.client.tmdb.batch.TmdbContentItemProcessor;
 import com.codeit.mople.domain.content.client.tmdb.batch.TmdbContentItemWriter;
+import com.codeit.mople.domain.content.client.tmdb.batch.TmdbGenreCatalogHolder;
 import com.codeit.mople.domain.content.client.tmdb.batch.TmdbPageItemReader;
 import com.codeit.mople.domain.content.client.tmdb.dto.TmdbContentItem;
+import com.codeit.mople.domain.content.client.tmdb.dto.TmdbGenreCatalog;
 import com.codeit.mople.domain.content.client.tmdb.listener.TmdbCollectJobListener;
 import com.codeit.mople.domain.content.entity.Content;
 import com.codeit.mople.domain.content.entity.ContentType;
 import com.codeit.mople.domain.content.repository.ContentRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
+import org.springframework.batch.core.configuration.annotation.JobScope;
 import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.item.ItemWriter;
+import org.springframework.batch.repeat.RepeatStatus;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -27,6 +32,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.PlatformTransactionManager;
 
+@Slf4j
 @Configuration
 @RequiredArgsConstructor
 public class TmdbCollectJobConfig {
@@ -43,12 +49,14 @@ public class TmdbCollectJobConfig {
   public Job tmdbCollectJob(
       JobRepository jobRepository,
       TmdbCollectJobListener listener,
+      @Qualifier("tmdbGenreCheckStep") Step tmdbGenreCheckStep,
       @Qualifier("tmdbMovieStep") Step tmdbMovieStep,
       @Qualifier("tmdbTvStep") Step tmdbTvStep
   ) {
     return new JobBuilder("tmdbCollectJob", jobRepository)
         .listener(listener)
-        .start(tmdbMovieStep)
+        .start(tmdbGenreCheckStep)
+        .next(tmdbMovieStep)
         .next(tmdbTvStep)
         .build();
   }
@@ -56,6 +64,33 @@ public class TmdbCollectJobConfig {
   @Bean
   public TmdbCollectJobListener tmdbCollectJobListener() {
     return new TmdbCollectJobListener(meterRegistry);
+  }
+
+  // Job 실행당 한 번만 해석되어 게이트 Step과 두 프로세서가 같은것을 공유
+  @Bean
+  @JobScope
+  public TmdbGenreCatalogHolder tmdbGenreCatalogHolder() {
+    TmdbGenreCatalog catalog = tmdbGenreProvider.get();
+
+    if (catalog.isEmpty()) {
+      throw new IllegalStateException(
+          "TMDB 장르 카탈로그가 비어 있어 수집을 중단합니다. 태그 없는 콘텐츠 저장을 막습니다.");
+    }
+    return new TmdbGenreCatalogHolder(catalog);
+  }
+
+  @Bean
+  public Step tmdbGenreCheckStep(
+      JobRepository jobRepository,
+      PlatformTransactionManager transactionManager,
+      TmdbGenreCatalogHolder tmdbGenreCatalogHolder) {
+    return new StepBuilder("tmdbGenreCheckStep", jobRepository)
+        .tasklet((contribution, chunkContext) -> {
+          log.info("TMDB 장르 카탈로그 {}건을 확인했습니다.", tmdbGenreCatalogHolder.size());
+          return RepeatStatus.FINISHED;
+        }, transactionManager)
+        .allowStartIfComplete(true)
+        .build();
   }
 
   @Bean
@@ -70,7 +105,6 @@ public class TmdbCollectJobConfig {
         .reader(tmdbMovieReader)
         .processor(tmdbMovieProcessor)
         .writer(writer(ContentType.MOVIE))
-        // DB제약 위반 예외는 건너뜀(지금은 최대 10번 까지 건너띌 수 있도록 설정)
         .faultTolerant()
         .skip(DataIntegrityViolationException.class)
         .skipLimit(skipLimit)
@@ -89,7 +123,6 @@ public class TmdbCollectJobConfig {
         .reader(tmdbTvReader)
         .processor(tmdbTvProcessor)
         .writer(writer(ContentType.TV_SERIES))
-        // DB제약 위반 예외는 건너뜀(지금은 최대 10번 까지 건너띌 수 있도록 설정)
         .faultTolerant()
         .skip(DataIntegrityViolationException.class)
         .skipLimit(skipLimit)
@@ -112,19 +145,19 @@ public class TmdbCollectJobConfig {
 
   @Bean
   @StepScope
-  public TmdbContentItemProcessor tmdbMovieProcessor() {
-    return processor(ContentType.MOVIE);
+  public TmdbContentItemProcessor tmdbMovieProcessor(TmdbGenreCatalogHolder holder) {
+    return processor(ContentType.MOVIE, holder);
   }
 
   @Bean
   @StepScope
-  public TmdbContentItemProcessor tmdbTvProcessor() {
-    return processor(ContentType.TV_SERIES);
+  public TmdbContentItemProcessor tmdbTvProcessor(TmdbGenreCatalogHolder holder) {
+    return processor(ContentType.TV_SERIES, holder);
   }
-  
-  private TmdbContentItemProcessor processor(ContentType contentType) {
-    return new TmdbContentItemProcessor(
-        contentType, tmdbGenreProvider.get().toMap(), tmdbProperties);
+
+  private TmdbContentItemProcessor processor(
+      ContentType contentType, TmdbGenreCatalogHolder holder) {
+    return new TmdbContentItemProcessor(contentType, holder.names(), tmdbProperties);
   }
 
   private ItemWriter<Content> writer(ContentType contentType) {

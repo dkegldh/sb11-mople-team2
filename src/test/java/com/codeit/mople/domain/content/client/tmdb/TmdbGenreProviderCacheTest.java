@@ -1,6 +1,7 @@
 package com.codeit.mople.domain.content.client.tmdb;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -73,34 +74,36 @@ class TmdbGenreProviderCacheTest {
   }
 
   @Test
-  @DisplayName("TMDB 호출이 실패하면 빈 결과를 캐싱하지 않는지")
-  void doesNotCacheEmptyCatalogWhenCallFails() {
+  @DisplayName("TMDB 호출이 실패하면 예외를 전파하고 캐싱하지 않는지")
+  void propagatesAndDoesNotCacheWhenCallFails() {
     // given
-    given(tmdbClient.getMovieGenres()).willThrow(new IllegalStateException("tmdb down"));
+    IllegalStateException cause = new IllegalStateException("tmdb down");
+    given(tmdbClient.getMovieGenres()).willThrow(cause);
 
-    // when
-    TmdbGenreCatalog first = tmdbGenreProvider.get();
-    TmdbGenreCatalog second = tmdbGenreProvider.get();
+    // when, then
+    assertThatThrownBy(() -> tmdbGenreProvider.get())
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("TMDB 장르 조회에 실패했습니다.")
+        .hasCause(cause);
+    assertThatThrownBy(() -> tmdbGenreProvider.get())
+        .isInstanceOf(IllegalStateException.class);
 
-    // then
-    assertThat(first.isEmpty()).isTrue();
-    assertThat(second.isEmpty()).isTrue();
     assertThat(cacheManager.getCache(CacheNames.TMDB_GENRES).get(CACHE_KEY)).isNull();
     verify(tmdbClient, times(2)).getMovieGenres();
   }
 
   @Test
-  @DisplayName("TMDB 응답의 장르 목록이 비어 있으면 캐싱하지 않는지")
-  void doesNotCacheEmptyCatalogWhenResponseIsEmpty() {
+  @DisplayName("TMDB 응답의 장르 목록이 비어 있으면 예외를 전파하고 캐싱하지 않는지")
+  void propagatesAndDoesNotCacheWhenResponseIsEmpty() {
     // given
     given(tmdbClient.getMovieGenres()).willReturn(genres());
     given(tmdbClient.getTvGenres()).willReturn(genres(new Genre(16, "애니메이션")));
 
-    // when
-    TmdbGenreCatalog catalog = tmdbGenreProvider.get();
+    // when, then
+    assertThatThrownBy(() -> tmdbGenreProvider.get())
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("TMDB 장르 목록이 비어 있습니다.");
 
-    // then
-    assertThat(catalog.isEmpty()).isTrue();
     assertThat(cacheManager.getCache(CacheNames.TMDB_GENRES).get(CACHE_KEY)).isNull();
   }
 }

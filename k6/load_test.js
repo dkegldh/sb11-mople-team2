@@ -104,7 +104,7 @@ export const options = {
 };
 
 // 환경 구성
-const BASE_URL = 'http://localhost:8080/api';
+const BASE_URL = 'http://localhost:8081/api';
 
 const PASSWORD = '12345678';
 const LOAD_TEST_USER_COUNT = 10000;

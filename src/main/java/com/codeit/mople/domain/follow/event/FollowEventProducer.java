@@ -11,23 +11,22 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @Slf4j
 @Component
 @ConditionalOnProperty(prefix = KafkaProperties.PREFIX, name = "enabled", havingValue = "true")
-public class FollowCreatedEventRelay {
+public class FollowEventProducer {
 
   private final KafkaEventPublisher publisher;
   private final String topic;
 
-  public FollowCreatedEventRelay(KafkaEventPublisher publisher, KafkaProperties kafkaProperties) {
+  public FollowEventProducer(KafkaEventPublisher publisher, KafkaProperties kafkaProperties) {
     this.publisher = publisher;
     this.topic = kafkaProperties.topics().followCreated();
   }
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-  public void relay(FollowCreatedEvent event) {
-    FollowCreatedMessage message = FollowCreatedMessage.from(event);
-    String key = message.followeeId().toString();
+  public void on(FollowCreatedEvent event) {
+    String key = event.followeeId().toString();
 
     log.debug("팔로우 생성 이벤트 발행: followId={}, eventId={}",
-        message.followId(), message.eventId());
-    publisher.publish(topic, key, message);
+        event.followId(), event.eventId());
+    publisher.publish(topic, key, event);
   }
 }

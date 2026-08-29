@@ -49,7 +49,7 @@ public class NotificationCreator {
         Notification notification =
             notificationRepository.save(Notification.create(receiver, title, content, type));
 
-        eventPublisher.publishEvent(new NotificationCreatedEvent(UUID.randomUUID(), receiverId, notification.getId()));
+        eventPublisher.publishEvent(new NotificationCreatedEvent(UUID.randomUUID(), notification.getCreatedAt(), receiverId, notification.getId()));
         log.info("알림 생성 완료 - receiverId: {}, type: {}", receiverId, type);
     }
 

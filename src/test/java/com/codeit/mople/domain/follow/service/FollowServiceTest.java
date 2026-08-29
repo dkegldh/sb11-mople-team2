@@ -14,6 +14,7 @@ import com.codeit.mople.domain.follow.dto.FollowRequest;
 import com.codeit.mople.domain.follow.dto.FollowResponse;
 import com.codeit.mople.domain.follow.entity.Follow;
 import com.codeit.mople.domain.follow.event.FollowCreatedEvent;
+import com.codeit.mople.domain.follow.event.FollowDeletedEvent;
 import com.codeit.mople.domain.follow.exception.FollowErrorCode;
 import com.codeit.mople.domain.follow.repository.FollowRepository;
 import com.codeit.mople.domain.user.entity.User;
@@ -179,7 +180,7 @@ class FollowServiceTest {
   class CancelFollow {
 
     @Test
-    @DisplayName("팔로우 취소에 성공하면 팔로우를 삭제하고 followeeId를 반환")
+    @DisplayName("팔로우 취소에 성공하면 팔로우를 삭제하고 삭제 이벤트를 발행")
     void unFollowSuccess() {
       // given
       UUID followId = UUID.randomUUID();
@@ -192,11 +193,11 @@ class FollowServiceTest {
       given(followRepository.findById(followId)).willReturn(Optional.of(follow));
 
       // when
-      UUID result = followService.unFollow(followId, followerId);
+      followService.unFollow(followId, followerId);
 
       // then
       verify(followRepository).delete(follow);
-      assertThat(result).isEqualTo(followeeId);
+      verify(publisher).publishEvent(new FollowDeletedEvent(followId, followeeId, followerId));
     }
 
     @Test
@@ -213,6 +214,7 @@ class FollowServiceTest {
           .isEqualTo(FollowErrorCode.UNFOLLOW_NOT_FOUND);
 
       verify(followRepository, never()).delete(any(Follow.class));
+      verify(publisher, never()).publishEvent(any(FollowDeletedEvent.class));
     }
 
     @Test
@@ -236,6 +238,7 @@ class FollowServiceTest {
           .isEqualTo(FollowErrorCode.UNFOLLOW_NOT_OWNER);
 
       verify(followRepository, never()).delete(any(Follow.class));
+      verify(publisher, never()).publishEvent(any(FollowDeletedEvent.class));
     }
   }
 

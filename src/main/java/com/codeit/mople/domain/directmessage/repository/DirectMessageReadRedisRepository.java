@@ -4,6 +4,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -11,6 +13,7 @@ import java.util.UUID;
 import java.time.format.DateTimeParseException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Repository;
@@ -23,8 +26,14 @@ public class DirectMessageReadRedisRepository {
   private final RedisTemplate<String, Object> redisTemplate;
 
   private static final String READ_KEY_PREFIX = "dm:read:";
-  // DB와 값이 달라져서 동기화가 필요한 대상들을 모아두는 Set
-  private static final String DIRTY_SET_KEY = "dm:read:dirty";
+
+  private static final String DIRTY_SET_KEY = "{dm:read:dirty}";
+
+  private static final String PROCESSING_SET_KEY = "{dm:read:dirty}:processing";
+
+  @Value("${dm.read-sync.chunk-size}")
+  private long chunkSize;
+
   // 7일 동안 조회/수정이 없는 유저의 읽음 키는 레디스에서 자동 삭제
   private static final Duration READ_DATA_TTL = Duration.ofDays(7);
 
@@ -75,6 +84,30 @@ public class DirectMessageReadRedisRepository {
     }
   }
 
+  // 대기열을 RENAME으로 분리한 후, 한 번에 최대 chunkSize개까지만 가져옴
+  public Set<Object> getDirtyMembersWithLimit() {
+    Boolean hasProcessing = redisTemplate.hasKey(PROCESSING_SET_KEY);
+
+    // 현재 처리 중인(processing) 대기열이 없으면, 원본(dirty)을 processing으로 가져옴
+    if (Boolean.FALSE.equals(hasProcessing) || hasProcessing == null) {
+      Boolean hasDirty = redisTemplate.hasKey(DIRTY_SET_KEY);
+      if (Boolean.TRUE.equals(hasDirty)) {
+        try {
+          // RENAMENX(renameIfAbsent)를 사용하여 이미 다른 서버가 선점했다면 덮어쓰지 않음
+          redisTemplate.renameIfAbsent(DIRTY_SET_KEY, PROCESSING_SET_KEY);
+        } catch (Exception e) {
+          log.info("다른 서버가 먼저 대기열을 선점(Dirty 큐 비어있음) - processing 큐 처리 참여");
+        }
+      } else {
+        return Collections.emptySet();
+      }
+    }
+
+    List<Object> members = redisTemplate.opsForSet().randomMembers(PROCESSING_SET_KEY, chunkSize);
+
+    return members != null ? new HashSet<>(members) : Collections.emptySet();
+  }
+
   // [조회 전용] 오직 레디스 캐시만 확인하여 반환
   public Optional<Instant> getCachedLastReadAt(UUID conversationId, UUID userId) {
     String valueKey = READ_KEY_PREFIX + conversationId + ":" + userId;
@@ -120,8 +153,10 @@ public class DirectMessageReadRedisRepository {
     return redisTemplate.opsForSet().members(DIRTY_SET_KEY);
   }
 
-  public void removeDirtyMember(String dirtyMember) {
-    log.info("Redis Dirty Set 항목 삭제 - member: {}", dirtyMember);
-    redisTemplate.opsForSet().remove(DIRTY_SET_KEY, dirtyMember);
+  public void removeProcessedMembers(Set<Object> processedMembers) {
+    log.info("Redis Processing Dirty Set 항목 삭제 - member: {}", processedMembers);
+    if (processedMembers != null && !processedMembers.isEmpty()) {
+      redisTemplate.opsForSet().remove(PROCESSING_SET_KEY, processedMembers.toArray());
+    }
   }
 }

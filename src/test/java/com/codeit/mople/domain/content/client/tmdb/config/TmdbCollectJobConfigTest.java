@@ -81,7 +81,7 @@ public class TmdbCollectJobConfigTest {
   class Launch {
 
     @Test
-    @DisplayName("영화 Step과 TV Step이 순서대로 돌고 수집분이 저장됨.")
+    @DisplayName("장르, 영화 Step, TV Step이 순서대로 돌고 수집분이 저장됨.")
     void launchJob_CompletesAndSaves() throws Exception {
       JobParameters parameters = jobParameters(COLLECTE_DATE);
 
@@ -94,6 +94,7 @@ public class TmdbCollectJobConfigTest {
       assertThat(execution.getStepExecutions())
           .extracting(StepExecution::getStepName, StepExecution::getReadCount)
           .containsExactly(
+              tuple("tmdbGenreCheckStep", 0L),
               tuple("tmdbMovieStep", 2L),
               tuple("tmdbTvStep", 2L));
     }

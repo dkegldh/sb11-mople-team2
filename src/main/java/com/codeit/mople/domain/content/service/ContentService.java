@@ -20,9 +20,11 @@ import com.codeit.mople.global.dto.SearchResult;
 import com.codeit.mople.global.storage.FileStorageService;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.time.Instant;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -118,6 +120,7 @@ public class ContentService{
     eventPublisher.publishEvent(
         new ContentSearchIndexEvent(
             UUID.randomUUID(),
+            savedContent.getCreatedAt(),
             savedContent.getId(),
             savedContent.getTitle(),
             savedContent.getType(),
@@ -235,7 +238,7 @@ public class ContentService{
             content.getTitle(),
             content.getDescription(),
             content.getThumbnailUrl(),
-            content.getTags(),
+            new ArrayList<>(content.getTags()),
             content.calculateAverageRating(),
             content.getReviewCount(),
             content.getWatcherCount()
@@ -292,7 +295,7 @@ public class ContentService{
         content.getTitle(),
         content.getDescription(),
         content.getThumbnailUrl(),
-        content.getTags(),
+        new ArrayList<>(content.getTags()),
         content.calculateAverageRating(),
         content.getReviewCount(),
         content.getWatcherCount()
@@ -350,6 +353,7 @@ public class ContentService{
     eventPublisher.publishEvent(
         new ContentSearchIndexEvent(
             UUID.randomUUID(),
+            Instant.now(),
             content.getId(),
             content.getTitle(),
             content.getType(),
@@ -406,7 +410,7 @@ public class ContentService{
 
     log.info("콘텐츠 삭제 완료 - contentId: {}", contentId);
 
-    eventPublisher.publishEvent(new ContentSearchIndexDeleteEvent(UUID.randomUUID(), contentId));
+    eventPublisher.publishEvent(new ContentSearchIndexDeleteEvent(UUID.randomUUID(), Instant.now(), contentId));
   }
 
   //썸네일 검증 및 파일 시스템 저장 메서드

@@ -9,18 +9,11 @@ import java.util.Map;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record TmdbGenreCatalog(List<Entry> entries) {
 
-  private static final TmdbGenreCatalog EMPTY = new TmdbGenreCatalog(List.of());
-
   @JsonIgnoreProperties(ignoreUnknown = true)
   public record Entry(Integer id, String name) {
 
   }
-  
-  public static TmdbGenreCatalog empty() {
-    return EMPTY;
-  }
 
-  // 장르를 hashMap 객체로 만들어 놓은것을 list형태로 변환
   public static TmdbGenreCatalog from(Map<Integer, String> names) {
     return new TmdbGenreCatalog(names.entrySet().stream()
         .map(entry -> new Entry(entry.getKey(), entry.getValue()))
@@ -30,10 +23,6 @@ public record TmdbGenreCatalog(List<Entry> entries) {
   @JsonIgnore
   public boolean isEmpty() {
     return entries.isEmpty();
-  }
-
-  public int size() {
-    return entries.size();
   }
 
   public Map<Integer, String> toMap() {

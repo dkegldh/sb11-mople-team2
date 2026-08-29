@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.codeit.mople.domain.auth.security.CustomUserDetails;
 import com.codeit.mople.domain.directmessage.dto.request.DirectMessageCursorRequest;
+import com.codeit.mople.domain.directmessage.dto.request.DirectMessageSendRequest;
 import com.codeit.mople.domain.directmessage.dto.response.DirectMessageDto;
 import com.codeit.mople.domain.directmessage.service.DirectMessageService;
 import com.codeit.mople.domain.user.entity.Role;
@@ -39,6 +40,9 @@ public class DirectMessageControllerTest {
 
   @Autowired
   private MockMvc mockMvc;
+
+  @Autowired
+  private DirectMessageController directMessageController;
 
   @MockitoBean
   private DirectMessageService directMessageService;
@@ -75,6 +79,35 @@ public class DirectMessageControllerTest {
         receiver,
         "테스트 다이렉트 메시지"
     );
+  }
+
+  @Test
+  @DisplayName("STOMP 송신 - 메시지 전송 시 Service를 거쳐 특정 Destination으로 발행된다.")
+  void sendDirectMessage_success() {
+    // given
+    UUID conversationId = UUID.randomUUID();
+    UUID messageId = UUID.randomUUID();
+    String content = "테스트 웹소켓 메시지";
+
+    DirectMessageSendRequest request = new DirectMessageSendRequest(content);
+
+    DirectMessageDto mockResponseDto = createMockDirectMessageDto(conversationId, messageId);
+
+    given(directMessageService.sendMessage(conversationId, myUserId, content))
+        .willReturn(mockResponseDto);
+
+    CustomUserDetails userDetails = (CustomUserDetails) authToken.getPrincipal();
+
+    // when
+    // 웹소켓(@MessageMapping)은 HTTP 통신이 아니므로 MockMvc 대신 컨트롤러 메서드를 직접 호출
+    directMessageController.sendDirectMessage(conversationId, request, userDetails);
+
+    // then
+    then(directMessageService).should().sendMessage(conversationId, myUserId, content);
+
+    // 올바른 목적지(destination)로 발송되었는지 검증
+    String expectedDestination = "/sub/conversations/" + conversationId + "/direct-messages";
+    then(messagingTemplate).should().convertAndSend(expectedDestination, mockResponseDto);
   }
 
   @Test

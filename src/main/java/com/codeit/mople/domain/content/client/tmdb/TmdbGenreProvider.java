@@ -26,21 +26,22 @@ public class TmdbGenreProvider {
         .register(meterRegistry);
   }
 
-  // 해당 메서드의 반환 값 캐싱(결과가 비어있으면 캐싱x)
-  @Cacheable(cacheNames = CacheNames.TMDB_GENRES, key = "'catalog'", unless = "#result.isEmpty()")
+  // 해당 메서드의 반환 값 캐싱(예외가 나면 캐싱x)
+  @Cacheable(cacheNames = CacheNames.TMDB_GENRES, key = "'catalog'")
   public TmdbGenreCatalog get() {
     Map<Integer, String> names = new HashMap<>();
+    boolean loaded;
 
     try {
-      if (!putAll(names, tmdbClient.getMovieGenres()) || !putAll(names, tmdbClient.getTvGenres())) {
-        loadFailureCounter.increment();
-        log.error("TMDB 장르 목록이 비어 있습니다.");
-        return TmdbGenreCatalog.empty();
-      }
+      loaded = putAll(names, tmdbClient.getMovieGenres()) && putAll(names, tmdbClient.getTvGenres());
     } catch (Exception e) {
       loadFailureCounter.increment();   // 메트릭 카운터(장르 조회 실패횟수)
-      log.error("TMDB 장르 조회에 실패했습니다.", e);
-      return TmdbGenreCatalog.empty();
+      throw new IllegalStateException("TMDB 장르 조회에 실패했습니다.", e);
+    }
+
+    if (!loaded) {
+      loadFailureCounter.increment();
+      throw new IllegalStateException("TMDB 장르 목록이 비어 있습니다.");
     }
 
     log.info("TMDB 장르 {}건을 조회했습니다.", names.size());

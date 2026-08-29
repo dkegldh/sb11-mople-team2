@@ -805,6 +805,7 @@ public class PlaylistServiceTest {
       // void 타입이기 때문에 assert 메서드 불필요
       verify(playlistRepository).findById(playlistId);
       verify(playlistContentRepository).deleteAllByPlaylistId(playlistId);
+      verify(playlistSubscriptionRepository).deleteAllByPlaylistId(playlistId);
       verify(playlistRepository).delete(playlist);
       verify(eventPublisher).publishEvent(
           argThat((PlaylistSearchIndexDeleteEvent event) ->
@@ -836,6 +837,9 @@ public class PlaylistServiceTest {
 
       // playlistContentRepository.deleteAllByPlaylistId() 메서드는 호출되지 않음
       verify(playlistContentRepository, never())
+          .deleteAllByPlaylistId(playlistId);
+
+      verify(playlistSubscriptionRepository, never())
           .deleteAllByPlaylistId(playlistId);
 
       // playlistRepository.delete() 메서드는 호출되지 않음
@@ -871,6 +875,9 @@ public class PlaylistServiceTest {
       verify(playlistRepository).findById(playlistId);
 
       verify(playlistContentRepository, never())
+          .deleteAllByPlaylistId(playlistId);
+
+      verify(playlistSubscriptionRepository, never())
           .deleteAllByPlaylistId(playlistId);
 
       verify(playlistRepository, never())

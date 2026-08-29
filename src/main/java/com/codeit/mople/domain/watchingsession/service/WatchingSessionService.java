@@ -16,6 +16,7 @@ import com.codeit.mople.domain.watchingsession.dto.WatchingSessionContentDto;
 import com.codeit.mople.domain.watchingsession.dto.WatchingSessionDetailDto;
 import com.codeit.mople.domain.watchingsession.dto.WatchingSessionEvent;
 import com.codeit.mople.domain.watchingsession.dto.WatchingSessionResponse;
+import com.codeit.mople.global.config.CacheNames;
 import com.codeit.mople.global.dto.UserSummary;
 import java.security.Principal;
 import java.time.Instant;
@@ -29,6 +30,9 @@ import java.util.stream.Collectors;
 import lombok.Generated;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.RedisOperations;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -50,6 +54,7 @@ public class WatchingSessionService {
   private final RedisTemplate<String, Object> redisTemplate;
   private final SimpMessagingTemplate messagingTemplate;
   private final ApplicationEventPublisher eventPublisher;
+  private final CacheManager cacheManager;
 
   private static final String USER_WATCHING_KEY_PREFIX = "user:watching:";
   private static final String CONTENT_WATCHERS_KEY_PREFIX = "content:watchers:";
@@ -280,6 +285,12 @@ public class WatchingSessionService {
     );
   }
 
+  @Caching(
+      evict = {
+          @CacheEvict(cacheNames = CacheNames.CONTENTS, key = "#contentId"),
+          @CacheEvict(cacheNames = CacheNames.CONTENT_LIST, allEntries = true)
+      }
+  )
   //유저가 콘텐츠 시청을 시작(입장)할 때 실시간 세션을 Redis에 기록하고 DB 갱신
   @Transactional
   public Long enterSession(UUID userId, UUID contentId) {
@@ -360,9 +371,16 @@ public class WatchingSessionService {
       Long prevCount = redisTemplate.opsForZSet().zCard(prevContentKey);
       int prevWatcherCountInt = prevCount != null ? prevCount.intValue() : 0;
 
-      Content prevContentEntity = contentRepository.findById(UUID.fromString(previousContentId)).orElse(null);
+      UUID prevContentUuid = UUID.fromString(previousContentId);
+      Content prevContentEntity = contentRepository.findById(prevContentUuid).orElse(null);
       if (prevContentEntity != null) {
         prevContentEntity.updateWatcherCount((long) prevWatcherCountInt);
+      }
+
+      // 이동 전(이전) 콘텐츠의 단건 캐시 무효화 추가
+      org.springframework.cache.Cache contentCache = cacheManager.getCache(CacheNames.CONTENTS);
+      if (contentCache != null) {
+        contentCache.evict(prevContentUuid);
       }
 
       WatchingSessionContentDto prevContentDto = prevContentEntity != null ? new WatchingSessionContentDto(
@@ -415,6 +433,12 @@ public class WatchingSessionService {
   }
 
   //유저가 콘텐츠 시청을 종료(퇴장)할 때 Redis에서 세션을 제거하고 DB 갱신
+  @Caching(
+      evict = {
+          @CacheEvict(cacheNames = CacheNames.CONTENTS, key = "#contentId"),
+          @CacheEvict(cacheNames = CacheNames.CONTENT_LIST, allEntries = true)
+      }
+  )
   @Transactional
   public Long leaveSession(UUID userId, UUID contentId) {
     String userKey = USER_WATCHING_KEY_PREFIX + userId.toString();
@@ -529,6 +553,63 @@ public class WatchingSessionService {
 
     //404 예외를 던지는 대신 삼항 연산자로 null 반환
     return (contentIdStr != null) ? UUID.fromString(contentIdStr) : null;
+  }
+
+  // 특정 유저가 현재 시청 중인 세션을 콘텐츠 정보까지 포함해 조회
+  // 시청 중이 아니면 null 반환
+  @Transactional(readOnly = true)
+  public WatchingSessionResponse getWatchingSessionForUser(UUID userId) {
+    // 1. userId 받아서 user 존재 검증 + user객체 획득
+    User user = userRepository.findById(userId)
+        .orElseThrow(() -> new ContentException(ContentErrorCode.CONTENT_NOT_FOUND, Map.of("userId", userId)));
+
+    // 2. redis에서 userKey를 조회 후 값을 받음 -> 비어있는 값이면 null 리턴
+    String userKey = USER_WATCHING_KEY_PREFIX + userId.toString();
+    String contentIdStr = (String) redisTemplate.opsForValue().get(userKey);
+    if (contentIdStr == null) {
+      return null;
+    }
+
+    // 3. redis에서 userKey 조회 후 받은 값을 UUID로 변환(목적:콘첸츠 조회하려고)
+    UUID contentId = UUID.fromString(contentIdStr);
+    // 4. 콘텐츠 조회 -> 콘텐츠 없으면 로그 + null 반환
+    Content content = contentRepository.findById(contentId).orElse(null);
+    if (content == null) {
+      log.warn("시청 중으로 기록된 콘텐츠가 DB에 없음: userId={}, contentId={}", userId, contentId);
+      return null;
+    }
+
+
+    // 5. redis에서 세션 ID 조회 -> 없으면 로그 + null 반환(목록 조회와 동일하게 시청 중이 아닌 것으로 처리)
+    String sessionIdKey = USER_SESSION_ID_KEY_PREFIX + userId.toString();
+    String sessionIdStr = (String) redisTemplate.opsForValue().get(sessionIdKey);
+    if (sessionIdStr == null) {
+      log.warn("시청 기록은 존재하나 활성 세션 ID가 누락됨: userId={}, contentId={}", userId, contentId);
+      return null;
+    }
+
+    // 6. ZSet의 score(입장 시각)를 조회해 createdAt으로 사용
+    // score가 없으면 목록 조회에서도 빠지는 유저이므로 로그 + null 반환
+    String contentKey = CONTENT_WATCHERS_KEY_PREFIX + contentIdStr;
+    Double joinScore = redisTemplate.opsForZSet().score(contentKey, userId.toString());
+    if (joinScore == null) {
+      log.warn("시청 기록은 존재하나 ZSet 입장 시각이 누락됨: userId={}, contentId={}", userId, contentId);
+      return null;
+    }
+    Instant createdAt = Instant.ofEpochMilli(joinScore.longValue());
+
+    // 7. 1번에서 얻은 user로 시청자 정보 조립
+    UserSummary watcher = new UserSummary(user.getId(), user.getName(), user.getProfileImageUrl());
+
+    // 8. 4번에서 얻은 content로 콘텐츠 정보 조립(프론트가 제목,id를 여기서 꺼내 씀)
+    WatchingSessionContentDto contentDto = new WatchingSessionContentDto(
+        content.getId(), content.getType().name(), content.getTitle(),
+        content.getDescription(), content.getThumbnailUrl(), content.getTags(),
+        content.calculateAverageRating(), content.getReviewCount()
+    );
+
+    // 9. 세션 ID + 입장 시각 + 시청자 + 콘텐츠를 묶어 반환
+    return new WatchingSessionResponse(UUID.fromString(sessionIdStr), createdAt, watcher, contentDto);
   }
 
   //실시간 채팅 메시지 처리 및 브로드캐스팅

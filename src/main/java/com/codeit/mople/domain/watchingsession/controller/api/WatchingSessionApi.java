@@ -2,13 +2,13 @@ package com.codeit.mople.domain.watchingsession.controller.api;
 
 import com.codeit.mople.domain.auth.security.CustomUserDetails;
 import com.codeit.mople.domain.watchingsession.dto.CursorResponseWatchingSessionDto;
+import com.codeit.mople.domain.watchingsession.dto.WatchingSessionResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -23,19 +23,16 @@ public interface WatchingSessionApi {
 
   @Operation(
       summary = "특정 유저 시청 세션 단건 조회",
-      description = "특정 유저가 현재 실시간으로 시청 중인 콘텐츠 ID를 조회합니다."
+      description = "특정 유저가 현재 실시간으로 시청 중인 세션을 콘텐츠 정보와 함께 조회합니다. 시청 중이 아니면 본문이 비어 있습니다."
   )
   @ApiResponses({
       @ApiResponse(
           responseCode = "200",
-          description = "조회 성공 (시청 중인 콘텐츠가 있음)"
-      ),
-      @ApiResponse(
-          responseCode = "204",
-          description = "시청 중인 콘텐츠가 없음 (본문 없음)"
+          description = "조회 성공 (시청 중이 아니면 본문 없음)",
+          content = @Content(schema = @Schema(implementation = WatchingSessionResponse.class))
       )
   })
-  ResponseEntity<Map<String, UUID>> getWatchingSessionForUser(
+  ResponseEntity<WatchingSessionResponse> getWatchingSessionForUser(
       @PathVariable UUID watcherId
   );
 

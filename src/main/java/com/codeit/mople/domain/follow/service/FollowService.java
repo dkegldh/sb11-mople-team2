@@ -4,6 +4,7 @@ import com.codeit.mople.domain.follow.dto.FollowRequest;
 import com.codeit.mople.domain.follow.dto.FollowResponse;
 import com.codeit.mople.domain.follow.entity.Follow;
 import com.codeit.mople.domain.follow.event.FollowCreatedEvent;
+import com.codeit.mople.domain.follow.event.FollowDeletedEvent;
 import com.codeit.mople.domain.follow.exception.FollowErrorCode;
 import com.codeit.mople.domain.follow.exception.FollowException;
 import com.codeit.mople.domain.follow.repository.FollowRepository;
@@ -15,7 +16,6 @@ import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -31,8 +31,6 @@ public class FollowService {
   private final FollowRepository followRepository;
   private final ApplicationEventPublisher publisher;
 
-  // CacheEvict -> 팔로우 성공처리되면 이전 데이터에 대한 캐시를 삭제하기 위한 어노테이션(삭제할 캐시 이름, 삭제할 데이터)
-  @CacheEvict(cacheNames = CacheNames.FOLLOW_COUNT, key = "#request.followeeId")
   @Transactional
   public FollowResponse follow(FollowRequest request, UUID followerId) {
 
@@ -70,11 +68,8 @@ public class FollowService {
     return FollowResponse.from(saved);
   }
 
-  // CacheEvict -> 여기서 key값이 왜 followeeId가 아니고 result인지?
-  // -> followeeId 파라미터가 리턴값에 있음 그러므로 result가 되는것임
-  @CacheEvict(cacheNames = CacheNames.FOLLOW_COUNT, key = "#result")
   @Transactional
-  public UUID unFollow(UUID followId, UUID followerId) {
+  public void unFollow(UUID followId, UUID followerId) {
 
     log.debug("팔로우 취소 시도: followId={}, followerId={}", followId, followerId);
 
@@ -87,14 +82,14 @@ public class FollowService {
        throw new FollowException(FollowErrorCode.UNFOLLOW_NOT_OWNER, Map.of("followerId", followerId));
      }
 
-     // 삭제 전에 캐시 키를 확보
+     // 삭제 전에 이벤트에 실을 followeeId를 확보
      UUID followeeId = follow.getFollowee().getId();
 
      // 해당 팔로우(row) 삭제
      followRepository.delete(follow);
      log.info("팔로우 취소 성공: followId={}, followerId={}", followId, followerId);
 
-     return followeeId;
+     publisher.publishEvent(new FollowDeletedEvent(followId, followeeId, followerId));
   }
 
   public FollowResponse getFollowByMe(UUID followeeId, UUID followerId) {

@@ -11,23 +11,22 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @Slf4j
 @Component
 @ConditionalOnProperty(prefix = KafkaProperties.PREFIX, name = "enabled", havingValue = "true")
-public class PlaylistContentAddedEventRelay {
+public class PlaylistContentAddedEventProducer {
 
   private final KafkaEventPublisher publisher;
   private final String topic;
 
-  public PlaylistContentAddedEventRelay(KafkaEventPublisher publisher, KafkaProperties kafkaProperties) {
+  public PlaylistContentAddedEventProducer(KafkaEventPublisher publisher, KafkaProperties kafkaProperties) {
     this.publisher = publisher;
     this.topic = kafkaProperties.topics().playlistContentAdded();
   }
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-  public void relay(PlaylistContentAddedEvent event) {
-    PlaylistContentAddedMessage message = PlaylistContentAddedMessage.from(event);
-    String key = message.playlistId().toString();
+  public void on(PlaylistContentAddedEvent event) {
+    String key = event.playlistId().toString();
 
     log.debug("플레이리스트 콘텐츠 추가 이벤트 발행: playlistContentId={}, playlistId={}, eventId={}",
-        message.playlistContentId(), message.playlistId(), message.eventId());
-    publisher.publish(topic, key, message);
+        event.playlistContentId(), event.playlistId(), event.eventId());
+    publisher.publish(topic, key, event);
   }
 }

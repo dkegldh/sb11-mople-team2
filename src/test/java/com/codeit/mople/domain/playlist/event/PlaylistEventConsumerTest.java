@@ -6,6 +6,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.codeit.mople.domain.playlist.repository.PlaylistRepository;
 import com.codeit.mople.global.event.processed.ProcessedEventRepository;
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -53,8 +54,7 @@ public class PlaylistEventConsumerTest {
       UUID eventId = UUID.randomUUID();
 
       PlaylistSubscribedEvent event =
-          new PlaylistSubscribedEvent(
-              eventId,
+          new PlaylistSubscribedEvent(eventId, Instant.now(),
               ownerId,
               playlistId,
               subscriberId,
@@ -86,8 +86,7 @@ public class PlaylistEventConsumerTest {
       UUID eventId = UUID.randomUUID();
 
       PlaylistSubscribedEvent event =
-          new PlaylistSubscribedEvent(
-              eventId,
+          new PlaylistSubscribedEvent(eventId, Instant.now(),
               ownerId,
               playlistId,
               subscriberId,
@@ -122,7 +121,7 @@ public class PlaylistEventConsumerTest {
       UUID eventId = UUID.randomUUID();
 
       PlaylistUnsubscribedEvent event =
-          new PlaylistUnsubscribedEvent(eventId, playlistId, subscriberId);
+          new PlaylistUnsubscribedEvent(eventId, Instant.now(), playlistId, subscriberId);
 
       given(processedEventRepository.insertIfAbsent(eventId))
           .willReturn(1);
@@ -145,8 +144,7 @@ public class PlaylistEventConsumerTest {
       UUID eventId = UUID.randomUUID();
 
       PlaylistUnsubscribedEvent event =
-          new PlaylistUnsubscribedEvent(
-              eventId,
+          new PlaylistUnsubscribedEvent(eventId, Instant.now(),
               playlistId,
               subscriberId
           );
@@ -172,7 +170,7 @@ public class PlaylistEventConsumerTest {
       UUID eventId = UUID.randomUUID();
 
       PlaylistUnsubscribedEvent event =
-          new PlaylistUnsubscribedEvent(eventId, playlistId, subscriberId);
+          new PlaylistUnsubscribedEvent(eventId, Instant.now(), playlistId, subscriberId);
 
       given(processedEventRepository.insertIfAbsent(eventId))
           .willReturn(1);

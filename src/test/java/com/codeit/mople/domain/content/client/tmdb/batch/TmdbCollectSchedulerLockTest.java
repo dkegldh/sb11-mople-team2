@@ -5,7 +5,7 @@ import static org.mockito.BDDMockito.willAnswer;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-import java.util.Set;
+import com.codeit.mople.global.config.RedisNamespaceProperties;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -25,7 +25,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @DisplayName("TMDB 수집 스케줄러 분산 락 통합 테스트")
 class TmdbCollectSchedulerLockTest {
 
-  private static final String LOCK_KEY_PATTERN = "*tmdb-collect*";
+  private static final String EXPECTED_LOCK_KEY = "mople:test:lock:tmdb-collect";
 
   @Autowired
   private TmdbCollectScheduler scheduler;
@@ -33,17 +33,23 @@ class TmdbCollectSchedulerLockTest {
   @Autowired
   private StringRedisTemplate stringRedisTemplate;
 
+  @Autowired
+  private RedisNamespaceProperties redisNamespaceProperties;
+
   @MockitoBean
   private TmdbCollectJobRunner runner;
 
+  private String lockKey;
+
   @BeforeEach
   void setUp() {
-    deleteLockKeys();
+    lockKey = redisNamespaceProperties.lockKey(TmdbCollectScheduler.LOCK_NAME);
+    stringRedisTemplate.delete(lockKey);
   }
 
   @AfterEach
   void tearDown() {
-    deleteLockKeys();
+    stringRedisTemplate.delete(lockKey);
   }
 
   @Nested
@@ -106,23 +112,8 @@ class TmdbCollectSchedulerLockTest {
       scheduler.collect();
 
       // then
-      Set<String> keys = lockKeys();
-      assertThat(keys).hasSize(1);
-      assertThat(keys.iterator().next())
-          .contains("mople:test")
-          .endsWith("tmdb-collect");
-    }
-  }
-
-  private Set<String> lockKeys() {
-    Set<String> keys = stringRedisTemplate.keys(LOCK_KEY_PATTERN);
-    return keys == null ? Set.of() : keys;
-  }
-
-  private void deleteLockKeys() {
-    Set<String> keys = lockKeys();
-    if (!keys.isEmpty()) {
-      stringRedisTemplate.delete(keys);
+      assertThat(lockKey).isEqualTo(EXPECTED_LOCK_KEY);
+      assertThat(stringRedisTemplate.hasKey(EXPECTED_LOCK_KEY)).isTrue();
     }
   }
 }

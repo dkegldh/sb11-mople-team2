@@ -81,7 +81,7 @@ public class DirectMessageService {
 
     DirectMessageDto responseDto = DirectMessageDto.from(directMessage);
 
-    publisher.publishEvent(new DirectMessageCreatedEvent(UUID.randomUUID(), receiver.getId(), directMessage.getId()));
+    publisher.publishEvent(new DirectMessageCreatedEvent(UUID.randomUUID(), directMessage.getCreatedAt(), receiver.getId(), directMessage.getId()));
 
     //발송 성공 시 카운트 증가
     dmSendCounter.increment();

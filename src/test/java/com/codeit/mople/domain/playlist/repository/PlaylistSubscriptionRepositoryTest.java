@@ -115,4 +115,31 @@ public class PlaylistSubscriptionRepositoryTest {
 
   }
 
+  @Nested
+  @DisplayName("플레이리스트에 속해있는 구독 정보들을 삭제")
+  class DeleteAllByPlaylistId {
+
+    @Test
+    @DisplayName("플레이리스트에 속해있는 구독 정보들을 삭제 성공")
+    void deleteAllByPlaylistId_success() {
+      // given
+      // setUp()에서 playlist에 대한 구독 정보 생성 및 저장
+
+      // when
+      playlistSubscriptionRepository.deleteAllByPlaylistId(playlistId);
+
+      // DB 삭제 후 1차 캐시가 비워지기 때문에 DB 삭제 메서드 후 호출
+      entityManager.clear();
+
+      // then
+      boolean result = playlistSubscriptionRepository.existsByPlaylistIdAndSubscriberId(
+          playlistId,
+          subscriberId
+      );
+
+      assertThat(result).isFalse();
+    }
+
+  }
+
 }

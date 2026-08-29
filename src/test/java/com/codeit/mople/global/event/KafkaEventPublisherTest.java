@@ -12,8 +12,11 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -33,7 +36,7 @@ class KafkaEventPublisherTest {
   static final String TOPIC = "mople.follow.created.v1";
   static final String KEY = "followee-key";
 
-  record TestEvent(UUID eventId) implements PublishableEvent {}
+  record TestEvent(UUID eventId, Instant occurredAt) implements PublishableEvent {}
 
   @Mock
   KafkaTemplate<String, Object> kafkaTemplate;
@@ -49,12 +52,16 @@ class KafkaEventPublisherTest {
   MeterRegistry meterRegistry;
   KafkaEventPublisher publisher;
 
+  final Executor sameThreadExecutor = Runnable::run;
+  final Executor neverRunsExecutor = command -> {
+  };
+
   @BeforeEach
   void setUp() {
-    event = new TestEvent(UUID.randomUUID());
+    event = new TestEvent(UUID.randomUUID(), Instant.now());
     meterRegistry = new SimpleMeterRegistry();
-    publisher =
-        new KafkaEventPublisher(kafkaTemplate, failedEventStore, objectMapper, meterRegistry);
+    publisher = new KafkaEventPublisher(
+        kafkaTemplate, failedEventStore, objectMapper, meterRegistry, sameThreadExecutor);
   }
 
   @Nested
@@ -136,6 +143,67 @@ class KafkaEventPublisherTest {
       // then
       verify(failedEventStore).save(failedEventCaptor.capture());
       assertThat(failedEventCaptor.getValue().error()).isEqualTo("max.block.ms 만료");
+    }
+
+    @Test
+    @DisplayName("발행에 성공하면 실패 처리 executor 에 아무것도 제출하지 않는지")
+    void publishSuccessSubmitsNothing() {
+      // given
+      AtomicInteger submitted = new AtomicInteger();
+      KafkaEventPublisher counting = new KafkaEventPublisher(
+          kafkaTemplate, failedEventStore, objectMapper, meterRegistry,
+          command -> {
+            submitted.incrementAndGet();
+            command.run();
+          });
+      given(kafkaTemplate.send(TOPIC, KEY, event))
+          .willReturn(CompletableFuture.completedFuture(null));
+
+      // when
+      counting.publish(TOPIC, KEY, event);
+
+      // then
+      assertThat(submitted).hasValue(0);
+    }
+
+    @Test
+    @DisplayName("발행에 실패하면 실패 처리를 executor 에 한 번만 제출하는지")
+    void publishFailureSubmitsOnce() throws Exception {
+      // given
+      AtomicInteger submitted = new AtomicInteger();
+      KafkaEventPublisher counting = new KafkaEventPublisher(
+          kafkaTemplate, failedEventStore, objectMapper, meterRegistry,
+          command -> {
+            submitted.incrementAndGet();
+            command.run();
+          });
+      given(kafkaTemplate.send(TOPIC, KEY, event))
+          .willReturn(CompletableFuture.failedFuture(new RuntimeException("broker down")));
+      given(objectMapper.writeValueAsString(event)).willReturn("{}");
+
+      // when
+      counting.publish(TOPIC, KEY, event);
+
+      // then
+      assertThat(submitted).hasValue(1);
+      verify(failedEventStore).save(any());
+    }
+
+    @Test
+    @DisplayName("발행 실패 처리가 호출 스레드가 아니라 전용 executor를 거쳐서 도는지")
+    void handlesFailureThroughExecutor() {
+      // given
+      KafkaEventPublisher deferred = new KafkaEventPublisher(
+          kafkaTemplate, failedEventStore, objectMapper, meterRegistry, neverRunsExecutor);
+      given(kafkaTemplate.send(TOPIC, KEY, event))
+          .willReturn(CompletableFuture.failedFuture(new RuntimeException("broker down")));
+
+      // when
+      deferred.publish(TOPIC, KEY, event);
+
+      // then
+      verify(failedEventStore, never()).save(any());
+      assertThat(meterRegistry.find("kafka.event.publish.failure").counter()).isNull();
     }
 
     @Test

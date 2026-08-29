@@ -12,6 +12,7 @@ import com.codeit.mople.domain.user.exception.UserException;
 import com.codeit.mople.global.config.CacheNames;
 import com.codeit.mople.global.event.ForceLogoutReason;
 import com.codeit.mople.global.event.UserAccountStatusChangedEvent;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -55,6 +56,7 @@ public class AdminService {
       eventPublisher.publishEvent(
           new UserSearchIndexEvent(
               UUID.randomUUID(),
+              Instant.now(),
               user.getId(),
               user.getEmail(),
               user.getName(),
@@ -92,6 +94,7 @@ public class AdminService {
       eventPublisher.publishEvent(
           new UserSearchIndexEvent(
               UUID.randomUUID(),
+              Instant.now(),
               user.getId(),
               user.getEmail(),
               user.getName(),

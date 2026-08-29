@@ -69,6 +69,7 @@ public class UserService {
     eventPublisher.publishEvent(
         new UserSearchIndexEvent(
             UUID.randomUUID(),
+            saved.getCreatedAt(),
             saved.getId(),
             saved.getEmail(),
             saved.getName(),
@@ -210,6 +211,7 @@ public class UserService {
     eventPublisher.publishEvent(
         new UserSearchIndexEvent(
             UUID.randomUUID(),
+            Instant.now(),
             user.getId(),
             user.getEmail(),
             user.getName(),

@@ -37,21 +37,25 @@ spring:
 
     topics:
       follow-created: mople.follow.created.v1
-      playlist-events: playlist-events.v1
+      playlist-events: mople.playlist-events.v1
       playlist-content-added: mople.playlist.content-added.v1
+      review-created: mople.review.created.v1
+      review-updated: mople.review.updated.v1
+      review-deleted: mople.review.deleted.v1
       direct-message-created: mople.direct-message.created.v1
       notification-created: mople.notification.created.v1
-      content-search-index: content-search-index-events.v1
-      user-search-index: user-search-index-events.v1
-      playlist-search-index: playlist-search-index-events.v1
+      content-search-index: mople.content-search-index-events.v1
+      user-search-index: mople.user-search-index-events.v1
+      playlist-search-index: mople.playlist-search-index-events.v1
 
     producer:
       acks: all
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       properties:
+        spring.json.type.mapping: ${mople.kafka.type-mapping}
         enable.idempotence: true
-        max.block.ms: 1000
+        max.block.ms: 3000          # Producer가 send() 호출하고 버퍼에 메세지를 집어넣기까지 최대시간, 기본은 60초
         request.timeout.ms: 10000
         delivery.timeout.ms: 30000
         retry.backoff.ms: 1000
@@ -63,6 +67,7 @@ spring:
       properties:
         spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
         spring.json.trusted.packages: "com.codeit.mople.domain.*"
+        spring.json.type.mapping: ${mople.kafka.type-mapping}
   mail:
     properties:
       mail.smtp.auth: true
@@ -115,10 +120,14 @@ batch:
     collect:
       max-pages: 5
       skip-limit: 10
+      # max-pages 를 올리면 이 값도 함께 올려야함
+      lock-at-most-for: PT10M
+      lock-at-least-for: PT1M
 
 dm:
   read-sync:
     delay-ms: 10000 # 10초마다 Redis DM 워터마크 DB 반영 스케줄러 자동 실행
+    chunk-size: 500
 
 sse:
   stream-consumer:
@@ -133,6 +142,22 @@ mople:
       es-sync-group-id: mople-dm-es-sync-group
     failed-events:
       max-entries: 1000 # 스트림 보관 상한(근사). Redis를 캐시,분산 락,SSE와 같이 쓰고 있어서 상한을 둠
+    # 메시지 헤더(TypeId)의 이름. 프로듀서,컨슈머가 같은 값을 보고 컨그래야 컨슈머가 어떤객체로 만들어야하는지 알 수 있음
+    type-mapping: >-
+      follow-created.v1:com.codeit.mople.domain.follow.event.FollowCreatedEvent,
+      playlist-content-added.v1:com.codeit.mople.domain.playlist.event.PlaylistContentAddedEvent,
+      playlist-subscribed.v1:com.codeit.mople.domain.playlist.event.PlaylistSubscribedEvent,
+      playlist-unsubscribed.v1:com.codeit.mople.domain.playlist.event.PlaylistUnsubscribedEvent,
+      playlist-search-index.v1:com.codeit.mople.domain.playlist.event.PlaylistSearchIndexEvent,
+      playlist-search-index-delete.v1:com.codeit.mople.domain.playlist.event.PlaylistSearchIndexDeleteEvent,
+      content-search-index.v1:com.codeit.mople.domain.content.event.ContentSearchIndexEvent,
+      content-search-index-delete.v1:com.codeit.mople.domain.content.event.ContentSearchIndexDeleteEvent,
+      user-search-index.v1:com.codeit.mople.domain.user.event.UserSearchIndexEvent,
+      review-created.v1:com.codeit.mople.domain.review.event.ReviewCreatedEvent,
+      review-updated.v1:com.codeit.mople.domain.review.event.ReviewUpdatedEvent,
+      review-deleted.v1:com.codeit.mople.domain.review.event.ReviewDeletedEvent,
+      notification-created.v1:com.codeit.mople.domain.notification.event.NotificationCreatedEvent,
+      direct-message-created.v1:com.codeit.mople.domain.directmessage.event.DirectMessageCreatedEvent
 
   elasticsearch:
     dm-retention-days: 365

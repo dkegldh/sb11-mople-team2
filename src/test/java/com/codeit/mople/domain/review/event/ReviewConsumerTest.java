@@ -5,6 +5,7 @@ import static org.mockito.Mockito.verify;
 
 import com.codeit.mople.domain.content.repository.ContentRepository;
 import com.codeit.mople.global.event.processed.ProcessedEventRepository;
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -47,7 +48,7 @@ public class ReviewConsumerTest {
 
       UUID eventId = UUID.randomUUID();
 
-      ReviewCreatedEvent event = new ReviewCreatedEvent(eventId, contentId, 4.0);
+      ReviewCreatedEvent event = new ReviewCreatedEvent(eventId, Instant.now(), contentId, 4.0);
 
       given(processedEventRepository.insertIfAbsent(eventId))
           .willReturn(1);
@@ -75,7 +76,7 @@ public class ReviewConsumerTest {
 
       UUID eventId = UUID.randomUUID();
 
-      ReviewUpdatedEvent event = new ReviewUpdatedEvent(eventId, contentId, 4.0, 5.0);
+      ReviewUpdatedEvent event = new ReviewUpdatedEvent(eventId, Instant.now(), contentId, 4.0, 5.0);
 
       given(processedEventRepository.insertIfAbsent(eventId))
           .willReturn(1);
@@ -103,7 +104,7 @@ public class ReviewConsumerTest {
 
       UUID eventId = UUID.randomUUID();
 
-      ReviewDeletedEvent event = new ReviewDeletedEvent(eventId, contentId, 4.0);
+      ReviewDeletedEvent event = new ReviewDeletedEvent(eventId, Instant.now(), contentId, 4.0);
 
       given(processedEventRepository.insertIfAbsent(eventId))
           .willReturn(1);

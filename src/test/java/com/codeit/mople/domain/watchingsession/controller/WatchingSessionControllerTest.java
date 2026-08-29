@@ -4,15 +4,20 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.codeit.mople.domain.content.exception.ContentErrorCode;
 import com.codeit.mople.domain.content.exception.ContentException;
 import com.codeit.mople.domain.watchingsession.dto.CursorResponseWatchingSessionDto;
+import com.codeit.mople.domain.watchingsession.dto.WatchingSessionContentDto;
+import com.codeit.mople.domain.watchingsession.dto.WatchingSessionResponse;
 import com.codeit.mople.domain.watchingsession.service.WatchingSessionService;
+import com.codeit.mople.global.dto.UserSummary;
 import com.codeit.mople.global.error.DiscordWebhookService;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -41,27 +46,40 @@ class WatchingSessionControllerTest {
   private DiscordWebhookService discordWebhookService;
 
   @Test
-  @DisplayName("특정 유저 시청 중인 콘텐츠 ID 조회 성공 - 200 OK")
+  @DisplayName("특정 유저 시청 세션 조회 성공 - 200 OK (콘텐츠 정보 포함)")
   void getWatchingSessionForUser_Success() throws Exception {
     UUID watcherId = UUID.randomUUID();
     UUID contentId = UUID.randomUUID();
+    UUID sessionId = UUID.randomUUID();
 
-    given(watchingSessionService.getWatchingContentId(watcherId)).willReturn(contentId);
+    WatchingSessionResponse mockResponse = new WatchingSessionResponse(
+        sessionId,
+        Instant.now(),
+        new UserSummary(watcherId, "시청자", null),
+        new WatchingSessionContentDto(
+            contentId, "MOVIE", "테스트 콘텐츠", "설명", null, List.of(), 0.0, 0L)
+    );
+
+    given(watchingSessionService.getWatchingSessionForUser(watcherId)).willReturn(mockResponse);
 
     mockMvc.perform(get("/api/users/{watcherId}/watching-sessions", watcherId))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.contentId").value(contentId.toString()));
+        .andExpect(jsonPath("$.id").value(sessionId.toString()))
+        .andExpect(jsonPath("$.watcher.userId").value(watcherId.toString()))
+        .andExpect(jsonPath("$.content.id").value(contentId.toString()))
+        .andExpect(jsonPath("$.content.title").value("테스트 콘텐츠"));
   }
 
   @Test
-  @DisplayName("특정 유저 시청 중인 콘텐츠 ID 조회 (시청 중 아님) - 204 No Content")
-  void getWatchingSessionForUser_NoContent() throws Exception {
+  @DisplayName("특정 유저 시청 세션 조회 (시청 중 아님) - 200 OK, 본문 없음")
+  void getWatchingSessionForUser_EmptyBody() throws Exception {
     UUID watcherId = UUID.randomUUID();
 
-    given(watchingSessionService.getWatchingContentId(watcherId)).willReturn(null);
+    given(watchingSessionService.getWatchingSessionForUser(watcherId)).willReturn(null);
 
     mockMvc.perform(get("/api/users/{watcherId}/watching-sessions", watcherId))
-        .andExpect(status().isNoContent());
+        .andExpect(status().isOk())
+        .andExpect(content().string(""));
   }
 
   @Test

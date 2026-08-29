@@ -4,6 +4,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -260,8 +261,8 @@ class FollowControllerTest {
     @DisplayName("팔로우를 찾을 수 없으면 400을 반환")
     void cancelFollowFailWhenFollowNotFound() throws Exception {
       // given
-      given(followService.unFollow(followId, followerId))
-          .willThrow(new FollowException(FollowErrorCode.UNFOLLOW_NOT_FOUND));
+      willThrow(new FollowException(FollowErrorCode.UNFOLLOW_NOT_FOUND))
+          .given(followService).unFollow(followId, followerId);
 
       // when, then
       mockMvc.perform(delete("/api/follows/{followId}", followId)
@@ -276,8 +277,8 @@ class FollowControllerTest {
     @DisplayName("본인의 팔로우가 아니면 403을 반환")
     void cancelFollowFailWhenNotOwner() throws Exception {
       // given
-      given(followService.unFollow(followId, followerId))
-          .willThrow(new FollowException(FollowErrorCode.UNFOLLOW_NOT_OWNER));
+      willThrow(new FollowException(FollowErrorCode.UNFOLLOW_NOT_OWNER))
+          .given(followService).unFollow(followId, followerId);
 
       // when, then
       mockMvc.perform(delete("/api/follows/{followId}", followId)

@@ -21,8 +21,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("팔로우 생성 이벤트 Kafka 릴레이 테스트")
-class FollowCreatedEventRelayTest {
+@DisplayName("팔로우 생성 이벤트 Kafka 발행 테스트")
+class FollowEventProducerTest {
 
   private static final String TOPIC = "mople.follow.created.v1";
 
@@ -30,9 +30,9 @@ class FollowCreatedEventRelayTest {
   KafkaEventPublisher publisher;
 
   @Captor
-  ArgumentCaptor<FollowCreatedMessage> messageCaptor;
+  ArgumentCaptor<FollowCreatedEvent> eventCaptor;
 
-  FollowCreatedEventRelay relay;
+  FollowEventProducer producer;
 
   UUID followId;
   UUID followeeId;
@@ -46,17 +46,20 @@ class FollowCreatedEventRelayTest {
         "localhost:9092",
         new KafkaProperties.Topics(
             "mople.follow.created.v1",
-            "playlist-events.v1",
+            "mople.playlist-events.v1",
             "mople.playlist.content-added.v1",
+            "mople.review.created.v1",
+            "mople.review.updated.v1",
+            "mople.review.deleted.v1",
             "mople.direct-message.created.v1",
             "mople.notification.created.v1",
-            "content-search-index-events.v1",
-            "user-search-index-events.v1",
-            "playlist-search-index-events.v1"
+            "mople.content-search-index-events.v1",
+            "mople.user-search-index-events.v1",
+            "mople.playlist-search-index-events.v1"
         )
     );
 
-    relay = new FollowCreatedEventRelay(publisher, properties);
+    producer = new FollowEventProducer(publisher, properties);
 
     followId = UUID.randomUUID();
     followeeId = UUID.randomUUID();
@@ -67,71 +70,46 @@ class FollowCreatedEventRelayTest {
 
   @Nested
   @DisplayName("이벤트 발행")
-  class Relay {
+  class Publish {
 
     @Test
     @DisplayName("설정된 토픽으로 발행하는지")
     void publishesToConfiguredTopic() {
       // when
-      relay.relay(event);
+      producer.on(event);
 
       // then
       verify(publisher).publish(eq(TOPIC),
-          anyString(), messageCaptor.capture());
+          anyString(), eventCaptor.capture());
     }
 
     @Test
     @DisplayName("파티션 키가 followeeId 인지")
     void usesFolloweeIdAsPartitionKey() {
       // when
-      relay.relay(event);
+      producer.on(event);
 
       // then
-      verify(publisher).publish(eq(TOPIC), eq(followeeId.toString()), any(FollowCreatedMessage.class));
+      verify(publisher).publish(eq(TOPIC), eq(followeeId.toString()), any(FollowCreatedEvent.class));
     }
 
     @Test
-    @DisplayName("원본 이벤트의 값이 페이로드에 그대로 실리는지")
+    @DisplayName("원본 이벤트가 그대로 페이로드로 실리는지")
     void carriesEventPayload() {
       // when
-      relay.relay(event);
+      producer.on(event);
 
       // then
       verify(publisher).publish(eq(TOPIC),
-          anyString(), messageCaptor.capture());
+          anyString(), eventCaptor.capture());
 
-      FollowCreatedMessage message = messageCaptor.getValue();
-      assertThat(message.followId()).isEqualTo(followId);
-      assertThat(message.followeeId()).isEqualTo(followeeId);
-      assertThat(message.followerId()).isEqualTo(followerId);
-      assertThat(message.followerName()).isEqualTo("아메리카노좋아");
-    }
-  }
-
-  @Nested
-  @DisplayName("메시지 변환")
-  class MessageMapping {
-
-    @Test
-    @DisplayName("도메인 이벤트의 id와 발생 시각을 그대로 싣는지")
-    void carriesEventIdAndOccurredAt() {
-      // when
-      FollowCreatedMessage message = FollowCreatedMessage.from(event);
-
-      // then
-      assertThat(message.eventId()).isEqualTo(event.eventId());
-      assertThat(message.occurredAt()).isEqualTo(event.occurredAt());
-    }
-
-    @Test
-    @DisplayName("같은 도메인 이벤트를 다시 변환해도 이벤트 id가 유지되는지")
-    void keepsEventIdAcrossCalls() {
-      // when
-      FollowCreatedMessage first = FollowCreatedMessage.from(event);
-      FollowCreatedMessage second = FollowCreatedMessage.from(event);
-
-      // then
-      assertThat(first.eventId()).isEqualTo(second.eventId());
+      FollowCreatedEvent published = eventCaptor.getValue();
+      assertThat(published.eventId()).isEqualTo(event.eventId());
+      assertThat(published.occurredAt()).isEqualTo(event.occurredAt());
+      assertThat(published.followId()).isEqualTo(followId);
+      assertThat(published.followeeId()).isEqualTo(followeeId);
+      assertThat(published.followerId()).isEqualTo(followerId);
+      assertThat(published.followerName()).isEqualTo("아메리카노좋아");
     }
   }
 }

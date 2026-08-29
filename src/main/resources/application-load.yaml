@@ -66,6 +66,7 @@ spring:
 logging:
   level:
     com.codeit.mople: INFO
+    com.codeit.mople.global.sse: DEBUG
 
 jwt:
   secret: local-dev-secret-key-change-this-1234567890
@@ -114,11 +115,13 @@ app:
     allowed-origins:
       - "http://localhost:5173"
       - "http://localhost:8080"
+      - "http://localhost:8081"
 
   websocket:
     allowed-origins:
       - "http://localhost:5173"
       - "http://localhost:8080"
+      - "http://localhost:8081"
 
 sse:
   server-id: "test"

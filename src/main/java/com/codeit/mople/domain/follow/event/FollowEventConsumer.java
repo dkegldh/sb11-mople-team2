@@ -23,19 +23,19 @@ public class FollowEventConsumer {
 
   @Transactional
   @KafkaListener(topics = "${spring.kafka.topics.follow-created}")
-  public void handle(FollowCreatedMessage message) {
-    if (checkAndRecordProcessedEvent(message.eventId())) {
+  public void handle(FollowCreatedEvent event) {
+    if (checkAndRecordProcessedEvent(event.eventId())) {
       return;
     }
 
     notificationCreator.createNotification(
-        message.followeeId(),
+        event.followeeId(),
         "새로운 팔로워가 생겼습니다.",
-        message.followerName() + "님이 팔로우했습니다.",
+        event.followerName() + "님이 팔로우했습니다.",
         NotificationType.NEW_FOLLOWER
     );
 
-    log.info("팔로우 생성 이벤트 처리 완료: followId={}", message.followId());
+    log.info("팔로우 생성 이벤트 처리 완료: followId={}", event.followId());
   }
 
   private boolean checkAndRecordProcessedEvent(UUID eventId) {

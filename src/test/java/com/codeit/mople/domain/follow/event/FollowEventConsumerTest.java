@@ -45,14 +45,14 @@ class FollowEventConsumerTest {
   void handle_success() {
     // given
     UUID eventId = UUID.randomUUID();
-    FollowCreatedMessage message = new FollowCreatedMessage(
+    FollowCreatedEvent event = new FollowCreatedEvent(
         eventId, Instant.now(), followId, followeeId, followerId, "팔로워"
     );
 
     given(processedEventRepository.insertIfAbsent(eventId)).willReturn(1);
 
     // when
-    eventConsumer.handle(message);
+    eventConsumer.handle(event);
 
     // then
     verify(processedEventRepository).insertIfAbsent(eventId);
@@ -69,14 +69,14 @@ class FollowEventConsumerTest {
   void handle_success_already_processed_skip() {
     // given
     UUID eventId = UUID.randomUUID();
-    FollowCreatedMessage message = new FollowCreatedMessage(
+    FollowCreatedEvent event = new FollowCreatedEvent(
         eventId, Instant.now(), followId, followeeId, followerId, "팔로워"
     );
 
     given(processedEventRepository.insertIfAbsent(eventId)).willReturn(0);
 
     // when
-    eventConsumer.handle(message);
+    eventConsumer.handle(event);
 
     // then
     verify(processedEventRepository).insertIfAbsent(eventId);

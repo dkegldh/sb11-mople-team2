@@ -3,8 +3,8 @@ package com.codeit.mople.domain.watchingsession.controller;
 import com.codeit.mople.domain.auth.security.CustomUserDetails;
 import com.codeit.mople.domain.watchingsession.controller.api.WatchingSessionApi;
 import com.codeit.mople.domain.watchingsession.dto.CursorResponseWatchingSessionDto;
+import com.codeit.mople.domain.watchingsession.dto.WatchingSessionResponse;
 import com.codeit.mople.domain.watchingsession.service.WatchingSessionService;
-import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -22,20 +22,12 @@ public class WatchingSessionController implements WatchingSessionApi {
 
   private final WatchingSessionService watchingSessionService;
 
-  //특정 유저가 시청 중인 콘텐츠 ID 조회
+  //특정 유저가 시청 중인 세션 조회
+  //시청 중이 아니면 본문 없이 200을 반환한다(스펙상 응답은 200 하나이고 nullable)
   @GetMapping("/users/{watcherId}/watching-sessions")
-  public ResponseEntity<Map<String, UUID>> getWatchingSessionForUser(
+  public ResponseEntity<WatchingSessionResponse> getWatchingSessionForUser(
       @PathVariable UUID watcherId) {
-    UUID contentId = watchingSessionService.getWatchingContentId(watcherId);
-
-    //만약 시청 중인 콘텐츠가 없다면(null이라면)
-    if (contentId == null) {
-      //204 No Content 반환
-      return ResponseEntity.noContent().build();
-    }
-
-    //시청 중인 콘텐츠가 있다면 정상적으로 200 OK + 데이터 반환
-    return ResponseEntity.ok(Map.of("contentId", contentId));
+    return ResponseEntity.ok(watchingSessionService.getWatchingSessionForUser(watcherId));
   }
 
   //콘텐츠 실시간 시청자 목록 조회

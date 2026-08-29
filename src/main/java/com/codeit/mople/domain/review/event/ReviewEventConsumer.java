@@ -24,7 +24,7 @@ public class ReviewEventConsumer {
 
   // 기본 전파레벨은 REQUIRED(트랜잭션 내에서 이 메서드가 호출되면 트랜잭션 새로 생성하지 않고 그 트랜잭션에 참여)
   @Transactional
-  @KafkaListener(topics = "review-created")
+  @KafkaListener(topics = "${spring.kafka.topics.review-created}")
   public void handle(ReviewCreatedEvent event) {
     log.debug("리뷰 생성 후 콘텐츠 통계 업데이트 시도: contentId={}, rating={}",
         event.contentId(), event.rating());
@@ -43,7 +43,7 @@ public class ReviewEventConsumer {
   }
 
   @Transactional
-  @KafkaListener(topics = "review-updated")
+  @KafkaListener(topics = "${spring.kafka.topics.review-updated}")
   public void handle(ReviewUpdatedEvent event) {
     log.debug("리뷰 수정 후 콘텐츠 통계 업데이트 시도: contentId={}, oldRating={}, newRating={}",
         event.contentId(), event.oldRating(), event.newRating());
@@ -63,7 +63,7 @@ public class ReviewEventConsumer {
   }
 
   @Transactional
-  @KafkaListener(topics = "review-deleted")
+  @KafkaListener(topics = "${spring.kafka.topics.review-deleted}")
   public void handle(ReviewDeletedEvent event) {
     log.debug("리뷰 삭제 후 콘텐츠 통계 업데이트 시도: contentId={}, rating={}",
         event.contentId(), event.rating());

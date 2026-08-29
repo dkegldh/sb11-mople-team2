@@ -1,11 +1,8 @@
 package com.codeit.mople.global.config;
 
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import jakarta.annotation.PreDestroy;
 import java.time.Duration;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import org.springframework.beans.factory.annotation.Value;
+import lombok.RequiredArgsConstructor;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CachingConfigurer;
 import org.springframework.cache.annotation.EnableCaching;
@@ -25,7 +22,10 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 // order를 낮춰 캐시 어드바이스를 트랜잭션 바깥에 고정함
 @EnableCaching(order = Ordered.LOWEST_PRECEDENCE - 1)
 @Configuration
+@RequiredArgsConstructor
 public class RedisConfig implements CachingConfigurer {
+
+  private final RedisCacheErrorHandler cacheErrorHandler;
 
   // 캐시별 설정이 없을 때의 기본 만료 시간
   private static final Duration DEFAULT_TTL = Duration.ofMinutes(10);
@@ -58,7 +58,7 @@ public class RedisConfig implements CachingConfigurer {
   @Bean
   public CacheManager cacheManager(
       RedisConnectionFactory connectionFactory,
-      @Value("${redis.namespace}") String namespace) {
+      RedisNamespaceProperties properties) {
 
     // 기존 로직에 namespace만 추가
     RedisCacheConfiguration defaultConfiguration = RedisCacheConfiguration.defaultCacheConfig()
@@ -67,7 +67,7 @@ public class RedisConfig implements CachingConfigurer {
         .serializeValuesWith(RedisSerializationContext.SerializationPair
             .fromSerializer(jsonSerializer()))
         .entryTtl(DEFAULT_TTL)
-        .prefixCacheNameWith(namespace + ":cache:");
+        .prefixCacheNameWith(properties.cacheKeyPrefix());
 
     // followCont 값 타입을 고정하지 않으면 long이 Integer로 되돌아와 캐시 히트에서 터짐 그래서 long으로 고정
     RedisCacheConfiguration followCountConfiguration = defaultConfiguration
@@ -92,24 +92,9 @@ public class RedisConfig implements CachingConfigurer {
         .build();
   }
 
-  // 비동기로 재시도 수행하기 위한 캐시 무효화 재시도 전용 스레드 풀
-  private final ScheduledExecutorService evictRetryScheduler =
-      // 싱글스레드 -> 이름"cache-evict-retry" 지정 -> 데몬스레드 지정 -> 스레드 리턴
-      Executors.newSingleThreadScheduledExecutor(runnable -> {
-        Thread thread = new Thread(runnable, "cache-evict-retry");
-        thread.setDaemon(true);
-        return thread;
-      });
-
-  // 서버가 종료 될 때 evictRetryScheduler의 스레드 풀을 종료시켜주는 역할(스레드 누수방지)
-  @PreDestroy
-  void shutdownEvictRetryScheduler() {
-    evictRetryScheduler.shutdownNow();
-  }
-
   @Override
   public CacheErrorHandler errorHandler() {
-    return new RedisCacheErrorHandler(evictRetryScheduler);
+    return cacheErrorHandler;
   }
 
   private GenericJackson2JsonRedisSerializer jsonSerializer() {
