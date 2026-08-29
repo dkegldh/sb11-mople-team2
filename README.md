@@ -1,6 +1,6 @@
 
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0:E50914&height=250&section=header&text=모두의%20플리&fontSize=100&fontColor=B20710&fontAlignY=45&animation=scaleIn" width="100%"/>
+<img src="https://capsule-render.vercel.app/api?type=waving&color=000000&height=250&section=header&text=모두의%20플리&fontSize=100&fontColor=B20710&fontAlignY=45&animation=scaleIn" width="100%"/>
 
 <div align="center">
 
@@ -394,4 +394,4 @@ main (production)
 
 <br/>
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0:221F1F,100:E50914&height=120&section=footer" width="100%"/>
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:000000,100:B20710&height=120&section=footer" width="100%"/>
