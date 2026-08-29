@@ -2,7 +2,9 @@
 # 라운드로빈. Cloud Map 서비스 디스커버리는 EC2/bridge 모드에서 SRV 레코드만
 # 지원하는데(오픈소스 nginx는 SRV 미지원) NAT 게이트웨이 없이는 awsvpc도 못 써서,
 # 지금 단계(고정 3대 테스트)에서는 IP를 직접 넣는 방식으로 단순화했다. 인스턴스가
-# 교체되면 이 파일의 IP를 수동으로 갱신해야 한다.
+# 교체되면 APP_INSTANCE_1/2/3 환경변수(ecs/task-def-nginx.json)만 갱신하고
+# nginx 재배포하면 된다 (이미지 재빌드 불필요, docker-entrypoint의 envsubst가
+# 이 파일의 ${...} 자리를 컨테이너 시작 시 실제 값으로 치환한다).
 # ip_hash: WebSocket/SockJS는 연결 상태를 처음 받은 서버가 메모리에 들고 있어서,
 # 같은 클라이언트의 요청이 매번 다른 서버로 라운드로빈되면 세션을 못 찾아 끊긴다.
 # 같은 IP는 항상 같은 서버로 고정시켜서 세션 연속성을 보장한다.
@@ -19,17 +21,17 @@ log_format sticky_debug '$remote_addr -> $upstream_addr [$time_local] "$request"
 
 # 일반 API 트래픽용 - 진짜 라운드로빈으로 3대에 고르게 분산
 upstream app_server {
-    server 172.31.61.239:8080;
-    server 172.31.13.97:8080;
-    server 172.31.42.248:8080;
+    server ${APP_INSTANCE_1}:8080;
+    server ${APP_INSTANCE_2}:8080;
+    server ${APP_INSTANCE_3}:8080;
 }
 
 # 실시간(WebSocket/SSE) 전용 - 같은 클라이언트는 같은 서버로 고정
 upstream app_server_sticky {
     ip_hash;
-    server 172.31.61.239:8080;
-    server 172.31.13.97:8080;
-    server 172.31.42.248:8080;
+    server ${APP_INSTANCE_1}:8080;
+    server ${APP_INSTANCE_2}:8080;
+    server ${APP_INSTANCE_3}:8080;
 }
 
 server {
