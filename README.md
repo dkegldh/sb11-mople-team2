@@ -85,10 +85,10 @@
   </td>
 </tr>
 <tr>
-  <td align="center"><sub><b>팀장 · Auth &amp; Infra</b><br/>인증·인가<br/>JWT · OAuth2 소셜 로그인<br/>Redis 세션·토큰 관리<br/>ECS Fargate 전환 · CI/CD</sub></td>
+  <td align="center"><sub><b>팀장 · Auth &amp; Infra</b><br/>인증·인가<br/>JWT · OAuth2 소셜 로그인<br/>Redis 세션·토큰 관리<br/>CI/CD</sub></td>
   <td align="center"><sub><b>Content &amp; Monitoring</b><br/>콘텐츠 CRUD<br/>시청 세션 · 채팅<br/>SportsDB 배치 · 분산 락<br/>Actuator 메트릭 · S3</sub></td>
   <td align="center"><sub><b>Batch &amp; Resiliency</b><br/>팔로우<br/>TMDB · Spring Batch<br/>Kafka 롤백 · DLT<br/>Redis 분산 락 · 캐시</sub></td>
-  <td align="center"><sub><b>Playlist &amp; Kafka</b><br/>리뷰 · 플레이리스트<br/>Kafka 비동기 전환<br/>Elasticsearch 검색<br/>k6 부하 테스트</sub></td>
+  <td align="center"><sub><b>Playlist &amp; Review</b><br/>리뷰 · 플레이리스트<br/>Kafka 비동기 전환<br/>Elasticsearch 검색<br/>k6 부하 테스트</sub></td>
   <td align="center"><sub><b>Conversation &amp; WebSocket</b><br/>DM 대화방<br/>WebSocket 송수신<br/>Redis Lua 워터마크<br/>비관적 락 최적화</sub></td>
   <td align="center"><sub><b>Admin &amp; Notification</b><br/>어드민 권한 · 계정 잠금<br/>강제 로그아웃<br/>Spring Event · Kafka 알림<br/>Nginx 다중 인스턴스</sub></td>
 </tr>
@@ -102,12 +102,12 @@
 
 | 단계 | 기간 | 주요 작업 |
 |:---|:---|:---|
-| **사전 준비** | `~ 07.26` | ERD·API 명세, 브랜치 전략, 프로젝트 스켈레톤, CI/CD(커버리지 80% 게이트) 세팅 |
+| **사전 준비** | `~ 07.26` | ERD·API 명세, 브랜치 전략, 프로젝트 스켈레톤, CI(커버리지 80% 게이트) 세팅 |
 | **Phase 1** | `07.27 ~ 07.30` | 핵심 엔티티 설계, 기본 CRUD API 구현 및 테스트 |
 | **Phase 2** | `07.30 ~ 08.04` | JWT 인증 필터 적용 및 전 도메인 커서 페이지네이션 구축 |
 | **Phase 3** | `08.05 ~ 08.14` | TMDB·SportsDB 수집 파이프라인 연동, WebSocket·SSE 통신 기반 마련, 소셜 로그인 연동 |
 | **Phase 4** | `08.15 ~ 08.21` | Kafka 도입(알림·이벤트 비동기화), Redis 분산 락 적용, AWS EC2 배포 및 S3 스토리지 연동 |
-| **Phase 5** | `08.22 ~ 08.28` | Elasticsearch 검색 고도화, ECS Fargate 배포 전환, Kafka DLT 고도화 및 부하 테스트 |
+| **Phase 5** | `08.22 ~ 08.28` | Elasticsearch 검색 고도화, ECS Fargate 배포 전환 및 CD 파이프라인 구축, Kafka DLT 고도화 및 부하 테스트 |
 
 <br/>
 
@@ -314,6 +314,11 @@ erDiagram
         varchar notification_type
         timestamptz created_at
     }
+
+    PROCESSED_EVENTS {
+        uuid event_id PK "Kafka 이벤트 ID"
+        varchar status "PENDING · PROCESSED"
+    }
 ```
 
 ---
@@ -387,7 +392,7 @@ main (production)
 | 항목 | 규칙 |
 |:---|:---|
 | **type** | `feature` `fix` `refactor` `docs` `test` `chore` `batch` `deploy` |
-| **push** | `develop` · `main` 직접 push 금지 — fork에서 작업 후 upstream `develop`으로 PR |
+| **push** | `develop` · `main` 직접 push 금지 |
 | **머지** | **2인 이상** 리뷰 승인 후 **Squash and Merge** (PR 제목 = squash 커밋 메시지) |
 | **이슈 제목** | `[FEAT] 팔로우 생성 구현` |
 | **커밋 메시지** | `feat: 팔로우 생성 구현` · `fix: 중복 구독 방지 버그 수정` |
