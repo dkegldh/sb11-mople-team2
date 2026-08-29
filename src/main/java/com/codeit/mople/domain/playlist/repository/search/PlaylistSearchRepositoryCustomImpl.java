@@ -1,5 +1,7 @@
 package com.codeit.mople.domain.playlist.repository.search;
 
+import co.elastic.clients.elasticsearch._types.SortOptions;
+import co.elastic.clients.elasticsearch._types.SortOrder;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import com.codeit.mople.domain.playlist.dto.request.PlaylistQueryCondition.PlaylistSortBy;
 import com.codeit.mople.global.dto.SearchResult;
@@ -9,7 +11,6 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHit;
@@ -89,24 +90,29 @@ public class PlaylistSearchRepositoryCustomImpl
     );
   }
 
-  private Sort getSort(
+  // Sort.Order로 "id"(@Id 필드)를 정렬하면 Spring Data Elasticsearch가
+  // 존재하지 않는 "id.keyword" 서브필드로 변환해버려 검색이 깨진다.
+  // SortOptions로 실제 매핑된 필드명("id")을 직접 지정해 이를 우회한다.
+  private List<SortOptions> getSort(
       PlaylistSortBy sortBy,
       SortDirection sortDirection
   ) {
-    Sort.Direction direction =
+    SortOrder direction =
         sortDirection == SortDirection.ASCENDING
-            ? Sort.Direction.ASC
-            : Sort.Direction.DESC;
+            ? SortOrder.Asc
+            : SortOrder.Desc;
+
+    SortOptions idSort = SortOptions.of(s -> s.field(f -> f.field("id").order(SortOrder.Asc)));
 
     return switch (sortBy) {
-      case UPDATED_AT -> Sort.by(
-          new Sort.Order(direction, "updatedAt"),
-          new Sort.Order(Sort.Direction.ASC, "id")
+      case UPDATED_AT -> List.of(
+          SortOptions.of(s -> s.field(f -> f.field("updatedAt").order(direction))),
+          idSort
       );
 
-      case SUBSCRIBE_COUNT -> Sort.by(
-          new Sort.Order(direction, "subscribeCount"),
-          new Sort.Order(Sort.Direction.ASC, "id")
+      case SUBSCRIBE_COUNT -> List.of(
+          SortOptions.of(s -> s.field(f -> f.field("subscribeCount").order(direction))),
+          idSort
       );
     };
   }
