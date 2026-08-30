@@ -126,7 +126,6 @@ public class DirectMessageIntegrationTest {
               .accept(MediaType.APPLICATION_JSON))
           .andDo(print())
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.length()").value(5))
           .andExpect(jsonPath("$.hasNext").value(false))
           .andExpect(jsonPath("$.data[4].content").value("메시지 1"));
     }

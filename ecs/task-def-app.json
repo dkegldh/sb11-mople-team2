@@ -1,0 +1,84 @@
+{
+  "family": "mople-app-lb",
+  "networkMode": "bridge",
+  "requiresCompatibilities": ["EC2"],
+  "cpu": "512",
+  "memory": "800",
+  "executionRoleArn": "arn:aws:iam::291883201761:role/ecsTaskExecutionRole",
+  "containerDefinitions": [
+    {
+      "name": "app",
+      "image": "291883201761.dkr.ecr.ap-northeast-2.amazonaws.com/mople-app-lb:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "name": "app",
+          "containerPort": 8080,
+          "hostPort": 8080,
+          "protocol": "tcp"
+        }
+      ],
+      "extraHosts": [
+        {
+          "hostname": "mople-elasticsearch",
+          "ipAddress": "172.31.43.182"
+        }
+      ],
+      "entryPoint": ["sh", "-c"],
+      "command": [
+        "export SSE_SERVER_ID=\"app-$HOSTNAME\" && echo \"$ELASTICSEARCH_CA_CERT\" > /tmp/es-ca.crt && export ELASTICSEARCH_CA_PATH=file:/tmp/es-ca.crt && exec java -XX:MaxRAMPercentage=65.0 -XX:+ExitOnOutOfMemoryError -jar app.jar"
+      ],
+      "healthCheck": {
+        "command": ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 240
+      },
+      "environment": [
+        { "name": "SPRING_PROFILES_ACTIVE", "value": "prod" },
+        { "name": "COOKIE_SECURE", "value": "false" },
+        { "name": "KAFKA_ENABLED", "value": "true" },
+        { "name": "KAFKA_BOOTSTRAP_SERVERS", "value": "172.31.47.10:9093" },
+        { "name": "TMDB_COLLECT_ENABLED", "value": "true" },
+        { "name": "DB_URL", "value": "jdbc:postgresql://mople-db.cnqucemckqxu.ap-northeast-2.rds.amazonaws.com:5432/mople_db" },
+        { "name": "REDIS_HOST", "value": "clustercfg.mople-redis.ffzjwk.apn2.cache.amazonaws.com" },
+        { "name": "REDIS_PORT", "value": "6379" },
+        { "name": "ELASTICSEARCH_URI", "value": "mople-elasticsearch" },
+        { "name": "ELASTICSEARCH_PORT", "value": "9200" },
+        { "name": "ELASTICSEARCH_SSL_ENABLED", "value": "true" },
+        { "name": "FRONTEND_ORIGIN", "value": "https://nginx.mople.store" },
+        { "name": "CORS_ALLOWED_ORIGIN", "value": "https://nginx.mople.store" }
+      ],
+      "secrets": [
+        { "name": "DB_USERNAME", "valueFrom": "arn:aws:ssm:ap-northeast-2:291883201761:parameter/mople/DB_USERNAME" },
+        { "name": "DB_PASSWORD", "valueFrom": "arn:aws:ssm:ap-northeast-2:291883201761:parameter/mople/DB_PASSWORD" },
+        { "name": "REDIS_PASSWORD", "valueFrom": "arn:aws:ssm:ap-northeast-2:291883201761:parameter/mople/REDIS_PASSWORD" },
+        { "name": "AWS_S3_ACCESS_KEY_ID", "valueFrom": "arn:aws:ssm:ap-northeast-2:291883201761:parameter/mople/AWS_S3_ACCESS_KEY_ID" },
+        { "name": "AWS_S3_SECRET_ACCESS_KEY", "valueFrom": "arn:aws:ssm:ap-northeast-2:291883201761:parameter/mople/AWS_S3_SECRET_ACCESS_KEY" },
+        { "name": "GOOGLE_CLIENT_ID", "valueFrom": "arn:aws:ssm:ap-northeast-2:291883201761:parameter/mople/GOOGLE_CLIENT_ID" },
+        { "name": "GOOGLE_CLIENT_SECRET", "valueFrom": "arn:aws:ssm:ap-northeast-2:291883201761:parameter/mople/GOOGLE_CLIENT_SECRET" },
+        { "name": "KAKAO_CLIENT_ID", "valueFrom": "arn:aws:ssm:ap-northeast-2:291883201761:parameter/mople/KAKAO_CLIENT_ID" },
+        { "name": "KAKAO_CLIENT_SECRET", "valueFrom": "arn:aws:ssm:ap-northeast-2:291883201761:parameter/mople/KAKAO_CLIENT_SECRET" },
+        { "name": "BREVO_SMTP_USERNAME", "valueFrom": "arn:aws:ssm:ap-northeast-2:291883201761:parameter/mople/BREVO_SMTP_USERNAME" },
+        { "name": "BREVO_SMTP_PASSWORD", "valueFrom": "arn:aws:ssm:ap-northeast-2:291883201761:parameter/mople/BREVO_SMTP_PASSWORD" },
+        { "name": "JWT_SECRET", "valueFrom": "arn:aws:ssm:ap-northeast-2:291883201761:parameter/mople/JWT_SECRET" },
+        { "name": "TMDB_API_KEY", "valueFrom": "arn:aws:ssm:ap-northeast-2:291883201761:parameter/mople/TMDB_API_KEY" },
+        { "name": "SPORTSDB_API_KEY", "valueFrom": "arn:aws:ssm:ap-northeast-2:291883201761:parameter/mople/SPORTSDB_API_KEY" },
+        { "name": "ADMIN_PASSWORD", "valueFrom": "arn:aws:ssm:ap-northeast-2:291883201761:parameter/mople/ADMIN_PASSWORD" },
+        { "name": "ELASTIC_USERNAME", "valueFrom": "arn:aws:ssm:ap-northeast-2:291883201761:parameter/mople/ELASTIC_USERNAME" },
+        { "name": "ELASTIC_PASSWORD", "valueFrom": "arn:aws:ssm:ap-northeast-2:291883201761:parameter/mople/ELASTIC_PASSWORD" },
+        { "name": "DISCORD_WEBHOOK_URL", "valueFrom": "arn:aws:ssm:ap-northeast-2:291883201761:parameter/mople/DISCORD_WEBHOOK_URL" },
+        { "name": "ELASTICSEARCH_CA_CERT", "valueFrom": "arn:aws:ssm:ap-northeast-2:291883201761:parameter/mople/ELASTICSEARCH_CA_CERT" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/mople-app-lb",
+          "awslogs-region": "ap-northeast-2",
+          "awslogs-stream-prefix": "app"
+        }
+      }
+    }
+  ]
+}

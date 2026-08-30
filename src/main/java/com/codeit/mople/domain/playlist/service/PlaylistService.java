@@ -389,6 +389,9 @@ public class PlaylistService {
     // 플레이리리스트 삭제 전 플레이리스트 안에 들어있던 컨텐츠들을 삭제
     playlistContentRepository.deleteAllByPlaylistId(playlistId);
 
+    // 플레이리스트 구독 정보 삭제
+    playlistSubscriptionRepository.deleteAllByPlaylistId(playlistId);
+
     // deleteById도 가능하지만 where id=로 조회 후 delete하기 때문에(불필요한 조회가 발생함) 조회 실행을 뺌
     playlistRepository.delete(playlist);
 

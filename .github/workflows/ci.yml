@@ -7,7 +7,7 @@ on:
     branches: [ "main", "develop" ]
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
 
 jobs:
@@ -121,3 +121,20 @@ jobs:
           name: jacoco-report
           path: '**/build/reports/jacoco/test/html'
           retention-days: 7
+
+      - name: JaCoCo 커버리지 배지 생성
+        if: github.event_name == 'push'
+        uses: cicirello/jacoco-badge-generator@v2
+        with:
+          jacoco-csv-file: build/reports/jacoco/test/jacocoTestReport.csv
+          badges-directory: .github/badges
+
+      - name: 커버리지 배지 커밋
+        if: github.event_name == 'push'
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: 커버리지 배지 갱신"
+          file_pattern: .github/badges/*.svg
+          branch: badges
+          create_branch: true
+          push_options: '--force'

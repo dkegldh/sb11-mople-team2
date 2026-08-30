@@ -1,5 +1,7 @@
 name: CD Pipeline
 
+# nginx/EC2 트랙(직접 로드밸런싱)이 ALB/Fargate 트랙을 완전히 대체하면서
+# 이 파일도 nginx 배포 전용으로 교체됨. main에 푸시되고 CI가 통과하면 자동 실행.
 on:
   workflow_run:
     workflows: ["CI PipeLine"]
@@ -15,15 +17,18 @@ permissions:
 
 env:
   AWS_REGION: ap-northeast-2
-  ECR_REPOSITORY: mople-app
-  CONTAINER_NAME: mople-app
+  ECR_APP_REPOSITORY: mople-app-lb
+  ECR_NGINX_REPOSITORY: mople-nginx-lb
+  ECS_CLUSTER: mople-nginx-cluster
+  APP_SERVICE: mople-app-lb-service
+  NGINX_SERVICE: mople-nginx-lb-service
+  APP_TASK_DEF_FILE: ecs/task-def-app.json
+  NGINX_TASK_DEF_FILE: ecs/task-def-nginx.json
 
 jobs:
   build-and-push:
     if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main'
     runs-on: ubuntu-latest
-    outputs:
-      image: ${{ steps.build-image.outputs.image }}
 
     steps:
       - name: 저장소 체크아웃
@@ -43,23 +48,29 @@ jobs:
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Docker 이미지 빌드 및 ECR 푸시
-        id: build-image
+      - name: app 이미지 빌드 및 푸시
         env:
           REGISTRY: ${{ steps.ecr-login.outputs.registry }}
           IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
         run: |
-          docker build -t $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker tag $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $REGISTRY/$ECR_REPOSITORY:latest
-          docker push $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          docker push $REGISTRY/$ECR_REPOSITORY:latest
-          echo "image=$REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+          docker build -t $REGISTRY/$ECR_APP_REPOSITORY:$IMAGE_TAG .
+          docker tag $REGISTRY/$ECR_APP_REPOSITORY:$IMAGE_TAG $REGISTRY/$ECR_APP_REPOSITORY:latest
+          docker push $REGISTRY/$ECR_APP_REPOSITORY:$IMAGE_TAG
+          docker push $REGISTRY/$ECR_APP_REPOSITORY:latest
+
+      - name: nginx 이미지 빌드 및 푸시
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          docker build --provenance=false -f nginx/Dockerfile.prod -t $REGISTRY/$ECR_NGINX_REPOSITORY:$IMAGE_TAG ./nginx
+          docker tag $REGISTRY/$ECR_NGINX_REPOSITORY:$IMAGE_TAG $REGISTRY/$ECR_NGINX_REPOSITORY:latest
+          docker push $REGISTRY/$ECR_NGINX_REPOSITORY:$IMAGE_TAG
+          docker push $REGISTRY/$ECR_NGINX_REPOSITORY:latest
 
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
-    env:
-      IMAGE: ${{ needs.build-and-push.outputs.image }}
 
     steps:
       - name: 저장소 체크아웃
@@ -68,28 +79,6 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha }}
           persist-credentials: false
 
-      - name: 필수 Secret 검증
-        env:
-          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-          DB_URL: ${{ secrets.DB_URL }}
-          REDIS_HOST: ${{ secrets.REDIS_HOST }}
-          REDIS_PORT: ${{ secrets.REDIS_PORT }}
-          ELASTICSEARCH_URI: ${{ secrets.ELASTICSEARCH_URI }}
-          SSE_SERVER_ID: ${{ secrets.SSE_SERVER_ID }}
-          CORS_ALLOWED_ORIGIN: ${{ secrets.CORS_ALLOWED_ORIGIN }}
-        run: |
-          missing=()
-          for name in AWS_ACCOUNT_ID DB_URL REDIS_HOST REDIS_PORT ELASTICSEARCH_URI SSE_SERVER_ID CORS_ALLOWED_ORIGIN; do
-            value="${!name}"
-            if [ -z "$value" ]; then
-              missing+=("$name")
-            fi
-          done
-          if [ ${#missing[@]} -gt 0 ]; then
-            echo "::error::필수 Secret이 누락되었습니다: ${missing[*]}"
-            exit 1
-          fi
-
       - name: AWS 자격 증명 설정
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -97,81 +86,48 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Task definition에 계정 ID 채우기
-        env:
-          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      - name: app 태스크 정의 등록
+        id: register-app
         run: |
-          sed -i "s/ACCOUNT_ID_PLACEHOLDER/${AWS_ACCOUNT_ID}/g" task-definition.json
+          TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://${{ env.APP_TASK_DEF_FILE }} \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+          echo "task_def_arn=$TASK_DEF_ARN" >> "$GITHUB_OUTPUT"
 
-      - name: Render task definition
-        id: render
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
-        with:
-          task-definition: task-definition.json
-          container-name: ${{ env.CONTAINER_NAME }}
-          image: ${{ env.IMAGE }}
-
-      - name: Fill in env vars
-        id: fill-env
-        env:
-          DB_URL: ${{ secrets.DB_URL }}
-          REDIS_HOST: ${{ secrets.REDIS_HOST }}
-          REDIS_PORT: ${{ secrets.REDIS_PORT }}
-          DOMAIN_HOST: ${{ secrets.DOMAIN_HOST }}
-          FRONTEND_ORIGIN: ${{ secrets.FRONTEND_ORIGIN }}
-          CORS_ALLOWED_ORIGIN: ${{ secrets.CORS_ALLOWED_ORIGIN }}
-          COOKIE_SECURE: ${{ secrets.COOKIE_SECURE }}
-          SSE_SERVER_ID: ${{ secrets.SSE_SERVER_ID }}
-          KAFKA_ENABLED: ${{ secrets.KAFKA_ENABLED }}
-          KAFKA_BOOTSTRAP_SERVERS: ${{ secrets.KAFKA_BOOTSTRAP_SERVERS }}
-          ELASTICSEARCH_URI: ${{ secrets.ELASTICSEARCH_URI }}
-          ELASTICSEARCH_PORT: ${{ secrets.ELASTICSEARCH_PORT }}
-          ELASTICSEARCH_SECURITY_ENABLED: ${{ secrets.ELASTICSEARCH_SECURITY_ENABLED }}
-          ELASTICSEARCH_SSL_ENABLED: ${{ secrets.ELASTICSEARCH_SSL_ENABLED }}
-          TMDB_COLLECT_ENABLED: ${{ secrets.TMDB_COLLECT_ENABLED }}
+      - name: nginx 태스크 정의 등록
+        id: register-nginx
         run: |
-          jq \
-            --arg CONTAINER_NAME "$CONTAINER_NAME" \
-            --arg DB_URL "$DB_URL" \
-            --arg REDIS_HOST "$REDIS_HOST" \
-            --arg REDIS_PORT "$REDIS_PORT" \
-            --arg DOMAIN_HOST "$DOMAIN_HOST" \
-            --arg FRONTEND_ORIGIN "$FRONTEND_ORIGIN" \
-            --arg CORS_ALLOWED_ORIGIN "$CORS_ALLOWED_ORIGIN" \
-            --arg COOKIE_SECURE "$COOKIE_SECURE" \
-            --arg SSE_SERVER_ID "$SSE_SERVER_ID" \
-            --arg KAFKA_ENABLED "$KAFKA_ENABLED" \
-            --arg KAFKA_BOOTSTRAP_SERVERS "$KAFKA_BOOTSTRAP_SERVERS" \
-            --arg ELASTICSEARCH_URI "$ELASTICSEARCH_URI" \
-            --arg ELASTICSEARCH_PORT "$ELASTICSEARCH_PORT" \
-            --arg ELASTICSEARCH_SECURITY_ENABLED "$ELASTICSEARCH_SECURITY_ENABLED" \
-            --arg ELASTICSEARCH_SSL_ENABLED "$ELASTICSEARCH_SSL_ENABLED" \
-            --arg TMDB_COLLECT_ENABLED "$TMDB_COLLECT_ENABLED" \
-            '(.containerDefinitions[] | select(.name == $CONTAINER_NAME) | .environment) =
-              [
-                {name:"DB_URL", value:$DB_URL},
-                {name:"REDIS_HOST", value:$REDIS_HOST},
-                {name:"REDIS_PORT", value:$REDIS_PORT},
-                {name:"DOMAIN_HOST", value:$DOMAIN_HOST},
-                {name:"FRONTEND_ORIGIN", value:$FRONTEND_ORIGIN},
-                {name:"CORS_ALLOWED_ORIGIN", value:$CORS_ALLOWED_ORIGIN},
-                {name:"COOKIE_SECURE", value:$COOKIE_SECURE},
-                {name:"SSE_SERVER_ID", value:$SSE_SERVER_ID},
-                {name:"KAFKA_ENABLED", value:$KAFKA_ENABLED},
-                {name:"KAFKA_BOOTSTRAP_SERVERS", value:$KAFKA_BOOTSTRAP_SERVERS},
-                {name:"ELASTICSEARCH_URI", value:$ELASTICSEARCH_URI},
-                {name:"ELASTICSEARCH_PORT", value:$ELASTICSEARCH_PORT},
-                {name:"ELASTICSEARCH_SECURITY_ENABLED", value:$ELASTICSEARCH_SECURITY_ENABLED},
-                {name:"ELASTICSEARCH_SSL_ENABLED", value:$ELASTICSEARCH_SSL_ENABLED},
-                {name:"TMDB_COLLECT_ENABLED", value:$TMDB_COLLECT_ENABLED}
-              ]' \
-            "${{ steps.render.outputs.task-definition }}" > filled-task-def.json
-          echo "task-definition=filled-task-def.json" >> "$GITHUB_OUTPUT"
+          TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://${{ env.NGINX_TASK_DEF_FILE }} \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+          echo "task_def_arn=$TASK_DEF_ARN" >> "$GITHUB_OUTPUT"
 
-      - name: Deploy to ECS
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-        with:
-          task-definition: ${{ steps.fill-env.outputs.task-definition }}
-          service: mople-app-service
-          cluster: mople-cluster
-          wait-for-service-stability: true
+      - name: app 서비스 업데이트
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ${{ env.APP_SERVICE }} \
+            --task-definition ${{ steps.register-app.outputs.task_def_arn }} \
+            --force-new-deployment
+
+      - name: nginx 서비스 업데이트
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ${{ env.NGINX_SERVICE }} \
+            --task-definition ${{ steps.register-nginx.outputs.task_def_arn }} \
+            --force-new-deployment
+
+      - name: app 배포 안정화 대기
+        run: |
+          aws ecs wait services-stable \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.APP_SERVICE }}
+
+      - name: nginx 배포 안정화 대기
+        run: |
+          aws ecs wait services-stable \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.NGINX_SERVICE }}

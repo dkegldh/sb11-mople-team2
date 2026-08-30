@@ -1,0 +1,180 @@
+# 운영(ECS) 배포용 nginx 설정. app 태스크 3개(고정 EC2 IP, 고정 포트 8080)로
+# 라운드로빈. Cloud Map 서비스 디스커버리는 EC2/bridge 모드에서 SRV 레코드만
+# 지원하는데(오픈소스 nginx는 SRV 미지원) NAT 게이트웨이 없이는 awsvpc도 못 써서,
+# 지금 단계(고정 3대 테스트)에서는 IP를 직접 넣는 방식으로 단순화했다. 인스턴스가
+# 교체되면 APP_INSTANCE_1/2/3 환경변수(ecs/task-def-nginx.json)만 갱신하고
+# nginx 재배포하면 된다 (이미지 재빌드 불필요, docker-entrypoint의 envsubst가
+# 이 파일의 ${...} 자리를 컨테이너 시작 시 실제 값으로 치환한다).
+# ip_hash: WebSocket/SockJS는 연결 상태를 처음 받은 서버가 메모리에 들고 있어서,
+# 같은 클라이언트의 요청이 매번 다른 서버로 라운드로빈되면 세션을 못 찾아 끊긴다.
+# 같은 IP는 항상 같은 서버로 고정시켜서 세션 연속성을 보장한다.
+# SockJS는 실제 웹소켓 업그레이드 요청과 순수 HTTP 폴백 요청(xhr, xhr_streaming 등)이
+# 섞여있는데, 모든 요청에 Connection: upgrade를 강제로 붙이면 HTTP 폴백 쪽이 깨진다.
+# 진짜 업그레이드 요청일 때만 upgrade를 붙이고, 아니면 비워서 정상 처리되게 한다.
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+# 실시간 트래픽이 실제로 어느 백엔드로 갔는지 확인하기 위한 디버그용 로그 포맷
+log_format sticky_debug '$remote_addr -> $upstream_addr [$time_local] "$request" $status';
+
+# 일반 API 트래픽용 - 진짜 라운드로빈으로 3대에 고르게 분산
+upstream app_server {
+    server ${APP_INSTANCE_1}:8080;
+    server ${APP_INSTANCE_2}:8080;
+    server ${APP_INSTANCE_3}:8080;
+}
+
+# 실시간(WebSocket/SSE) 전용 - 같은 클라이언트는 같은 서버로 고정
+upstream app_server_sticky {
+    ip_hash;
+    server ${APP_INSTANCE_1}:8080;
+    server ${APP_INSTANCE_2}:8080;
+    server ${APP_INSTANCE_3}:8080;
+}
+
+server {
+    listen 80;
+    server_name _;
+
+    # nginx 자체 헬스체크 전용 (app 연결 상태와 무관하게 nginx 프로세스만 확인)
+    location = /nginx-health {
+        return 200 "ok\n";
+        add_header Content-Type text/plain;
+    }
+
+    # 일반 API 요청
+    location / {
+        proxy_pass http://app_server;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # WebSocket (STOMP + SockJS) - WebSocketConfig의 /ws 엔드포인트
+    location /ws {
+        access_log /var/log/nginx/access.log sticky_debug;
+        proxy_pass http://app_server_sticky;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 3600s;
+    }
+
+    # SSE - SseController의 /api/sse 엔드포인트
+    location /api/sse {
+        access_log /var/log/nginx/access.log sticky_debug;
+        proxy_pass http://app_server_sticky;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+        proxy_cache off;
+        chunked_transfer_encoding off;
+        proxy_read_timeout 3600s;
+    }
+
+    # OAuth2 로그인(구글/카카오) - 시작(authorization) 요청과 콜백(code) 요청이
+    # 서로 다른 인스턴스로 라운드로빈되면, 시작 요청 때 세션에 저장해둔
+    # OAuth 요청 정보를 콜백을 받은 인스턴스가 못 찾아 authorization_request_not_found
+    # 에러가 난다. 같은 클라이언트는 같은 서버로 고정시켜서 세션 연속성을 보장한다.
+    location /oauth2/authorization {
+        proxy_pass http://app_server_sticky;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /login/oauth2/code {
+        proxy_pass http://app_server_sticky;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+server {
+    listen 443 ssl;
+    server_name nginx.mople.store;
+
+    ssl_certificate     /etc/letsencrypt/live/nginx.mople.store/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/nginx.mople.store/privkey.pem;
+
+    location = /nginx-health {
+        return 200 "ok\n";
+        add_header Content-Type text/plain;
+    }
+
+    location / {
+        proxy_pass http://app_server;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /ws {
+        access_log /var/log/nginx/access.log sticky_debug;
+        proxy_pass http://app_server_sticky;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 3600s;
+    }
+
+    location /api/sse {
+        access_log /var/log/nginx/access.log sticky_debug;
+        proxy_pass http://app_server_sticky;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+        proxy_cache off;
+        chunked_transfer_encoding off;
+        proxy_read_timeout 3600s;
+    }
+
+    # OAuth2 로그인(구글/카카오) - 시작(authorization) 요청과 콜백(code) 요청이
+    # 서로 다른 인스턴스로 라운드로빈되면, 시작 요청 때 세션에 저장해둔
+    # OAuth 요청 정보를 콜백을 받은 인스턴스가 못 찾아 authorization_request_not_found
+    # 에러가 난다. 같은 클라이언트는 같은 서버로 고정시켜서 세션 연속성을 보장한다.
+    location /oauth2/authorization {
+        proxy_pass http://app_server_sticky;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /login/oauth2/code {
+        proxy_pass http://app_server_sticky;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
