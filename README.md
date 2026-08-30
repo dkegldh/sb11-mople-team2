@@ -1,9 +1,16 @@
 
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=000000&height=250&section=header&text=모두의%20플리&fontSize=100&fontColor=B20710&fontAlignY=45&animation=scaleIn" width="100%"/>
+<img src=".github/assets/header.svg" alt="모두의 플리" width="100%"/>
 
 <div align="center">
 
+![Coverage](https://raw.githubusercontent.com/dkegldh/sb11-mople-team2/badges/.github/badges/jacoco.svg)
+![Java](https://img.shields.io/badge/Java-17-ED8B00?logo=openjdk&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.16-6DB33F?logo=springboot&logoColor=white)
+![Gradle](https://img.shields.io/badge/Gradle-9.5.1-02303A?logo=gradle&logoColor=white)
+![Team](https://img.shields.io/badge/team-6%20backend-blue)
+
+<br/>
 ### 영화 · 드라마 · 스포츠, 함께 보고 함께 기록하다
 
 <table>
@@ -107,7 +114,7 @@
 | **Phase 2** | `07.30 ~ 08.04` | JWT 인증 필터 적용 및 전 도메인 커서 페이지네이션 구축 |
 | **Phase 3** | `08.05 ~ 08.14` | TMDB·SportsDB 수집 파이프라인 연동, WebSocket·SSE 통신 기반 마련, 소셜 로그인 연동 |
 | **Phase 4** | `08.15 ~ 08.21` | Kafka 도입(알림·이벤트 비동기화), Redis 분산 락 적용, AWS EC2 배포 및 S3 스토리지 연동 |
-| **Phase 5** | `08.22 ~ 08.28` | Elasticsearch 검색 고도화, ECS Fargate 배포 전환 및 CD 파이프라인 구축, Kafka DLT 고도화 및 부하 테스트 |
+| **Phase 5** | `08.22 ~ 08.28` | Elasticsearch 검색 고도화, ECS 배포 전환 및 CD 파이프라인 구축, Kafka DLT 고도화 및 부하 테스트 |
 
 <br/>
 
@@ -176,14 +183,14 @@
 
 <br/>
 
-| 분류 | 상세 |
-|:---|:---|
+| 분류 | 상세                                                                                  |
+|:---|:--------------------------------------------------------------------------------------|
 | **Language & Framework** | Java 17 · Spring Boot 3.5.16 · Spring Security · Spring Batch · Spring Cloud 2025.0.1 |
-| **Database & ORM** | PostgreSQL 16 · Spring Data JPA · QueryDSL 5.0.0 · Redis 7 · H2(테스트) |
-| **Real-time & Messaging** | WebSocket(STOMP over SockJS) · SSE · Apache Kafka 3.9.0 · Elasticsearch 8.18.8 |
-| **Auth & External API** | JWT(jjwt) · OAuth2(Google · Kakao) · TMDB · The Sports DB · OpenFeign |
-| **Infra & Deploy** | AWS ECS Fargate · ECR · S3 · Docker · Docker Compose · Nginx · GitHub Actions |
-| **Test & Monitoring** | JUnit 5 · Mockito · Testcontainers · JaCoCo · k6 · Actuator · Prometheus · Swagger |
+| **Database & ORM** | PostgreSQL 16 · Spring Data JPA · QueryDSL 5.0.0 · Redis 7 · H2(테스트)               |
+| **Real-time & Messaging** | WebSocket(STOMP over SockJS) · SSE · Apache Kafka 3.9.0 · Elasticsearch 8.18.8        |
+| **Auth & External API** | JWT(jjwt) · OAuth2(Google · Kakao) · TMDB · The Sports DB · OpenFeign                 |
+| **Infra & Deploy** | AWS ECS · ECR · S3 · Docker · Docker Compose · Nginx · GitHub Actions                 |
+| **Test & Monitoring** | JUnit 5 · Mockito · Testcontainers · JaCoCo · k6 · Actuator · Prometheus · Swagger    |
 
 <br/>
 
