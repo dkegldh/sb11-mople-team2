@@ -18,9 +18,11 @@
           "protocol": "tcp"
         }
       ],
-      "entryPoint": ["sh", "-c"],
-      "command": [
-        "echo \"$ES_HOST_IP mople-elasticsearch\" >> /etc/hosts && export SSE_SERVER_ID=\"app-$HOSTNAME\" && echo \"$ELASTICSEARCH_CA_CERT\" > /tmp/es-ca.crt && export ELASTICSEARCH_CA_PATH=file:/tmp/es-ca.crt && exec java -XX:MaxRAMPercentage=65.0 -XX:+ExitOnOutOfMemoryError -jar app.jar"
+      "extraHosts": [
+        {
+          "hostname": "mople-elasticsearch",
+          "ipAddress": "__ES_HOST_IP__"
+        }
       ],
       "healthCheck": {
         "command": ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"],
@@ -47,7 +49,6 @@
         { "name": "DB_USERNAME", "valueFrom": "arn:aws:ssm:ap-northeast-2:291883201761:parameter/mople/DB_USERNAME" },
         { "name": "DB_PASSWORD", "valueFrom": "arn:aws:ssm:ap-northeast-2:291883201761:parameter/mople/DB_PASSWORD" },
         { "name": "KAFKA_BOOTSTRAP_SERVERS", "valueFrom": "arn:aws:ssm:ap-northeast-2:291883201761:parameter/mople/KAFKA_BOOTSTRAP_SERVERS" },
-        { "name": "ES_HOST_IP", "valueFrom": "arn:aws:ssm:ap-northeast-2:291883201761:parameter/mople/ES_HOST_IP" },
         { "name": "REDIS_PASSWORD", "valueFrom": "arn:aws:ssm:ap-northeast-2:291883201761:parameter/mople/REDIS_PASSWORD" },
         { "name": "AWS_S3_ACCESS_KEY_ID", "valueFrom": "arn:aws:ssm:ap-northeast-2:291883201761:parameter/mople/AWS_S3_ACCESS_KEY_ID" },
         { "name": "AWS_S3_SECRET_ACCESS_KEY", "valueFrom": "arn:aws:ssm:ap-northeast-2:291883201761:parameter/mople/AWS_S3_SECRET_ACCESS_KEY" },

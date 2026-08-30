@@ -86,11 +86,24 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: app 태스크 정의 렌더링 (ES_HOST_IP 주입)
+        id: render-app
+        run: |
+          ES_HOST_IP=$(aws ssm get-parameter \
+            --name /mople/ES_HOST_IP \
+            --with-decryption \
+            --query 'Parameter.Value' \
+            --output text)
+          jq --arg ip "$ES_HOST_IP" \
+            '.containerDefinitions[0].extraHosts[0].ipAddress = $ip' \
+            ${{ env.APP_TASK_DEF_FILE }} > rendered-task-def-app.json
+          echo "rendered_file=rendered-task-def-app.json" >> "$GITHUB_OUTPUT"
+
       - name: app 태스크 정의 등록
         id: register-app
         run: |
           TASK_DEF_ARN=$(aws ecs register-task-definition \
-            --cli-input-json file://${{ env.APP_TASK_DEF_FILE }} \
+            --cli-input-json file://${{ steps.render-app.outputs.rendered_file }} \
             --query 'taskDefinition.taskDefinitionArn' \
             --output text)
           echo "task_def_arn=$TASK_DEF_ARN" >> "$GITHUB_OUTPUT"
