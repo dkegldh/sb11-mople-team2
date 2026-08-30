@@ -11,7 +11,7 @@
 ![Team](https://img.shields.io/badge/team-6%20backend-blue)
 
 <br/>
-### 영화 · 드라마 · 스포츠, 함께 보고 함께 기록하다
+영화 · 드라마 · 스포츠, 함께 보고 함께 기록하다
 
 <table>
 <tr>
@@ -94,9 +94,10 @@
 <tr>
   <td align="center"><sub><b>팀장 · Auth &amp; Infra</b><br/>인증·인가<br/>JWT · OAuth2 소셜 로그인<br/>Redis 세션·토큰 관리<br/>CI/CD</sub></td>
   <td align="center"><sub><b>Content &amp; Monitoring</b><br/>콘텐츠 CRUD<br/>시청 세션 · 채팅<br/>SportsDB 배치 · 분산 락<br/>Actuator 메트릭 · S3</sub></td>
-  <td align="center"><sub><b>Batch &amp; Resiliency</b><br/>팔로우<br/>TMDB · Spring Batch<br/>Kafka 롤백 · DLT<br/>Redis 분산 락 · 캐시</sub></td>
+  <td align="center"><sub><b>Batch &amp; Resiliency</b><br/>팔로우<br/>플레이리스트 구독 · 콘텐츠 연결<br/>TMDB · Spring Batch<br/>Kafka 롤백 · DLT<br/>Redis 분산 락 · 캐시</sub></td>
   <td align="center"><sub><b>Playlist &amp; Review</b><br/>리뷰 · 플레이리스트<br/>Kafka 비동기 전환<br/>Elasticsearch 검색<br/>k6 부하 테스트</sub></td>
-  <td align="center"><sub><b>Conversation &amp; WebSocket</b><br/>DM 대화방<br/>WebSocket 송수신<br/>Redis Lua 워터마크<br/>비관적 락 최적화</sub></td>
+  <td align="center"><sub><b>Conversation &amp; WebSocket</b><br/>대화방 · DM<br/>WebSocket 실시간 통신<br/>Redis Lua 읽음 워터마크<br/>Elasticsearch 전문 검색
+</sub></td>
   <td align="center"><sub><b>Admin &amp; Notification</b><br/>어드민 권한 · 계정 잠금<br/>강제 로그아웃<br/>Spring Event · Kafka 알림<br/>Nginx 다중 인스턴스</sub></td>
 </tr>
 </table>
@@ -358,12 +359,37 @@ com.codeit.mople
 
 ## 🚀 기술적 도전과 트러블슈팅
 
-| 문제 | 해결 |
-|:---|:---|
-|  |  |
-|  |  |
-|  |  |
-|  |  |
+### 리뷰 집계에서 평점이 어긋나는 문제
+
+콘텐츠의 평균 평점을 **평균값 그대로 컬럼에 저장**하고 있었습니다. 리뷰가 동시에 들어오면 각자 읽은 값을 기준으로 덮어써서 갱신이 유실됩니다(lost update).
+
+**평균 대신 별점 총합(`rating_sum`)을 저장하도록 바꿨습니다.** 총합과 리뷰 수는 더하고 빼는 연산이라 원자적으로 처리할 수 있고, 평균은 응답을 만들 때 나누면 됩니다. 리뷰 수 갱신에도 `@Modifying(clearAutomatically, flushAutomatically)`을 붙여 원자적 업데이트로 정리했습니다.
+
+### 커서 페이지네이션 최적화가 500 에러가 된 문제
+
+"첫 페이지에서만 `totalCount`를 세고 이후엔 세지 말자"는 리뷰를 받았습니다. 커서 페이지네이션에서 전체 개수는 매번 셀 필요가 없으니 맞는 지적이었습니다.
+
+그런데 적용해보니 **2페이지부터 NPE가 나면서 500이 떨어졌습니다.** API 명세에 `totalCount`가 required로 잡혀 있어 값이 비면 안 되는 필드였습니다. 테스트 코드로 재현해 확인했습니다.
+
+**매 페이지마다 count 쿼리를 실행하는 쪽으로 되돌렸습니다.** 커서 방식에서 굳이 필요한 필드는 아니지만, 명세가 계약이라 값을 채우는 쪽을 택했습니다.
+
+### EC2 메모리 부족으로 배포가 롤백된 문제
+
+T3.micro는 메모리가 909MB인데 앱만 띄워도 750MB를 썼습니다. 여유가 150MB 남짓이라 OOM으로 서버가 내려갔습니다. 여기에 Elasticsearch까지 올리자 Kafka와 ES가 함께 죽으면서 **배포가 롤백**됐습니다.
+
+**세 가지를 했습니다.** 컨테이너 JVM이 가용 메모리의 65%만 쓰도록 상한을 걸고, swap 1GB를 추가하고, 최종적으로 T3.small로 올렸습니다. 재배포 때 기존 컨테이너가 메모리를 붙잡고 있어 교체가 실패하는 문제도 있어서 배포 순서를 손봤습니다.
+
+### 로드밸런서를 ALB와 Nginx 중에서 고른 과정
+
+원래 계획은 Nginx였습니다. 로컬 분산 환경에서 부하 테스트를 하려면 어차피 Nginx 설정을 써야 하는데, 운영을 ALB로 두면 **부하 테스트 환경과 운영 환경이 갈려서** 테스트 결과를 그대로 신뢰하기 어려웠습니다.
+
+문제는 **Fargate에서 태스크 IP가 계속 바뀐다**는 점이었습니다. 오픈소스 Nginx는 업스트림 주소를 기동 시점에 한 번만 해석해서 IP 변동을 따라가지 못하고, 이걸 처리하려면 유료판의 서비스 디스커버리가 필요합니다. ALB는 이 부분을 알아서 처리하지만 대신 환경이 갈립니다.
+
+남은 일정이 빠듯해서 **어느 쪽이 제때 완성될지 확신할 수 없었습니다.** 그래서 하나를 고르는 대신 역할을 나눠 병행했습니다. ALB용 Fargate 클러스터와 Nginx용 EC2 기반 ECS 클러스터를 각각 맡아 진행하고, 먼저 되는 쪽으로 가기로 했습니다.
+
+결과적으로 **같은 날 둘 다 동작했습니다.** 그래서 원래 목적이었던 Nginx로 정리하고 ALB와 관련 클러스터·대상그룹·미사용 리소스는 내렸습니다.
+
+덕분에 **부하 테스트를 처음 계획대로 진행할 수 있었습니다.** 앞에 Nginx를 두고 앱 3대로 라운드 로빈 분산하는 구성을 로컬 docker-compose로 그대로 재현해서, 단일 환경과 분산 환경을 같은 조건으로 비교했습니다. ALB로 갔다면 이 비교 자체가 성립하지 않았을 겁니다.
 
 <br/>
 
