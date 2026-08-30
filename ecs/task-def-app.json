@@ -40,7 +40,7 @@
         { "name": "COOKIE_SECURE", "value": "false" },
         { "name": "KAFKA_ENABLED", "value": "true" },
         { "name": "KAFKA_BOOTSTRAP_SERVERS", "value": "172.31.47.10:9093" },
-        { "name": "TMDB_COLLECT_ENABLED", "value": "false" },
+        { "name": "TMDB_COLLECT_ENABLED", "value": "true" },
         { "name": "DB_URL", "value": "jdbc:postgresql://mople-db.cnqucemckqxu.ap-northeast-2.rds.amazonaws.com:5432/mople_db" },
         { "name": "REDIS_HOST", "value": "clustercfg.mople-redis.ffzjwk.apn2.cache.amazonaws.com" },
         { "name": "REDIS_PORT", "value": "6379" },
