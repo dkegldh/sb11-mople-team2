@@ -40,7 +40,7 @@
       "environment": [
         { "name": "APP_INSTANCE_1", "value": "172.31.55.248" },
         { "name": "APP_INSTANCE_2", "value": "172.31.13.97" },
-        { "name": "APP_INSTANCE_3", "value": "172.31.43.237" }
+        { "name": "APP_INSTANCE_3", "value": "172.31.35.107" }
       ],
       "healthCheck": {
         "command": ["CMD-SHELL", "wget -q --spider http://localhost:80/nginx-health || exit 1"],
